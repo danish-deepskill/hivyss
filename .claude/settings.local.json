@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create:*)",
+      "Bash(npm install:*)",
+      "Bash(rm -f counter.js main.js style.css javascript.svg public/vite.svg)",
+      "Bash(mkdir -p src/config src/scenes src/entities src/systems src/ui public/audio)",
+      "Bash(rm -f src/counter.js src/main.js src/style.css src/javascript.svg public/vite.svg)",
+      "Bash(npx vite:*)",
+      "Bash(npm run:*)",
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(mv \"ant-empire\" \"bugattle\")",
+      "Bash(grep -r \"spd:\" src/units/*.js)",
+      "Bash(sed -i 's/spd: 3.5/spd: 2.1/' zephyr.js)",
+      "Bash(sed -i 's/spd: 2.5/spd: 1.5/' digger.js)",
+      "Bash(sed -i 's/spd: 2.2/spd: 1.3/' hornet.js)",
+      "Bash(sed -i 's/spd: 1.6/spd: 1.0/' grub.js)",
+      "Bash(sed -i 's/spd: 1.4/spd: 0.85/' bombardier.js)",
+      "Bash(grep -r \"spd:\" src/units/*.js src/config/EnemyDefs.js)",
+      "Bash(sed -i 's/spd: 2.1/spd: 3.5/' zephyr.js)",
+      "Bash(sed -i 's/spd: 1.5/spd: 2.5/' digger.js)",
+      "Bash(sed -i 's/spd: 1.3/spd: 2.2/' hornet.js)",
+      "Bash(sed -i 's/spd: 1.0/spd: 1.6/' grub.js)",
+      "Bash(sed -i 's/spd: 0.85/spd: 1.4/' bombardier.js)",
+      "Bash(grep \"trait:\" src/units/*.js)",
+      "Bash(grep -A1 \"export const def\" src/units/*.js)",
+      "Bash(grep -v \"^--$\")",
+      "Bash(grep \"cost:\\\\|reward:\\\\|tier:\" src/units/*.js)",
+      "Bash(npx tsc:*)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(find src:*)",
+      "WebFetch(domain:thanksfeanor.pythonanywhere.com)",
+      "Bash(find C:/Files/Phaser/hivyss/app -name *.html)",
+      "Bash(node -e \"console.log\\(''At 1920:'', 1920/900\\); console.log\\(''At 1536:'', 1536/900\\); console.log\\(''At 1366:'', 1366/900\\);\")",
+      "Bash(wc -l \"c:/Files/Phaser/hivyss/app/src/units/\"*.ts)",
+      "Bash(grep -n \"{ W\\\\b\\\\|,\\\\s*W\\\\b\\\\|W,\\\\s\\\\|W\\\\s*}\" \"C:/Files/Phaser/hivyss/app/src/config/Constants.ts\")",
+      "WebSearch"
+    ]
+  }
+}
