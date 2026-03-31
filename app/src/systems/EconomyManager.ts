@@ -1,18 +1,18 @@
 import Phaser from 'phaser';
-import { MAX_GOLD } from '../config/Constants';
+import { MAX_NECTAR } from '../config/Constants';
 
 export class EconomyManager {
   scene: Phaser.Scene;
-  gold: number;
-  maxGold: number;
+  nectar: number;
+  maxNectar: number;
   income: number;
   incomeAcc: number;
   elapsed: number;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
-    this.gold = 80;
-    this.maxGold = MAX_GOLD;
+    this.nectar = 80;
+    this.maxNectar = MAX_NECTAR;
     this.income = 8;
     this.incomeAcc = 0;
     this.elapsed = 0;
@@ -23,27 +23,27 @@ export class EconomyManager {
     this.incomeAcc += dt;
     if (this.incomeAcc >= 1) {
       this.incomeAcc -= 1;
-      this.gold = Math.min(this.maxGold, this.gold + this.income);
+      this.nectar = Math.min(this.maxNectar, this.nectar + this.income);
       // Increase income slowly over time
       this.income = Math.min(30, 8 + Math.floor(this.elapsed / 30) * 2);
     }
   }
 
   canAfford(cost: number): boolean {
-    return this.gold >= cost;
+    return this.nectar >= cost;
   }
 
   spend(cost: number): boolean {
-    if (this.gold < cost) return false;
-    this.gold -= cost;
+    if (this.nectar < cost) return false;
+    this.nectar -= cost;
     return true;
   }
 
   earn(amount: number): void {
-    this.gold = Math.min(this.maxGold, this.gold + amount);
+    this.nectar = Math.min(this.maxNectar, this.nectar + amount);
   }
 
-  getGoldPercent(): number {
-    return (this.gold / this.maxGold) * 100;
+  getNectarPercent(): number {
+    return (this.nectar / this.maxNectar) * 100;
   }
 }

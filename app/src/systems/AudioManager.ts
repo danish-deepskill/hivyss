@@ -110,7 +110,7 @@ export class AudioManager {
     this._tone(80, 0.35, 'square', 0.1);
   }
 
-  goldEarn(): void {
+  nectarEarn(): void {
     this._tone(1047, 0.04, 'square', 0.06);
     this._tone(1319, 0.06, 'square', 0.05);
   }

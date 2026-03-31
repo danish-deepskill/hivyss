@@ -7,6 +7,8 @@ import Phaser from 'phaser';
 export type TierKey = 'F' | 'E' | 'D' | 'C' | 'B' | 'A' | 'S' | 'SS' | 'SSS';
 export type CasteKey = 'soldier' | 'elite' | 'royal';
 export type GeneLine = 'alpha';
+export type Route = 'air' | 'land' | 'tunnel';
+export type AttackRange = 'melee' | 'ranged';
 
 export interface TierDef {
   label: string;
@@ -26,13 +28,13 @@ export interface UnitDef {
   ico: string;
   hp: number;              // [num] raw hit points
   atk: number;             // [num] raw damage per hit (±3 random variance applied at combat time)
-  spd: number;             // [num] movement speed (scaled by S * SPD_MULT at runtime)
-  range: number;           // [px] attack range in pixels (scaled by S at runtime)
+  spd: number;             // [num] movement speed (scaled by SPD_MULT at runtime)
+  range: number;           // [px] attack range in pixels
   atkRate: number;         // [num] attacks per second (interval = 1/atkRate seconds)
-  cost: number;            // [num] gold cost to deploy
-  reward: number;          // [num] gold earned when enemy version is killed
-  w: number;               // [px] base sprite width (scaled by S at runtime)
-  h: number;               // [px] base sprite height (scaled by S at runtime)
+  cost: number;            // [num] nectar cost to deploy
+  reward: number;          // [num] nectar earned when enemy version is killed
+  w: number;               // [px] sprite width in pixels
+  h: number;               // [px] sprite height in pixels
   col: number;             // [hex] primary body color (e.g. 0xff8020)
   dk: number;              // [hex] dark/accent color for outlines, limbs
   trait: string;
@@ -46,12 +48,14 @@ export interface UnitDef {
   backswing?: number;      // [sec] cosmetic recovery after damage (default: 0.15)
   knockForce?: number;     // [poise] fills target's poise meter per hit, 100 = instant stagger vs 0 resist (default: 0)
   knockResist?: number;    // [poise] subtracted from incoming knockForce (default: 0)
+  route?: Route;           // native route (default: 'land')
+  attackRange?: AttackRange; // melee or ranged (default: 'melee')
   _key?: string;           // injected at runtime by BattleScene
 }
 
 // --- Combat System ---
 
-export type DamageType = 'melee' | 'ranged' | 'aoe' | 'poison' | 'burn' | 'heal' | 'gold' | 'blocked' | 'base';
+export type DamageType = 'melee' | 'ranged' | 'aoe' | 'poison' | 'burn' | 'heal' | 'nectar' | 'blocked' | 'base';
 export type HitSoundType = 'melee' | 'ranged' | 'aoe' | 'heal';
 export type UnitState = 'march' | 'attack';
 export type Side = 'player' | 'enemy';
@@ -63,6 +67,7 @@ export interface CombatContext {
   events: { emit(event: string, data: unknown): void };
   allAlive: IUnit[];
   S: number;
+  sourceUnit: IUnit | null;
   hitUnit: (target: IUnit, dmg: number, dmgType: DamageType) => void;
   playHitSound: (type: HitSoundType) => void;
 }
@@ -148,6 +153,9 @@ export interface IUnit {
   dmgFlash: number;
   x: number;
   y: number;
+  route: Route;
+  currentRoute: Route;
+  attackRange: AttackRange;
 
   // Status effect timers (backward compat — will become effect Map accessors)
   slowTimer: number;
@@ -210,7 +218,7 @@ export interface IAudioManager {
   heal(): void;
   unitDeath(): void;
   bossDeath(): void;
-  goldEarn(): void;
+  nectarEarn(): void;
   waveStart(): void;
   abilityNuke(): void;
   abilityWall(): void;

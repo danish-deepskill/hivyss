@@ -2,9 +2,10 @@ import type { UnitDef, CombatHooks, RenderUnit, IUnit, CombatContext } from '../
 import { hexToInt, drawCommonParts } from './renderUtils';
 
 export const def: UnitDef = {
-  name: 'Ember', ico: '\u{1F525}', hp: 80, atk: 40, spd: 1.3, range: 30, atkRate: 0.8,
-  cost: 65, reward: 28, w: 15, h: 14, col: 0xf08020, dk: 0xa04008,
-  trait: 'burn', desc: 'Burns Foes', tier: 'D', incubation: 8, knockForce: 10, caste: 'soldier',
+  name: 'Ember', ico: '\u{1F525}', hp: 80, atk: 40, spd: 1.85, range: 43, atkRate: 0.8,
+  cost: 65, reward: 28, w: 21, h: 20, col: 0xf08020, dk: 0xa04008,
+  trait: 'burn', desc: 'Burns Foes', route: 'land', attackRange: 'melee',
+  tier: 'D', incubation: 8, knockForce: 10, caste: 'soldier',
 };
 
 export const combat: CombatHooks = {
@@ -12,7 +13,7 @@ export const combat: CombatHooks = {
     // Spread burn to up to 3 nearby enemies
     const foes = ctx.allAlive.filter(e =>
       e.side !== u.side && !e.dead && !e.burrowed &&
-      Math.abs((e.x + e.unitW / 2) - (target.x + target.unitW / 2)) < 60 * ctx.S
+      Math.abs((e.x + e.unitW / 2) - (target.x + target.unitW / 2)) < 85
     ).sort((a, b) =>
       Math.abs(a.x - target.x) - Math.abs(b.x - target.x)
     ).slice(0, 3);

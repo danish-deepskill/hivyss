@@ -2,9 +2,10 @@ import type { UnitDef, CombatHooks, RenderUnit, IUnit, CombatContext } from '../
 import { hexToInt, drawCommonParts } from './renderUtils';
 
 export const def: UnitDef = {
-  name: 'Aphid', ico: '\u{1F33F}', hp: 120, atk: 8, spd: 0.8, range: 60, atkRate: 0.6,
-  cost: 50, reward: 25, w: 16, h: 15, col: 0xf060c0, dk: 0x801060,
-  trait: 'healer', desc: 'Heals Allies', tier: 'D', incubation: 8, knockResist: 5, caste: 'soldier',
+  name: 'Aphid', ico: '\u{1F33F}', hp: 120, atk: 8, spd: 1.14, range: 85, atkRate: 0.6,
+  cost: 50, reward: 25, w: 23, h: 21, col: 0xf060c0, dk: 0x801060,
+  trait: 'healer', desc: 'Heals Allies', route: 'land', attackRange: 'ranged',
+  tier: 'D', incubation: 8, knockResist: 5, caste: 'soldier',
 };
 
 export const combat: CombatHooks = {

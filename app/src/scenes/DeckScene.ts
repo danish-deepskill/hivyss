@@ -9,15 +9,10 @@ const POOL_COLS: number = 7;
 const POOL_ROWS: number = 2;
 const PAGE_SIZE: number = POOL_COLS * POOL_ROWS;
 
-// Scale factor relative to 900px base design
-const S: number = W / 900;
-
-const CARD_W: number = Math.round(80 * S);
+const CARD_W: number = 114;
 const CARD_H: number = 78;
-const CARD_GAP_X: number = Math.round(8 * S);
+const CARD_GAP_X: number = 11;
 const CARD_GAP_Y: number = 8;
-
-function fs(px: number): string { return `${Math.round(px * S)}px`; }
 
 function getDefaultDeck(max: number): string[] {
   const keys: string[] = Object.keys(UNIT_DEFS).filter(k => !UNIT_DEFS[k].unlock);
@@ -73,8 +68,6 @@ export class DeckScene extends Phaser.Scene {
   create(): void {
     this.save = new SaveManager();
 
-    this.setDomUiVisible(false);
-    this.events.once('shutdown', () => this.setDomUiVisible(true));
 
     // Background
     const bg: Phaser.GameObjects.Graphics = this.add.graphics();
@@ -117,9 +110,9 @@ export class DeckScene extends Phaser.Scene {
     this.previews = {};
     this.pool.forEach((key: string) => {
       const def = UNIT_DEFS[key];
-      const pad: number = Math.round(8 * S * TEX_SCALE);
-      const uw: number = Math.round(def.w * S * TEX_SCALE);
-      const uh: number = Math.round(def.h * S * TEX_SCALE);
+      const pad: number = Math.round(11 * TEX_SCALE);
+      const uw: number = Math.round(def.w * TEX_SCALE);
+      const uh: number = Math.round(def.h * TEX_SCALE);
       const pw: number = uw + pad * 2;
       const ph: number = uh + pad * 2;
       const g: Phaser.GameObjects.Graphics = this.add.graphics();
@@ -160,7 +153,7 @@ export class DeckScene extends Phaser.Scene {
     const bottomY: number = startY + POOL_ROWS * (CARD_H + CARD_GAP_Y) + 14;
 
     // Page nav
-    this.prevBtn = this.add.text(W / 2 - Math.round(50 * S), bottomY, '<', {
+    this.prevBtn = this.add.text(W / 2 - 71, bottomY, '<', {
       fontFamily: '"Press Start 2P", monospace', fontSize: '10px', color: '#555',
     }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
@@ -168,7 +161,7 @@ export class DeckScene extends Phaser.Scene {
       fontFamily: '"Courier New", monospace', fontSize: '10px', color: '#888',
     }).setOrigin(0.5);
 
-    this.nextBtn = this.add.text(W / 2 + Math.round(50 * S), bottomY, '>', {
+    this.nextBtn = this.add.text(W / 2 + 71, bottomY, '>', {
       fontFamily: '"Press Start 2P", monospace', fontSize: '10px', color: '#555',
     }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
@@ -188,9 +181,9 @@ export class DeckScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // Deck slots row
-    const slotW: number = Math.round(38 * S);
+    const slotW: number = 54;
     const slotH: number = 24;
-    const slotGap: number = Math.round(4 * S);
+    const slotGap: number = 6;
     const slotsY: number = deckLblY + 18;
     const slotsRowW: number = this.deckSize * (slotW + slotGap) - slotGap;
     const slotsStartX: number = (W - slotsRowW) / 2;
@@ -219,7 +212,7 @@ export class DeckScene extends Phaser.Scene {
     // Buttons row
     const btnY: number = slotsY + slotH + 16;
 
-    const backBtn: Phaser.GameObjects.Text = this.add.text(W / 2 - Math.round(80 * S), btnY, 'BACK', {
+    const backBtn: Phaser.GameObjects.Text = this.add.text(W / 2 - 114, btnY, 'BACK', {
       fontFamily: '"Press Start 2P", monospace',
       fontSize: '10px',
       color: '#888',
@@ -227,7 +220,7 @@ export class DeckScene extends Phaser.Scene {
       padding: { x: 14, y: 6 },
     }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
-    const confirmBtn: Phaser.GameObjects.Text = this.add.text(W / 2 + Math.round(80 * S), btnY, 'BATTLE', {
+    const confirmBtn: Phaser.GameObjects.Text = this.add.text(W / 2 + 114, btnY, 'BATTLE', {
       fontFamily: '"Press Start 2P", monospace',
       fontSize: '10px',
       color: '#f0c040',
@@ -301,18 +294,18 @@ export class DeckScene extends Phaser.Scene {
 
     const glTag = def.geneline ? ` ${GENELINE_DEFS[def.geneline].symbol}` : '';
     const lines: TooltipLine[] = [
-      { text: `${def.name}  [${(TIER_DEFS[def.tier] || TIER_DEFS.F).label}]${glTag}`, color: '#ffe080', size: fs(12), bold: true },
-      { text: `HP: ${def.hp}   ATK: ${def.atk}   DPS: ${dps}`, color: '#ccc', size: fs(10) },
-      { text: `Speed: ${def.spd}   Range: ${def.range}   Rate: ${def.atkRate}/s`, color: '#999', size: fs(9) },
-      { text: `Cost: ${def.cost}g   Incubation: ${def.incubation}s`, color: '#f0c040', size: fs(9) },
-      { text: TRAIT_DESC[def.trait] || def.desc, color: '#80c0ff', size: fs(9) },
+      { text: `${def.name}  [${(TIER_DEFS[def.tier] || TIER_DEFS.F).label}]${glTag}`, color: '#ffe080', size: '17px', bold: true },
+      { text: `HP: ${def.hp}   ATK: ${def.atk}   DPS: ${dps}`, color: '#ccc', size: '14px' },
+      { text: `Speed: ${def.spd}   Range: ${def.range}   Rate: ${def.atkRate}/s`, color: '#999', size: '13px' },
+      { text: `Cost: ${def.cost}g   Incubation: ${def.incubation}s`, color: '#f0c040', size: '13px' },
+      { text: TRAIT_DESC[def.trait] || def.desc, color: '#80c0ff', size: '13px' },
     ];
 
     // Clear old texts
     this.tooltipTexts.forEach((t: Phaser.GameObjects.Text) => t.destroy());
     this.tooltipTexts = [];
 
-    const pad: number = Math.round(10 * S);
+    const pad: number = 14;
     let maxW: number = 0;
     let yOff: number = pad;
 
@@ -326,7 +319,7 @@ export class DeckScene extends Phaser.Scene {
       this.tooltip.add(t);
       this.tooltipTexts.push(t);
       maxW = Math.max(maxW, t.width);
-      yOff += t.height + Math.round(3 * S);
+      yOff += t.height + 4;
     });
 
     const tw: number = maxW + pad * 2;
@@ -334,17 +327,17 @@ export class DeckScene extends Phaser.Scene {
 
     // Position: above the card, clamped to canvas
     let tx: number = worldX - tw / 2;
-    let ty: number = worldY - th - Math.round(8 * S);
+    let ty: number = worldY - th - 11;
     if (tx < 4) tx = 4;
     if (tx + tw > W - 4) tx = W - 4 - tw;
-    if (ty < 4) ty = worldY + Math.round(60 * S); // flip below if no room above
+    if (ty < 4) ty = worldY + 85; // flip below if no room above
 
     this.tooltip.setPosition(tx, ty);
     this.tooltipBg.clear();
     this.tooltipBg.fillStyle(0x0a0a18, 0.95);
-    this.tooltipBg.fillRoundedRect(0, 0, tw, th, Math.round(4 * S));
+    this.tooltipBg.fillRoundedRect(0, 0, tw, th, 6);
     this.tooltipBg.lineStyle(1, 0x444466);
-    this.tooltipBg.strokeRoundedRect(0, 0, tw, th, Math.round(4 * S));
+    this.tooltipBg.strokeRoundedRect(0, 0, tw, th, 6);
     this.tooltip.setVisible(true);
   }
 
@@ -515,10 +508,4 @@ export class DeckScene extends Phaser.Scene {
     this.confirmBtn.setAlpha(full ? 1 : 0.35);
   }
 
-  private setDomUiVisible(visible: boolean): void {
-    ['header', 'resbar', 'tray', 'abilities', 'log-row'].forEach((id: string) => {
-      const el: HTMLElement | null = document.getElementById(id);
-      if (el) el.style.display = visible ? '' : 'none';
-    });
-  }
 }

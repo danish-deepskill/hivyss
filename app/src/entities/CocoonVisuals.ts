@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
 import type { Chamber } from '../systems/IncubationManager';
 import { MAX_CHAMBERS } from '../systems/IncubationManager';
-import { S } from '../config/Constants';
 
 /**
  * Canvas-rendered cocoons on the ground near the hive.
@@ -61,8 +60,8 @@ export class CocoonVisuals {
     progress: number, index: number,
   ): void {
     const size = 0.5 + progress * 0.5;
-    const w = Math.round(5 * S * size);
-    const h = Math.round(8 * S * size);
+    const w = Math.round(7 * size);
+    const h = Math.round(11 * size);
 
     const pulse = 1 + Math.sin(this.bobTime * 2.5 + index * 1.7) * 0.05;
 

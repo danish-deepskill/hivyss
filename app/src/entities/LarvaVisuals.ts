@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { MAX_LARVAE } from '../systems/IncubationManager';
-import { GND, S, BASE_W } from '../config/Constants';
+import { SBW } from '../config/Constants';
+import { LANE } from '../config/Layout';
+const GND = LANE.land.groundY;
 
 /** Per-larva roaming state. */
 interface LarvaState {
@@ -32,7 +34,7 @@ export class LarvaVisuals {
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
-    const bw = Math.round(BASE_W * S);
+    const bw = SBW;
     this.hiveCenter = bw / 2;
     this.bobTime = 0;
     this.graphics = [];
@@ -55,7 +57,7 @@ export class LarvaVisuals {
 
   private randomRoamX(): number {
     const range = ROAM_MAX_X - ROAM_MIN_X;
-    return this.hiveCenter + (ROAM_MIN_X + Math.random() * range) * BASE_W * S / 2;
+    return this.hiveCenter + (ROAM_MIN_X + Math.random() * range) * SBW / 2;
   }
 
   private randomRoamY(): number {
@@ -87,7 +89,7 @@ export class LarvaVisuals {
       l.targetX = this.randomRoamX();
       l.targetY = this.randomRoamY();
     } else {
-      const speed = LARVA_SPEED * S * dt;
+      const speed = 11.4 * dt;
       l.x += (dx / dist) * speed;
       l.y += (dy / dist) * speed;
       l.facing = dx > 0 ? 1 : -1;
@@ -98,8 +100,8 @@ export class LarvaVisuals {
     g: Phaser.GameObjects.Graphics,
     l: LarvaState, index: number,
   ): void {
-    const w = Math.round(3 * S);
-    const h = Math.round(5 * S);
+    const w = 4;
+    const h = 7;
 
     const wiggle = Math.sin(this.bobTime * 4 + index * 2.3) * 1.5;
     const squirm = Math.sin(this.bobTime * 5 + index * 1.9) * 0.8;

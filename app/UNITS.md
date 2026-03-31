@@ -28,7 +28,7 @@
 
 **Ability:** None. Just a body.
 
-**Strategy:** Spam them early to stall enemies while saving gold for stronger units. Great as meat shields for backline units like Locust or Mantis.
+**Strategy:** Spam them early to stall enemies while saving nectar for stronger units. Great as meat shields for backline units like Locust or Mantis.
 
 ---
 

@@ -2,15 +2,16 @@ import type { UnitDef, CombatHooks, RenderUnit, IUnit, CombatContext } from '../
 import { hexToInt } from './renderUtils';
 
 export const def: UnitDef = {
-  name: 'Guardian', ico: '\u{1F6E1}\uFE0F', hp: 300, atk: 15, spd: 0.7, range: 25, atkRate: 0.5,
-  cost: 70, reward: 35, w: 22, h: 20, col: 0xe0c040, dk: 0x806020,
-  trait: 'aura', desc: '-20% Ally DMG', tier: 'D', incubation: 10, knockResist: 20, caste: 'soldier',
+  name: 'Guardian', ico: '\u{1F6E1}\uFE0F', hp: 300, atk: 15, spd: 1.0, range: 36, atkRate: 0.5,
+  cost: 70, reward: 35, w: 31, h: 28, col: 0xe0c040, dk: 0x806020,
+  trait: 'aura', desc: '-20% Ally DMG', route: 'land', attackRange: 'melee',
+  tier: 'D', incubation: 10, knockResist: 20, caste: 'soldier',
 };
 
 export const combat: CombatHooks = {
   modifyAllyDamage(auraUnit: IUnit, target: IUnit, dmg: number, ctx: CombatContext) {
     // Reduce damage to nearby allies by 20%
-    if (Math.abs((auraUnit.x + auraUnit.unitW / 2) - (target.x + target.unitW / 2)) < 80 * ctx.S) {
+    if (Math.abs((auraUnit.x + auraUnit.unitW / 2) - (target.x + target.unitW / 2)) < 114) {
       return Math.ceil(dmg * 0.8);
     }
     return dmg;

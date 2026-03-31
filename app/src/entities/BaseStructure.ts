@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import type { Side } from '../types';
-import { BASE_W, BASE_HP, GND, S } from '../config/Constants';
+import { BASE_HP, SBW } from '../config/Constants';
+import { LANE } from '../config/Layout';
+const GND = LANE.land.groundY;
 
 export class BaseStructure extends Phaser.GameObjects.Container {
   side: Side;
@@ -45,7 +47,7 @@ export class BaseStructure extends Phaser.GameObjects.Container {
     const g = this.gfx;
     const isBlue = this.side === 'player';
     const frac = Math.max(0, this.hp / this.maxHp);
-    const bw = Math.round(BASE_W * S);
+    const bw = SBW;
     const cx = bw / 2;
 
     g.clear();
@@ -96,7 +98,7 @@ export class BaseStructure extends Phaser.GameObjects.Container {
     }
 
     // Honeycomb cells (hexagonal pattern)
-    const cellR = Math.round(5 * S);
+    const cellR = 7;
     const cells = [
       { x: cx - 12, y: GND - 60 },
       { x: cx + 8, y: GND - 62 },
@@ -121,7 +123,7 @@ export class BaseStructure extends Phaser.GameObjects.Container {
 
     // Entrance tunnel (facing the battlefield)
     g.fillStyle(0x0a0806);
-    const tunnelW = Math.round(10 * S);
+    const tunnelW = 14;
     const tx = isBlue ? bw - tunnelW - 2 : 2;
     g.beginPath();
     g.arc(tx + tunnelW / 2, GND - 4, tunnelW / 2, Math.PI, 0, false);
@@ -173,22 +175,7 @@ export class BaseStructure extends Phaser.GameObjects.Container {
 
     // Spire tip glow
     g.fillStyle(isBlue ? 0x70d8ff : 0xff8060, 0.6);
-    g.fillCircle(cx, GND - 104, Math.round(2 * S));
-
-    // HP bar
-    const hpW = bw - 4;
-    g.fillStyle(0x080810);
-    g.fillRect(2, GND - 114, hpW, 6);
-
-    let hpColor: number;
-    if (frac > 0.5) hpColor = isBlue ? 0x4ab0f0 : 0xf05050;
-    else if (frac > 0.25) hpColor = 0xf0c040;
-    else hpColor = 0xf03030;
-    g.fillStyle(hpColor);
-    g.fillRect(2, GND - 114, hpW * frac, 6);
-
-    g.lineStyle(0.5, 0x111111);
-    g.strokeRect(2, GND - 114, hpW, 6);
+    g.fillCircle(cx, GND - 104, 3);
 
     // Shield aura (organic membrane)
     if (this.shielded) {

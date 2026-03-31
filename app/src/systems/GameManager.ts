@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { UnitDef, Side, AbilityKey, RenderUnit } from '../types';
-import { W, WORLD_W, BASE_W, S } from '../config/Constants';
-// W = viewport width (used for camera), WORLD_W = full battlefield width
+import { W, DEFAULT_WORLD_W, SBW as SBW_CONST } from '../config/Constants';
+// W = viewport width (used for camera), worldW = per-battle battlefield width
 import { UNIT_DEFS, drawUnit } from '../units/registry';
 import { ENEMY_DEFS } from '../config/EnemyDefs';
 import { BaseStructure } from '../entities/BaseStructure';
@@ -42,6 +42,7 @@ export class GameManager {
   units: Unit[];
   deckKeys: string[];
   SBW: number;
+  worldW: number;
 
   // Game state
   running: boolean;
@@ -52,19 +53,20 @@ export class GameManager {
   // Camera
   manualPanTimer: number;
 
-  constructor(scene: Phaser.Scene, deckKeys: string[], startWave: number = 1) {
+  constructor(scene: Phaser.Scene, deckKeys: string[], startWave: number = 1, worldW: number = DEFAULT_WORLD_W) {
     this.scene = scene;
     this.events = new EventBus();
+    this.worldW = worldW;
     resetUid();
 
     // Deck
     this.deckKeys = deckKeys;
 
     // Create bases
-    const SBW = Math.round(BASE_W * S);
+    const SBW = SBW_CONST;
     this.SBW = SBW;
     this.playerBase = new BaseStructure(scene, 0, 'player');
-    this.enemyBase = new BaseStructure(scene, WORLD_W - SBW, 'enemy');
+    this.enemyBase = new BaseStructure(scene, worldW - SBW, 'enemy');
 
     // Units
     this.unitPool = new UnitPool(scene);
@@ -72,10 +74,10 @@ export class GameManager {
 
     // Systems
     this.audio = new AudioManager();
-    this.combat = new CombatSystem(scene, this.events);
+    this.combat = new CombatSystem(scene, this.events, worldW);
     this.waves = new WaveManager(scene, startWave, this.events);
     this.economy = new EconomyManager(scene);
-    this.abilities = new AbilityManager(scene, this.events);
+    this.abilities = new AbilityManager(scene, this.events, worldW);
     this.particles = new ParticleManager(scene);
     this.incubation = new IncubationManager();
     this.cocoons = new CocoonVisuals(scene);
@@ -92,11 +94,16 @@ export class GameManager {
     this.events.on('enemyKilled', (data) => {
       this.economy.earn(data.unit.reward);
       this.kills++;
-      this.audio.goldEarn();
+      this.audio.nectarEarn();
     });
 
     this.events.on('unitSpawned', (data) => {
       if (data.side === 'enemy') this.spawnEnemy(data.key);
+    });
+
+    this.events.on('waveStart', (data) => {
+      this.audio.waveStart();
+      this.events.emit('logMessage', { message: `\u26A0 Wave ${data.wave} incoming!` });
     });
   }
 
@@ -194,7 +201,7 @@ export class GameManager {
       scaledDef = { ...def, hp: Math.ceil(def.hp * scale), atk: Math.ceil(def.atk * scale) };
     }
 
-    this.createUnit(key, 'enemy', scaledDef, WORLD_W - this.SBW - Math.round(def.w * S) - 2);
+    this.createUnit(key, 'enemy', scaledDef, this.worldW - this.SBW - def.w - 2);
   }
 
   createUnit(key: string, side: Side, def: UnitDef, x: number): void {
@@ -279,7 +286,7 @@ export class GameManager {
 
     // Find frontline — rightmost player unit and leftmost enemy unit
     let playerFront = this.SBW;
-    let enemyFront = WORLD_W - this.SBW;
+    let enemyFront = this.worldW - this.SBW;
 
     for (const u of this.units) {
       if (u.dead) continue;
@@ -291,7 +298,7 @@ export class GameManager {
     const cam = this.scene.cameras.main;
     const viewW = W / cam.zoom;
     const midpoint = (playerFront + enemyFront) / 2;
-    const targetX = Math.max(0, Math.min(midpoint - viewW / 2, WORLD_W - viewW));
+    const targetX = Math.max(0, Math.min(midpoint - viewW / 2, this.worldW - viewW));
 
     cam.scrollX += (targetX - cam.scrollX) * Math.min(1, 2 * dt); // smooth lerp
   }

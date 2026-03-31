@@ -17,6 +17,8 @@ export const def: UnitDef = {
   dk: 0x6b1a1a,
   trait: "grunt",
   desc: "Basic Soldier",
+  route: "land",
+  attackRange: "melee",
   tier: "F",
   incubation: 3,
   caste: "soldier",

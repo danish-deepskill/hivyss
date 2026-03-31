@@ -17,6 +17,8 @@ export const def: UnitDef = {
   dk: 0x6b1a1a,
   trait: "ranged",
   desc: "Ranged",
+  route: "land",
+  attackRange: "ranged",
   tier: "E",
   incubation: 5,
   caste: "soldier",

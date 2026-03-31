@@ -4,7 +4,8 @@ import { hexToInt } from '../renderUtils';
 export const def: UnitDef = {
   name: 'Centurion', ico: '\u{2694}\uFE0F', hp: 250, atk: 26, spd: 0.9, range: 24, atkRate: 0.8,
   cost: 100, reward: 48, w: 26, h: 22, col: 0xc03030, dk: 0x6b1a1a,
-  trait: 'rally', desc: '+20% Ally ATK', tier: 'C', incubation: 8, knockResist: 15,
+  trait: 'rally', desc: '+20% Ally ATK', route: 'land', attackRange: 'melee',
+  tier: 'C', incubation: 8, knockResist: 15,
   caste: 'soldier', geneline: 'alpha',
 };
 

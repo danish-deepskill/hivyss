@@ -2,9 +2,10 @@ import type { UnitDef, CombatHooks, RenderUnit, IUnit, CombatContext } from '../
 import { hexToInt } from './renderUtils';
 
 export const def: UnitDef = {
-  name: 'Mantis', ico: '\u{1F52D}', hp: 100, atk: 120, spd: 0.5, range: 200, atkRate: 0.25,
-  cost: 85, reward: 38, w: 15, h: 14, col: 0xc0a0f0, dk: 0x503080,
-  trait: 'sniper', desc: 'Long Range', tier: 'C', incubation: 14, caste: 'soldier',
+  name: 'Mantis', ico: '\u{1F52D}', hp: 100, atk: 120, spd: 0.71, range: 284, atkRate: 0.25,
+  cost: 85, reward: 38, w: 21, h: 20, col: 0xc0a0f0, dk: 0x503080,
+  trait: 'sniper', desc: 'Long Range', route: 'land', attackRange: 'ranged',
+  tier: 'C', incubation: 14, caste: 'soldier',
 };
 
 export const combat: CombatHooks = {

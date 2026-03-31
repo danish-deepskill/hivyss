@@ -2,9 +2,10 @@ import type { UnitDef, RenderUnit } from '../types';
 import { hexToInt } from './renderUtils';
 
 export const def: UnitDef = {
-  name: 'Grub', ico: '\u{1F41B}', hp: 55, atk: 12, spd: 1.6, range: 20, atkRate: 1.1,
-  cost: 15, reward: 8, w: 16, h: 14, col: 0x80d040, dk: 0x3a6010,
-  trait: 'grub', desc: 'Fodder', tier: 'F', incubation: 2, caste: 'soldier',
+  name: 'Grub', ico: '\u{1F41B}', hp: 55, atk: 12, spd: 2.28, range: 28, atkRate: 1.1,
+  cost: 15, reward: 8, w: 23, h: 20, col: 0x80d040, dk: 0x3a6010,
+  trait: 'grub', desc: 'Fodder', route: 'land', attackRange: 'melee',
+  tier: 'F', incubation: 2, caste: 'soldier',
 };
 
 export function draw(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, uy: number): void {

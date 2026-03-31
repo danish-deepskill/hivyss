@@ -17,6 +17,8 @@ export const def: UnitDef = {
   dk: 0x6b1a1a,
   trait: "basic",
   desc: "Balanced",
+  route: "land",
+  attackRange: "melee",
   tier: "E",
   incubation: 4,
   knockResist: 5,

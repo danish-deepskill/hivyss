@@ -1,11 +1,13 @@
 import Phaser from 'phaser';
 import type { DamageType, DamageColorMap, CombatHooks, CombatContext, IUnit, IParticleManager, IAudioManager, HitSoundType } from '../types';
-import { BASE_W, WORLD_W, GND, S } from '../config/Constants';
+import { DEFAULT_WORLD_W, SBW } from '../config/Constants';
+import { LANE } from '../config/Layout';
+import { canAttack } from '../config/RouteMatrix';
+const GND = LANE.land.groundY;
 import { COMBAT_MAP } from '../units/registry';
 import { BaseStructure } from '../entities/BaseStructure';
 import { AudioManager } from './AudioManager';
 import { EventBus } from './EventBus';
-const SBW: number = Math.round(BASE_W * S); // scaled base width
 
 // Consistent damage indicator colors by type
 const DMG_COLORS: DamageColorMap = {
@@ -15,7 +17,7 @@ const DMG_COLORS: DamageColorMap = {
   poison: 0x60e030,  // green — poison DOT
   burn:   0xff6010,  // fire orange — burn DOT
   heal:   0x60f880,  // green — healing
-  gold:   0xf0c040,  // gold — reward
+  nectar: 0xf0c040,  // nectar — reward
   blocked:0x5ac8f8,  // blue — blocked/shielded
   base:   0xf05050,  // red — base damage
 };
@@ -24,14 +26,16 @@ export class CombatSystem {
   scene: Phaser.Scene;
   events: EventBus;
   audio: AudioManager | null;
+  worldW: number;
   _lastHitSound: number;
   _lastHealSound: number;
   _lastAttacker: IUnit | null;
 
-  constructor(scene: Phaser.Scene, events: EventBus) {
+  constructor(scene: Phaser.Scene, events: EventBus, worldW: number = DEFAULT_WORLD_W) {
     this.scene = scene;
     this.events = events;
     this.audio = null;
+    this.worldW = worldW;
     this._lastHitSound = 0;
     this._lastHealSound = 0;
     this._lastAttacker = null;
@@ -48,12 +52,14 @@ export class CombatSystem {
       scene: this.scene,
       events: this.events,
       allAlive: alive,
-      S,
+      S: 1,
+      sourceUnit: null,
       hitUnit: (target: IUnit, dmg: number, dmgType: DamageType) => this.hitUnit(target, dmg, dmgType, ctx),
       playHitSound: (type: HitSoundType) => this._playHitSound(audio, type),
     };
 
     alive.forEach(u => {
+      ctx.sourceUnit = u;
       u.update(dt);
       const handler = COMBAT_MAP[u.trait];
 
@@ -135,8 +141,8 @@ export class CombatSystem {
         u.x += u.facing * spd * 60 * dt;
 
         // Player unit reaches enemy base edge — stop
-        if (u.side === 'player' && u.x + u.unitW >= WORLD_W - SBW) {
-          u.x = WORLD_W - SBW - u.unitW;
+        if (u.side === 'player' && u.x + u.unitW >= this.worldW - SBW) {
+          u.x = this.worldW - SBW - u.unitW;
         }
 
         // Enemy unit reaches player base — attack it
@@ -198,6 +204,7 @@ export class CombatSystem {
     let bestDist = Infinity;
     foes.forEach(e => {
       if (e.burrowed) return;
+      if (!canAttack(u.currentRoute, u.attackRange, e.currentRoute)) return;
       const dist = u.facing > 0
         ? (e.x - (u.x + u.unitW))
         : (u.x - (e.x + e.unitW));
@@ -213,6 +220,8 @@ export class CombatSystem {
   // --- Damage application with modifier hooks ---
   hitUnit(u: IUnit, dmg: number, dmgType: DamageType, ctx: CombatContext): void {
     if (u.dead || u.burrowed) return;
+    // Route validation — source must be able to hit target's route
+    if (ctx.sourceUnit && !canAttack(ctx.sourceUnit.currentRoute, ctx.sourceUnit.attackRange, u.currentRoute)) return;
     const col = DMG_COLORS[dmgType] || DMG_COLORS.melee;
 
     // Aura-type ally damage reduction: check all allies for modifyAllyDamage hook
@@ -245,7 +254,7 @@ export class CombatSystem {
           // Stagger! Distance scales with overflow
           const overflow = u.poiseAccum - 100;
           u.poiseAccum = 0;
-          const knockDist = (100 + overflow * 0.5) * ctx.S;
+          const knockDist = 142 + overflow * 0.71;
           if (Math.abs(u.knockback) < 10) {
             u.knockback = -u.facing * knockDist;
             if (ctx.particles) {
@@ -277,11 +286,11 @@ export class CombatSystem {
         handler.onDeath(u, ctx);
       }
 
-      // Gold reward for killing enemies
+      // Nectar reward for killing enemies
       if (u.side === 'enemy') {
         this.events.emit('enemyKilled', { unit: { key: u.key, reward: u.reward, x: u.x, y: u.y } });
         if (ctx.particles) {
-          ctx.particles.float(u.x + u.unitW / 2, u.y - 18, `+${u.reward}\u2B21`, DMG_COLORS.gold);
+          ctx.particles.float(u.x + u.unitW / 2, u.y - 18, `+${u.reward}\u2B21`, DMG_COLORS.nectar);
         }
       }
     }

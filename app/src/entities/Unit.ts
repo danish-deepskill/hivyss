@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
-import type { UnitDef, Side, UnitState, StatusEffect, RenderUnit } from '../types';
-import { GND, S, SPD_MULT } from '../config/Constants';
+import type { UnitDef, Side, UnitState, StatusEffect, RenderUnit, Route, AttackRange } from '../types';
+import { SPD_MULT } from '../config/Constants';
+import { getGroundY } from '../config/RouteMatrix';
 import { drawUnit } from '../units/registry';
 
 let _uid = 0;
@@ -30,6 +31,9 @@ export class Unit extends Phaser.GameObjects.Container {
   reward: number;
   trait: string;
   cost: number;
+  route: Route;
+  currentRoute: Route;
+  attackRange: AttackRange;
 
   // State
   state: UnitState;
@@ -87,6 +91,9 @@ export class Unit extends Phaser.GameObjects.Container {
     this.reward = 0;
     this.trait = '';
     this.cost = 0;
+    this.route = 'land';
+    this.currentRoute = 'land';
+    this.attackRange = 'melee';
     this.state = 'march';
     this.facing = 1;
     this.bob = 0;
@@ -123,9 +130,6 @@ export class Unit extends Phaser.GameObjects.Container {
   /** (Re)initialize this unit with new stats. Used by pool to recycle units. */
   init(def: UnitDef, side: Side, x: number): void {
     const isPlayer = side === 'player';
-    const scaledW = Math.round(def.w * S);
-    const scaledH = Math.round(def.h * S);
-
     this.id = uid();
     this.key = def._key!;
     this.side = side;
@@ -133,12 +137,12 @@ export class Unit extends Phaser.GameObjects.Container {
     this.hp = def.hp;
     this.maxHp = def.hp;
     this.atk = def.atk;
-    this.spd = def.spd * S * SPD_MULT;
-    this.range = def.range * S;
+    this.spd = def.spd * SPD_MULT;
+    this.range = def.range;
     this.atkRate = def.atkRate;
     this.atkCd = 0;
-    this.unitW = scaledW;
-    this.unitH = scaledH;
+    this.unitW = def.w;
+    this.unitH = def.h;
     this.col = def.col;
     this.dk = def.dk;
     this.unitName = def.name;
@@ -146,6 +150,9 @@ export class Unit extends Phaser.GameObjects.Container {
     this.reward = def.reward;
     this.trait = def.trait;
     this.cost = def.cost || 0;
+    this.route = def.route ?? 'land';
+    this.currentRoute = this.route;
+    this.attackRange = def.attackRange ?? 'melee';
 
     this.state = 'march';
     this.facing = isPlayer ? 1 : -1;
@@ -173,7 +180,7 @@ export class Unit extends Phaser.GameObjects.Container {
     this.effects.clear();
     this._spawned = undefined;
 
-    this.setPosition(Math.round(x), Math.round(GND - scaledH));
+    this.setPosition(Math.round(x), Math.round(getGroundY(this.currentRoute) - def.h));
     this.setActive(true);
     this.setVisible(true);
     this.gfx.clear();
@@ -349,7 +356,7 @@ export class Unit extends Phaser.GameObjects.Container {
 
     // Shadow
     g.fillStyle(0x000000, 0.25);
-    g.fillEllipse(this.unitW / 2, GND - this.y + 1, this.unitW / 2 + 2, 3);
+    g.fillEllipse(this.unitW / 2, getGroundY(this.currentRoute) - this.y + 1, this.unitW / 2 + 2, 3);
 
     if (this.slowTimer > 0) g.setAlpha(0.85);
 

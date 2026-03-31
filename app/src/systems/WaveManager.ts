@@ -2,7 +2,9 @@ import Phaser from 'phaser';
 import type { WaveDef, IParticleManager } from '../types';
 import { WAVE_DEFS, WAVE_INTERVAL } from '../config/WaveDefs';
 import { ENEMY_DEFS } from '../config/EnemyDefs';
-import { W, GND } from '../config/Constants';
+import { W } from '../config/Constants';
+import { LANE } from '../config/Layout';
+const GND = LANE.land.groundY;
 // W used for camera-relative text positioning
 import { EventBus } from './EventBus';
 

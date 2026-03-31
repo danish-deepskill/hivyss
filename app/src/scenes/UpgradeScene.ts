@@ -25,12 +25,6 @@ export class UpgradeScene extends Phaser.Scene {
   create(): void {
     this.save = new SaveManager();
 
-    // Hide battle DOM
-    ['header', 'resbar', 'tray', 'abilities', 'log-row'].forEach((id: string) => {
-      const el: HTMLElement | null = document.getElementById(id);
-      if (el) el.style.display = 'none';
-    });
-
     // Background
     const bg: Phaser.GameObjects.Graphics = this.add.graphics();
     bg.fillStyle(0x0a0a14);

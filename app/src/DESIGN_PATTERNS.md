@@ -71,14 +71,15 @@ this.events.emit('enemyKilled', { unit: { key, reward, x, y } });
 **Current events:**
 | Event | Data | Emitted by | Consumed by |
 |---|---|---|---|
-| `enemyKilled` | `{ unit: { key, reward, x, y } }` | CombatSystem, AbilityManager | GameManager (gold + kills) |
+| `enemyKilled` | `{ unit: { key, reward, x, y } }` | CombatSystem, AbilityManager | GameManager (nectar + kills) |
 | `unitSpawned` | `{ key, side }` | WaveManager, enemyTraits | GameManager (spawn enemy) |
-| `waveStart` | `{ wave }` | WaveManager | (available) |
+| `waveStart` | `{ wave }` | WaveManager | GameManager (audio + log), MenuUIScene (stage label) |
+| `deployUnit` | `{ key }` | MenuUIScene | WorldScene → GameManager.playerSpawn() |
+| `useAbility` | `{ key }` | MenuUIScene | WorldScene → GameManager.castAbility() |
+| `cancelIncubation` | `{ index }` | MenuUIScene | WorldScene → GameManager.cancelIncubation() |
+| `logMessage` | `{ message }` | WorldScene, GameManager | MenuUIScene (log display) |
 
 **Adding new events:** Define in `GameEvents` interface in `EventBus.ts`. All events are typed — compiler catches wrong data shapes.
-
-Reserved event names (defined but not yet emitted):
-`unitDied`, `waveCleared`, `incubationStart`, `incubationHatched`, `incubationCancelled`, `larvaConsumed`, `larvaSpawned`, `baseHit`, `gameOver`
 
 ### Future: Expanded Event Bus (all systems decoupled)
 **When:** Combat system architecture implementation
@@ -164,7 +165,7 @@ Each game system is a standalone class with its own state and update loop. GameM
 | `GameManager` | Orchestrator — owns all systems, runs game loop |
 | `CombatSystem` | Unit targeting, damage, death, combat hooks |
 | `WaveManager` | Wave scheduling, enemy queue, stage progression |
-| `EconomyManager` | Gold/nectar income, spending, balance |
+| `EconomyManager` | Nectar income, spending, balance |
 | `AbilityManager` | Player abilities, cooldowns, effects |
 | `IncubationManager` | Larva resource, chamber queue, hatch timers |
 | `AudioManager` | Web Audio API, sound effects |
@@ -174,6 +175,109 @@ Each game system is a standalone class with its own state and update loop. GameM
 | `SaveManager` | LocalStorage persistence |
 
 **Do not** add game logic directly to Scene classes. Scenes are thin — they create managers and wire UI.
+
+---
+
+## 7. Scene Architecture (4 Parallel Scenes)
+
+**Status:** Implemented
+**Files:** `scenes/BattleScene.ts`, `scenes/WorldScene.ts`, `scenes/HUDScene.ts`, `scenes/MenuUIScene.ts`, `scenes/ModalScene.ts`
+
+During battle, 4 parallel Phaser scenes run simultaneously. BattleScene is a thin orchestrator that launches and stops them.
+
+```
+BattleScene (orchestrator)
+  ├── WorldScene     — game world, GameManager, camera, canvas rendering
+  ├── HUDScene       — floating HP bars (canvas), synced to WorldScene camera
+  ├── MenuUIScene    — bottom panel DOM UI (resource bar, unit tray, abilities, log)
+  └── ModalScene     — game-over overlay (launched on demand)
+```
+
+**Communication between scenes:**
+- **Registry** (continuous state): WorldScene writes economy/incubation/ability/game state to `this.registry` every frame. HUDScene and MenuUIScene read from it.
+- **EventBus** (discrete actions): MenuUIScene emits `deployUnit`/`useAbility`/`cancelIncubation`. WorldScene subscribes and calls GameManager methods, emits `logMessage` back.
+- **Phaser scene events**: BattleScene waits for WorldScene `'create'` event before launching MenuUIScene (ensures registry data is available).
+
+**Lifecycle:**
+1. BattleScene.create() → launches WorldScene + HUDScene
+2. WorldScene.create() fires → BattleScene launches MenuUIScene
+3. Game runs — WorldScene ticks logic + writes registry, other scenes read
+4. Game over → BattleScene launches ModalScene with data
+5. Restart → ModalScene emits `'restart'`, BattleScene stops all scenes + restarts
+
+**Cleanup:** All scenes clean up EventBus listeners in `this.events.once('shutdown', ...)` to prevent leaks across restarts.
+
+**Do not:**
+- Access `worldScene.gm` from MenuUIScene — use registry + EventBus
+- Put game logic in scene classes — use systems/managers
+- Emit game events on Phaser `scene.events` — use the typed EventBus
+
+---
+
+## 8. DOM Container Pattern (Hybrid Rendering)
+
+**Status:** Implemented
+**Files:** `config/GameConfig.ts` (`dom: { createContainer: true }`), `scenes/MenuUIScene.ts`, `scenes/ModalScene.ts`
+
+Phaser's DOM container overlays an invisible `<div>` on top of the canvas. Scenes create DOM elements via `this.add.dom(x, y, element)` for text-heavy UI that would be expensive to render on canvas.
+
+**Pointer events:** The DOM container has `pointer-events: none` by default. Individual UI panels set `pointer-events: auto`. Clicks on transparent areas pass through to the canvas below.
+
+**Mouse tracking caveat:** The DOM container intercepts browser mouse events before they reach the canvas. Phaser's `this.input.activePointer` won't track hover without a click. Fix: use native `canvas.parentElement.addEventListener('mousemove', ...)` and convert coordinates manually.
+
+```ts
+// Edge-pan uses native listener, not Phaser input
+canvas.parentElement!.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  this.mouseX = ((e.clientX - rect.left) / rect.width) * W;
+});
+```
+
+---
+
+## 9. Route System (Multi-Lane Combat)
+
+**Status:** Implemented
+**Files:** `config/RouteMatrix.ts`, `config/Layout.ts`, `types.ts` (Route, AttackRange), `systems/CombatSystem.ts`, `entities/Unit.ts`
+
+Three combat lanes (air/land/tunnel) with data-driven targeting rules. Routes are a **targeting filter + damage validation** — not a separate system.
+
+**Lane Y levels** (`config/Layout.ts`):
+```
+Air:    y=240  (sky, above mountains)
+Land:   y=380  (ground level)
+Tunnel: y=410  (just below ground, above UI panel)
+```
+
+**Targeting matrix** (`config/RouteMatrix.ts`):
+```ts
+const ROUTE_MATRIX: Record<Route, Record<Route, 'always' | 'ranged' | 'never'>> = {
+  air:    { air: 'always', land: 'always', tunnel: 'never' },
+  land:   { air: 'ranged', land: 'always', tunnel: 'never' },
+  tunnel: { air: 'never',  land: 'never',  tunnel: 'always' },
+};
+```
+
+Add new route = add row/column. Change interaction = change one cell.
+
+**Enforcement at TWO levels** (Unreal GAS pattern):
+1. **Targeting** (`_findTarget`): route filter prevents selecting invalid targets for auto-attacks
+2. **Damage application** (`hitUnit`): `ctx.sourceUnit` tracks who is dealing damage. `hitUnit()` validates routes before applying — catches combat hooks and AOE that bypass targeting. No source (null) = ability-level damage, bypasses check.
+
+```ts
+// CombatSystem.resolve() — tracks source
+ctx.sourceUnit = u;
+
+// CombatSystem.hitUnit() — validates before damage
+if (ctx.sourceUnit && !canAttack(source.route, source.attackRange, target.route)) return;
+```
+
+**`canAttack()` is a pure function** — takes primitives (route, attackRange, targetRoute), not objects. Testable, no circular dependencies.
+
+**Do not:**
+- Add route checks inside individual combat hooks — `hitUnit()` handles enforcement
+- Create separate combat systems per route — one CombatSystem, one matrix
+- Hardcode route interactions in if/else — use the data matrix
 
 ---
 
@@ -896,62 +1000,11 @@ export const EFFECT_VISUALS: Record<string, EffectVisual> = {
 1. Background → 2. Shadows → 3. Unit bodies → 4. Effect overlays → 5. Particles → 6. UI
 ```
 
-### Route System
-**When:** Multi-lane combat (air/land/tunnel)
+### Route System — IMPLEMENTED (see Section 9)
 
-Routes are a **targeting filter** that runs before the damage pipeline + a **modifier** for off-route debuff. Not a separate system — plugs into existing combat architecture.
+Core route system is implemented. Remaining planned features:
 
-**Data:**
-```ts
-type Route = 'air' | 'land' | 'tunnel';
-
-// UnitDef — native route
-interface UnitDef {
-  route: Route;  // where it spawns by default
-}
-
-// IUnit — runtime route (mutable, can change via hooks)
-interface IUnit {
-  route: Route;         // native (from def)
-  currentRoute: Route;  // mutable — hooks can change mid-battle
-}
-```
-
-**Targeting filter — data-driven matrix, runs before pipeline:**
-```ts
-const ROUTE_MATRIX: Record<Route, Record<Route, 'always' | 'ranged' | 'never'>> = {
-  air:    { air: 'always', land: 'always', tunnel: 'never' },
-  land:   { air: 'ranged', land: 'always', tunnel: 'never' },
-  tunnel: { air: 'never',  land: 'never',  tunnel: 'always' },
-};
-
-// UnitDef — optional per-unit override
-interface UnitDef {
-  route: Route;
-  routeOverrides?: Partial<Record<Route, 'always' | 'ranged' | 'never'>>;
-  // Example: tunnel anti-air unit: routeOverrides: { air: 'ranged' }
-}
-
-// UnitDef also declares attack range type
-interface UnitDef {
-  range: number;                     // distance in px
-  attackRange: 'melee' | 'ranged';   // type — melee can't hit air from land
-}
-
-function canAttack(attacker: IUnit, target: IUnit): boolean {
-  const override = attacker.def.routeOverrides?.[target.currentRoute];
-  const rule = override ?? ROUTE_MATRIX[attacker.currentRoute][target.currentRoute];
-  if (rule === 'always') return true;
-  if (rule === 'ranged') return attacker.def.attackRange === 'ranged';
-  return false;
-}
-
-// In combat system — before queueAbility:
-if (!canAttack(attacker, target)) return;
-```
-Add new route = add row/column. Change interaction = change one cell. Per-unit exceptions = `routeOverrides` in UnitDef.
-
-**Off-route debuff — uses existing modifier system:**
+**Off-route debuff** (needs StatDef + Modifiers system):
 ```ts
 // On deploy with shift+click (land↔tunnel only, air can't shift)
 if (deployRoute !== unit.route) {
@@ -960,7 +1013,13 @@ if (deployRoute !== unit.route) {
 }
 ```
 
-**Route switching — hooks change `currentRoute`:**
+**Per-unit route overrides** (not yet on UnitDef):
+```ts
+routeOverrides?: Partial<Record<Route, 'always' | 'ranged' | 'never'>>;
+// Example: tunnel anti-air unit: routeOverrides: { air: 'ranged' }
+```
+
+**Route switching via hooks:**
 ```ts
 // Example: air unit crash-lands at low HP
 onUpdate(u, dt, ctx) {

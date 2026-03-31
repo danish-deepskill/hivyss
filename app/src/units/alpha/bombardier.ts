@@ -4,7 +4,8 @@ import { hexToInt } from '../renderUtils';
 export const def: UnitDef = {
   name: 'Bombardier', ico: '\u{1F4A5}', hp: 100, atk: 28, spd: 1.6, range: 22, atkRate: 0.85,
   cost: 60, reward: 28, w: 24, h: 20, col: 0xc03030, dk: 0x6b1a1a,
-  trait: 'area', desc: 'Area ATK', tier: 'D', incubation: 5, knockForce: 15,
+  trait: 'area', desc: 'Area ATK', route: 'land', attackRange: 'melee',
+  tier: 'D', incubation: 5, knockForce: 15,
   caste: 'soldier', geneline: 'alpha',
 };
 

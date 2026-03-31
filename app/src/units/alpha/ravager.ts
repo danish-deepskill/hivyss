@@ -4,7 +4,8 @@ import { hexToInt, lerpColor } from '../renderUtils';
 export const def: UnitDef = {
   name: 'Ravager', ico: '\u{1F41D}', hp: 160, atk: 60, spd: 2.2, range: 20, atkRate: 1.25,
   cost: 70, reward: 32, w: 22, h: 18, col: 0xc03030, dk: 0x6b1a1a,
-  trait: 'berserk', desc: 'Rage SPD', tier: 'D', incubation: 6,
+  trait: 'berserk', desc: 'Rage SPD', route: 'air', attackRange: 'melee',
+  tier: 'D', incubation: 6,
   caste: 'soldier', geneline: 'alpha',
 };
 

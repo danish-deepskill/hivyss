@@ -14,6 +14,11 @@ export interface GameEvents {
   larvaSpawned: { count: number };
   baseHit: { side: 'player' | 'enemy'; damage: number };
   gameOver: { winner: 'player' | 'enemy' };
+  // UI action events (MenuUIScene → WorldScene)
+  deployUnit: { key: string };
+  useAbility: { key: string };
+  cancelIncubation: { index: number };
+  logMessage: { message: string };
 }
 
 type EventKey = keyof GameEvents;

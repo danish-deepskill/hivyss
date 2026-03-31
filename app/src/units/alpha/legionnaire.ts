@@ -4,7 +4,8 @@ import { hexToInt } from '../renderUtils';
 export const def: UnitDef = {
   name: 'Legionnaire', ico: '\u{1FAB2}', hp: 800, atk: 18, spd: 0.6, range: 10, atkRate: 0.5,
   cost: 85, reward: 40, w: 30, h: 22, col: 0xc03030, dk: 0x6b1a1a,
-  trait: 'massive', desc: 'Massive HP', tier: 'D', incubation: 7, knockForce: 20, knockResist: 40,
+  trait: 'massive', desc: 'Massive HP', route: 'land', attackRange: 'melee',
+  tier: 'D', incubation: 7, knockForce: 20, knockResist: 40,
   caste: 'soldier', geneline: 'alpha',
 };
 

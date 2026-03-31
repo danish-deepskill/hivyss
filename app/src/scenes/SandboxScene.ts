@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
-import { W, H, GND, S } from '../config/Constants';
+import { W, H } from '../config/Constants';
+import { LANE } from '../config/Layout';
+const GND = LANE.land.groundY;
 import { UNIT_DEFS, TIER_DEFS, drawUnit } from '../units/registry';
 import { Unit, resetUid } from '../entities/Unit';
 import { CombatSystem } from '../systems/CombatSystem';
@@ -7,8 +9,6 @@ import { EventBus } from '../systems/EventBus';
 import { ParticleManager } from '../systems/ParticleManager';
 import { AudioManager } from '../systems/AudioManager';
 import type { RenderUnit } from '../types';
-
-const fs = (px: number): string => `${Math.round(px * S)}px`;
 const UNIT_KEYS: string[] = Object.keys(UNIT_DEFS);
 
 export class SandboxScene extends Phaser.Scene {
@@ -40,8 +40,6 @@ export class SandboxScene extends Phaser.Scene {
 
   create(): void {
     resetUid();
-    this.setDomUiVisible(false);
-    this.events.once('shutdown', () => this.setDomUiVisible(true));
 
     // State
     this.leftKey = UNIT_KEYS[0];
@@ -73,75 +71,75 @@ export class SandboxScene extends Phaser.Scene {
     // Title
     this.add.text(W / 2, 10, 'SANDBOX', {
       fontFamily: '"Press Start 2P", monospace',
-      fontSize: fs(14), color: '#f0c040',
+      fontSize: '20px', color: '#f0c040',
     }).setOrigin(0.5, 0);
 
     // Left side controls
-    this.leftIcon = this.add.image(W * 0.2 - 50 * S, cy + 8, '_sb_preview_' + this.leftKey).setScale(1.5);
-    this.leftLabel = this.add.text(W * 0.2 + 10 * S, cy, '', {
+    this.leftIcon = this.add.image(W * 0.2 - 71, cy + 8, '_sb_preview_' + this.leftKey).setScale(1.5);
+    this.leftLabel = this.add.text(W * 0.2 + 14, cy, '', {
       fontFamily: '"Press Start 2P", monospace',
-      fontSize: fs(10), color: '#40c0ff',
+      fontSize: '14px', color: '#40c0ff',
     }).setOrigin(0.5, 0);
 
     this.leftCountLabel = this.add.text(W * 0.2, cy + 22, '', {
       fontFamily: '"Courier New", monospace',
-      fontSize: fs(10), color: '#aaa',
+      fontSize: '14px', color: '#aaa',
     }).setOrigin(0.5, 0);
 
     // Left arrows
-    this.makeBtn(W * 0.2 - 80 * S, cy, '\u25C0', () => this.cycleUnit('left', -1));
-    this.makeBtn(W * 0.2 + 80 * S, cy, '\u25B6', () => this.cycleUnit('left', 1));
-    this.makeBtn(W * 0.2 - 40 * S, cy + 20, '-', () => this.adjustCount('left', -1));
-    this.makeBtn(W * 0.2 + 40 * S, cy + 20, '+', () => this.adjustCount('left', 1));
+    this.makeBtn(W * 0.2 - 114, cy, '\u25C0', () => this.cycleUnit('left', -1));
+    this.makeBtn(W * 0.2 + 114, cy, '\u25B6', () => this.cycleUnit('left', 1));
+    this.makeBtn(W * 0.2 - 57, cy + 20, '-', () => this.adjustCount('left', -1));
+    this.makeBtn(W * 0.2 + 57, cy + 20, '+', () => this.adjustCount('left', 1));
 
     // Right side controls (capped so it doesn't overflow on wide screens)
-    const rx: number = Math.min(W * 0.8, W - 140 * S);
-    this.rightIcon = this.add.image(rx + 50 * S, cy + 8, '_sb_preview_' + this.rightKey).setScale(1.5);
-    this.rightLabel = this.add.text(rx - 10 * S, cy, '', {
+    const rx: number = Math.min(W * 0.8, W - 157);
+    this.rightIcon = this.add.image(rx + 71, cy + 8, '_sb_preview_' + this.rightKey).setScale(1.5);
+    this.rightLabel = this.add.text(rx - 14, cy, '', {
       fontFamily: '"Press Start 2P", monospace',
-      fontSize: fs(10), color: '#ff6040',
+      fontSize: '14px', color: '#ff6040',
     }).setOrigin(0.5, 0);
 
     this.rightCountLabel = this.add.text(rx, cy + 22, '', {
       fontFamily: '"Courier New", monospace',
-      fontSize: fs(10), color: '#aaa',
+      fontSize: '14px', color: '#aaa',
     }).setOrigin(0.5, 0);
 
-    this.makeBtn(rx - 80 * S, cy, '\u25C0', () => this.cycleUnit('right', -1));
-    this.makeBtn(rx + 80 * S, cy, '\u25B6', () => this.cycleUnit('right', 1));
-    this.makeBtn(rx - 40 * S, cy + 20, '-', () => this.adjustCount('right', -1));
-    this.makeBtn(rx + 40 * S, cy + 20, '+', () => this.adjustCount('right', 1));
+    this.makeBtn(rx - 114, cy, '\u25C0', () => this.cycleUnit('right', -1));
+    this.makeBtn(rx + 114, cy, '\u25B6', () => this.cycleUnit('right', 1));
+    this.makeBtn(rx - 57, cy + 20, '-', () => this.adjustCount('right', -1));
+    this.makeBtn(rx + 57, cy + 20, '+', () => this.adjustCount('right', 1));
 
     // Center buttons
-    this.fightBtn = this.makeBtn(W / 2, cy + 4, '\u2694 FIGHT', () => this.startFight(), '#f0c040', fs(11));
-    this.resetBtn = this.makeBtn(W / 2, cy + 26, '\u21BB RESET', () => this.resetArena(), '#888', fs(9));
+    this.fightBtn = this.makeBtn(W / 2, cy + 4, '\u2694 FIGHT', () => this.startFight(), '#f0c040', '16px');
+    this.resetBtn = this.makeBtn(W / 2, cy + 26, '\u21BB RESET', () => this.resetArena(), '#888', '13px');
 
     // Back button
-    this.makeBtn(60 * S, H - 30, '\u25C0 BACK', () => {
+    this.makeBtn(85, H - 30, '\u25C0 BACK', () => {
       this.scene.start('MainMenuScene');
-    }, '#888', fs(9));
+    }, '#888', '13px');
 
     // Result text
     this.resultText = this.add.text(W / 2, GND + 20, '', {
       fontFamily: '"Press Start 2P", monospace',
-      fontSize: fs(12), color: '#f0c040',
+      fontSize: '17px', color: '#f0c040',
     }).setOrigin(0.5, 0);
 
     // Stats text
     this.statsText = this.add.text(W / 2, GND + 38, '', {
       fontFamily: '"Courier New", monospace',
-      fontSize: fs(9), color: '#666',
+      fontSize: '13px', color: '#666',
     }).setOrigin(0.5, 0);
 
     this.updateLabels();
   }
 
-  private makeBtn(x: number, y: number, label: string, cb: () => void, color: string = '#ccc', size: string = fs(10)): Phaser.GameObjects.Text {
+  private makeBtn(x: number, y: number, label: string, cb: () => void, color: string = '#ccc', size: string = '14px'): Phaser.GameObjects.Text {
     const btn: Phaser.GameObjects.Text = this.add.text(x, y, label, {
       fontFamily: '"Press Start 2P", monospace',
       fontSize: size, color: color,
       backgroundColor: '#0a0a14',
-      padding: { x: Math.round(8 * S), y: Math.round(4 * S) },
+      padding: { x: 11, y: 6 },
     }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true });
     btn.on('pointerover', () => btn.setAlpha(0.7));
     btn.on('pointerout', () => btn.setAlpha(1));
@@ -196,18 +194,18 @@ export class SandboxScene extends Phaser.Scene {
 
     // Spawn left team (player side)
     const ld = UNIT_DEFS[this.leftKey];
-    const spacing: number = Math.round((ld.w * S + 4) * 1.2);
+    const spacing: number = Math.round((ld.w + 4) * 1.2);
     for (let i = 0; i < this.leftCount; i++) {
-      const x: number = Math.round(40 * S) + i * spacing;
+      const x: number = Math.round(57) + i * spacing;
       const unit: Unit = new Unit(this, { ...ld, _key: this.leftKey }, 'player', x);
       this.units.push(unit);
     }
 
     // Spawn right team (enemy side)
     const rd = UNIT_DEFS[this.rightKey];
-    const rSpacing: number = Math.round((rd.w * S + 4) * 1.2);
+    const rSpacing: number = Math.round((rd.w + 4) * 1.2);
     for (let i = 0; i < this.rightCount; i++) {
-      const x: number = Math.round(W - 40 * S) - i * rSpacing - Math.round(rd.w * S);
+      const x: number = Math.round(W - 57) - i * rSpacing - Math.round(rd.w);
       const unit: Unit = new Unit(this, { ...rd, _key: this.rightKey, col: this.toEnemyColor(rd.col), dk: this.toEnemyDark(rd.dk) }, 'enemy', x);
       this.units.push(unit);
     }
@@ -330,14 +328,8 @@ export class SandboxScene extends Phaser.Scene {
     }
     this.add.text(W / 2, GND * 0.5, 'VS', {
       fontFamily: '"Press Start 2P", monospace',
-      fontSize: fs(20), color: '#ffffff',
+      fontSize: '28px', color: '#ffffff',
     }).setOrigin(0.5).setAlpha(0.06);
   }
 
-  private setDomUiVisible(visible: boolean): void {
-    ['header', 'resbar', 'tray', 'abilities', 'log-row'].forEach((id: string) => {
-      const el: HTMLElement | null = document.getElementById(id);
-      if (el) el.style.display = visible ? '' : 'none';
-    });
-  }
 }

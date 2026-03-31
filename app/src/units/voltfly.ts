@@ -2,9 +2,10 @@ import type { UnitDef, CombatHooks, RenderUnit, IUnit, CombatContext } from '../
 import { hexToInt, drawCommonParts } from './renderUtils';
 
 export const def: UnitDef = {
-  name: 'Voltfly', ico: '\u{26A1}', hp: 240, atk: 55, spd: 1.1, range: 90, atkRate: 0.6,
-  cost: 130, reward: 50, w: 17, h: 15, col: 0x40c0f0, dk: 0x1060a0,
-  trait: 'lightning', desc: 'Chain Lightning', tier: 'B', incubation: 18, knockForce: 20, knockResist: 10, caste: 'elite',
+  name: 'Voltfly', ico: '\u{26A1}', hp: 240, atk: 55, spd: 1.56, range: 128, atkRate: 0.6,
+  cost: 130, reward: 50, w: 24, h: 21, col: 0x40c0f0, dk: 0x1060a0,
+  trait: 'lightning', desc: 'Chain Lightning', route: 'land', attackRange: 'ranged',
+  tier: 'B', incubation: 18, knockForce: 20, knockResist: 10, caste: 'elite',
 };
 
 export const combat: CombatHooks = {
@@ -15,7 +16,7 @@ export const combat: CombatHooks = {
     const chainDmg = isOvercharge ? dmg * 2 : dmg;
     const chainTargets = [target];
 
-    const chainRange = 80 * ctx.S;
+    const chainRange = 114;
     const others = foes.filter(e =>
       e !== target && !e.burrowed && !e.dead &&
       Math.abs(e.x - target.x) <= chainRange

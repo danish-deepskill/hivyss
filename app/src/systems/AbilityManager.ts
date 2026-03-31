@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
 import type { AbilityKey, IUnit, IParticleManager } from '../types';
 import { ABILITY_DEFS } from '../config/AbilityDefs';
-import { BASE_W, WORLD_W, GND, S } from '../config/Constants';
+import { DEFAULT_WORLD_W, SBW } from '../config/Constants';
+import { LANE } from '../config/Layout';
+const GND = LANE.land.groundY;
 import { EconomyManager } from './EconomyManager';
 import { BaseStructure } from '../entities/BaseStructure';
 import { EventBus } from './EventBus';
-const SBW: number = Math.round(BASE_W * S);
 
 export class AbilityManager {
   scene: Phaser.Scene;
@@ -13,14 +14,16 @@ export class AbilityManager {
   cooldowns: Record<string, number>;
   wallActive: number;
   slowActive: number;
+  worldW: number;
 
-  constructor(scene: Phaser.Scene, events?: EventBus) {
+  constructor(scene: Phaser.Scene, events?: EventBus, worldW: number = DEFAULT_WORLD_W) {
     this.scene = scene;
     this.events = events || new EventBus();
     this.cooldowns = {};
     Object.keys(ABILITY_DEFS).forEach(k => this.cooldowns[k] = 0);
     this.wallActive = 0;
     this.slowActive = 0;
+    this.worldW = worldW;
   }
 
   update(dt: number): void {
@@ -57,7 +60,7 @@ export class AbilityManager {
     });
 
     if (particles) {
-      particles.burst(WORLD_W / 2, GND - 40, 0xffee44, 20);
+      particles.burst(this.worldW / 2, GND - 40, 0xffee44, 20);
     }
     return true;
   }
@@ -85,7 +88,7 @@ export class AbilityManager {
       u.slowTimer = def.duration!;
     });
     if (particles) {
-      particles.burst(WORLD_W / 2, GND - 30, 0x80f8c0, 15);
+      particles.burst(this.worldW / 2, GND - 30, 0x80f8c0, 15);
     }
     return true;
   }

@@ -14,7 +14,7 @@ This document captures design decisions — not yet implemented.
 | **Vyssid** | A being with vyss | Any unit/creature in the game (lore term for "unit") |
 | **Hivyss** | Hive of vyss | The planet — origin of all vyss |
 | **Geneline** | A lineage of vyss expression | Genetic faction (Alpha, Beta, etc. — Greek letters) |
-| **Nectar** | Floral resource | Currency (code: gold) |
+| **Nectar** | Floral resource | Currency |
 | **Pheromone** | Chemical signal | Command system for soldiers |
 | **Larva** | Immature vyssid | Pre-hatch unit in incubation |
 | **Spire** | Capturable turret structure | Biological tower — auto-attacks enemies when captured |

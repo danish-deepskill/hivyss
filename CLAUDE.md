@@ -18,7 +18,7 @@
 - Cross-system events go through typed `EventBus`, not Phaser `scene.events`
 - Units are pooled via `UnitPool` — never `new Unit()` or `destroy()` in gameplay code
 - Game logic lives in `systems/` managers, not in Scene classes
-- Gold is called "nectar" in UI
+- Currency is "nectar" everywhere (code and UI)
 - Units are called "vyssids" in lore, "units" in code
 
 ## Phaser Graphics API

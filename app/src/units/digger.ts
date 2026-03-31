@@ -2,9 +2,10 @@ import type { UnitDef, CombatHooks, RenderUnit, IUnit, CombatContext } from '../
 import { hexToInt, drawCommonParts } from './renderUtils';
 
 export const def: UnitDef = {
-  name: 'Digger', ico: '\u{1F573}\uFE0F', hp: 100, atk: 35, spd: 2.5, range: 20, atkRate: 1.0,
-  cost: 55, reward: 20, w: 14, h: 13, col: 0xc09050, dk: 0x604020,
-  trait: 'burrow', desc: 'Burrows Past', tier: 'D', incubation: 7, caste: 'soldier',
+  name: 'Digger', ico: '\u{1F573}\uFE0F', hp: 100, atk: 35, spd: 3.56, range: 28, atkRate: 1.0,
+  cost: 55, reward: 20, w: 20, h: 18, col: 0xc09050, dk: 0x604020,
+  trait: 'burrow', desc: 'Burrows Past', route: 'tunnel', attackRange: 'melee',
+  tier: 'D', incubation: 7, caste: 'soldier',
 };
 
 export const combat: CombatHooks = {
@@ -19,7 +20,7 @@ export const combat: CombatHooks = {
 
     // Surface once past at least one enemy, or safety timer expires
     const foes = ctx.allAlive.filter(e => e.side !== u.side && !e.dead);
-    const gap = 30 * ctx.S; // surface a short distance behind the enemy
+    const gap = 43; // surface a short distance behind the enemy
     const passed = foes.some(e => (u.x - e.x) * u.facing > gap);
 
     if (passed || u.burrowTimer <= 0) {

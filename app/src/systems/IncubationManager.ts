@@ -51,7 +51,7 @@ export class IncubationManager {
     return !this.isFull();
   }
 
-  /** Cancel an incubating chamber. Returns the gold to refund, or -1 if slot is empty/locked. Refunds the larva. */
+  /** Cancel an incubating chamber. Returns the nectar to refund, or -1 if slot is empty/locked. Refunds the larva. */
   cancel(index: number): number {
     if (index >= this.numChambers) return -1;
     const chamber = this.chambers[index];

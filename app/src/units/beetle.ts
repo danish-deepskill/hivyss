@@ -2,9 +2,10 @@ import type { UnitDef, CombatHooks, RenderUnit, IUnit, CombatContext } from '../
 import { hexToInt } from './renderUtils';
 
 export const def: UnitDef = {
-  name: 'Beetle', ico: '\u{1F6E1}\uFE0F', hp: 450, atk: 30, spd: 0.7, range: 55, atkRate: 0.55,
-  cost: 120, reward: 55, w: 22, h: 19, col: 0x6090c0, dk: 0x304060,
-  trait: 'shield_poison', desc: 'Shield + Poison', tier: 'C', incubation: 15, knockResist: 25, caste: 'soldier',
+  name: 'Beetle', ico: '\u{1F6E1}\uFE0F', hp: 450, atk: 30, spd: 1.0, range: 78, atkRate: 0.55,
+  cost: 120, reward: 55, w: 31, h: 27, col: 0x6090c0, dk: 0x304060,
+  trait: 'shield_poison', desc: 'Shield + Poison', route: 'land', attackRange: 'melee',
+  tier: 'C', incubation: 15, knockResist: 25, caste: 'soldier',
 };
 
 export const combat: CombatHooks = {

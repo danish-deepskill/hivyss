@@ -2,9 +2,10 @@ import type { UnitDef, RenderUnit } from '../types';
 import { hexToInt } from './renderUtils';
 
 export const def: UnitDef = {
-  name: 'Rhino', ico: '\u{1F98F}', hp: 280, atk: 45, spd: 1.0, range: 24, atkRate: 0.7,
-  cost: 95, reward: 42, w: 40, h: 24, col: 0x908060, dk: 0x504030,
-  trait: 'knockback', desc: 'Rams Enemies', tier: 'C', incubation: 13, caste: 'soldier',
+  name: 'Rhino', ico: '\u{1F98F}', hp: 280, atk: 45, spd: 1.42, range: 34, atkRate: 0.7,
+  cost: 95, reward: 42, w: 57, h: 34, col: 0x908060, dk: 0x504030,
+  trait: 'knockback', desc: 'Rams Enemies', route: 'land', attackRange: 'melee',
+  tier: 'C', incubation: 13, caste: 'soldier',
   knockForce: 100, knockResist: 30,
 };
 
