@@ -3,6 +3,7 @@ import { W, H } from '../config/Constants';
 import { LANE } from '../config/Layout';
 const GND = LANE.land.groundY;
 import { UNIT_DEFS, TIER_DEFS, drawUnit } from '../units/registry';
+import { resolveColors } from '../config/Palettes';
 import { Unit, resetUid } from '../entities/Unit';
 import { CombatSystem } from '../systems/CombatSystem';
 import { EventBus } from '../systems/EventBus';
@@ -206,7 +207,7 @@ export class SandboxScene extends Phaser.Scene {
     const rSpacing: number = Math.round((rd.w + 4) * 1.2);
     for (let i = 0; i < this.rightCount; i++) {
       const x: number = Math.round(W - 57) - i * rSpacing - Math.round(rd.w);
-      const unit: Unit = new Unit(this, { ...rd, _key: this.rightKey, col: this.toEnemyColor(rd.col), dk: this.toEnemyDark(rd.dk) }, 'enemy', x);
+      const unit: Unit = new Unit(this, { ...rd, _key: this.rightKey, primary: this.toEnemyColor(rd.primary ?? 0xffffff), secondary: this.toEnemyDark(rd.secondary ?? 0x808080) }, 'enemy', x);
       this.units.push(unit);
     }
   }
@@ -280,7 +281,8 @@ export class SandboxScene extends Phaser.Scene {
       const g: Phaser.GameObjects.Graphics = this.add.graphics();
       const renderUnit: RenderUnit = {
         w: def.w, h: def.h,
-        col: def.col, dk: def.dk,
+        ...resolveColors(def),
+        palette: def.palette,
         facing: 1, bob: 0,
         state: 'march' as const, atkCd: 0, atkRate: def.atkRate,
         trait: def.trait, hp: def.hp, maxHp: def.hp,

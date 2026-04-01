@@ -21,6 +21,15 @@ export interface GeneLineDef {
   color: string;
 }
 
+// --- Geneline Palette ---
+
+export interface GenePalette {
+  primary: number;  // [hex] body fill
+  secondary: number; // [hex] dark body shade
+  accent: number;   // [hex] signature highlight (bone for alpha)
+  shadow: number;   // [hex] deepest shadow
+}
+
 // --- Unit Definitions ---
 
 export interface UnitDef {
@@ -35,8 +44,9 @@ export interface UnitDef {
   reward: number;          // [num] nectar earned when enemy version is killed
   w: number;               // [px] sprite width in pixels
   h: number;               // [px] sprite height in pixels
-  col: number;             // [hex] primary body color (e.g. 0xff8020)
-  dk: number;              // [hex] dark/accent color for outlines, limbs
+  primary?: number;        // [hex] per-unit body color override (resolved from palette if omitted)
+  secondary?: number;      // [hex] per-unit dark accent override (resolved from palette if omitted)
+  palette?: GenePalette;   // geneline color palette (geneline units use this instead of primary/secondary)
   trait: string;
   desc: string;
   tier: TierKey;
@@ -88,8 +98,9 @@ export interface CombatHooks {
 export interface RenderUnit {
   w: number;
   h: number;
-  col: number;
-  dk: number;
+  primary: number;
+  secondary: number;
+  palette?: GenePalette;
   facing: number;
   bob: number;
   state: UnitState;
@@ -106,12 +117,52 @@ export interface RenderUnit {
 
 export type DrawFunction = (g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, uy: number) => void;
 
+// --- Sprite Animation (future — type foundations only, no runtime code yet) ---
+
+export type AnimState =
+  | 'idle' | 'walk'
+  | 'attack_windup' | 'attack_strike' | 'attack_recovery'
+  | 'death'
+  | string; // unit-specific: 'burrow', 'surface', 'rally', etc.
+
+export type AnimTrigger =
+  | 'state:march' | 'state:attack'
+  | 'foreswing_start' | 'foreswing_end' | 'backswing_end'
+  | 'death' | 'burrowed:true' | 'burrowed:false'
+  | 'anim_complete'
+  | string; // unit-specific
+
+export interface AnimClip {
+  key: string;           // Phaser animation key, e.g. 'grunt_walk'
+  frameRate: number;
+  repeat: number;        // -1 = loop, 0 = once
+  yoyo?: boolean;
+}
+
+export interface AnimTransition {
+  from: AnimState | '*';
+  to: AnimState;
+  on: AnimTrigger;
+  priority?: number;     // higher wins when multiple triggers fire (default: 0)
+}
+
+export interface SpriteAnimDef {
+  atlas: string;         // texture atlas key, e.g. 'atlas_alpha'
+  prefix: string;        // frame prefix in atlas, e.g. 'grunt_'
+  anchor: { x: number; y: number };
+  clips: Record<AnimState, AnimClip>;
+  transitions: AnimTransition[];
+  defaultState: AnimState;
+  flipForFacing: boolean;
+}
+
 // --- Unit Module (what each unit file exports) ---
 
 export interface UnitModule {
   def: UnitDef;
   combat?: CombatHooks;
   draw: DrawFunction;
+  spriteAnim?: SpriteAnimDef; // future — when sprite sheet is available
 }
 
 // --- Status Effects ---
@@ -136,8 +187,8 @@ export interface IUnit {
   atkCd: number;
   unitW: number;
   unitH: number;
-  col: number;
-  dk: number;
+  primary: number;
+  secondary: number;
   unitName: string;
   ico: string;
   reward: number;
@@ -217,7 +268,6 @@ export interface IAudioManager {
   aoeHit(): void;
   heal(): void;
   unitDeath(): void;
-  bossDeath(): void;
   nectarEarn(): void;
   waveStart(): void;
   abilityNuke(): void;

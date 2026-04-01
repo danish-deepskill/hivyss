@@ -21,7 +21,7 @@ export class MenuUIScene extends Phaser.Scene {
   private larvaCounter!: HTMLElement;
   private moundSlots: { div: HTMLDivElement; ico: HTMLElement; bar: HTMLElement; timer: HTMLElement }[] = [];
 
-  // Unit tray
+  // Unit slots
   private cardEls: Record<string, HTMLDivElement> = {};
 
   // Abilities
@@ -52,7 +52,7 @@ export class MenuUIScene extends Phaser.Scene {
 
     panel.appendChild(this.buildResourceBar());
     panel.appendChild(this.buildLarvaMound());
-    panel.appendChild(this.buildUnitTray(previews));
+    panel.appendChild(this.buildUnitSlots(previews));
     panel.appendChild(this.buildAbilities());
     panel.appendChild(this.buildLog());
 
@@ -168,7 +168,7 @@ export class MenuUIScene extends Phaser.Scene {
     const nectarLbl = this.el('span', 'font-size:9px; color:#666; letter-spacing:0.5px;', 'NECTAR');
 
     const nectarTrack = document.createElement('div');
-    nectarTrack.style.cssText = 'flex:1; height:10px; background:#1a1a22; border-radius:5px; border:1px solid #2a2a3a; overflow:hidden;';
+    nectarTrack.style.cssText = 'width:200px; height:10px; background:#1a1a22; border-radius:5px; border:1px solid #2a2a3a; overflow:hidden;';
     this.nectarFill = this.el('div', 'height:100%; background:linear-gradient(90deg,#806010,#f0c040); border-radius:5px; transition:width .1s; width:26%;');
     nectarTrack.appendChild(this.nectarFill);
 
@@ -188,7 +188,7 @@ export class MenuUIScene extends Phaser.Scene {
 
   private buildLarvaMound(): HTMLElement {
     const mound = document.createElement('div');
-    mound.style.cssText = 'display:flex; flex-wrap:wrap; gap:4px; padding:4px 6px; background:#0b0b14; border-bottom:1px solid #1a1a28; max-width:600px; margin:0 auto; width:100%; justify-content:center; align-items:center; pointer-events:auto;';
+    mound.style.cssText = 'display:flex; flex-wrap:wrap; gap:4px; padding:4px 6px; background:#0b0b14; border-bottom:1px solid #1a1a28; width:100%; justify-content:center; align-items:center; pointer-events:auto;';
 
     this.larvaCounter = document.createElement('div');
     this.larvaCounter.style.cssText = 'width:100%; text-align:center; font-size:10px; color:#8a8a6a; letter-spacing:0.5px; padding:1px 0;';
@@ -220,10 +220,10 @@ export class MenuUIScene extends Phaser.Scene {
     return mound;
   }
 
-  private buildUnitTray(previews: Record<string, string>): HTMLElement {
+  private buildUnitSlots(previews: Record<string, string>): HTMLElement {
     const cols = this.deckKeys.length;
-    const tray = document.createElement('div');
-    tray.style.cssText = `display:grid; grid-template-columns:repeat(${cols},1fr); gap:3px; padding:5px 6px; background:#0a0a12; border-bottom:1px solid #1a1a28; width:100%; pointer-events:auto;`;
+    const slots = document.createElement('div');
+    slots.style.cssText = `display:grid; grid-template-columns:repeat(${cols},1fr); gap:3px; padding:5px 6px; background:#0a0a12; border-bottom:1px solid #1a1a28; width:100%; pointer-events:auto;`;
 
     this.cardEls = {};
     this.deckKeys.forEach(key => {
@@ -243,25 +243,32 @@ export class MenuUIScene extends Phaser.Scene {
         ? ` <span style="display:inline-block;width:10px;height:10px;line-height:10px;text-align:center;border-radius:50%;background:${gl.color};color:#d4c4b0;font-size:7px;font-weight:bold;vertical-align:baseline">${gl.symbol}</span>`
         : '';
 
+      const route = d.route ?? 'land';
+      const routeHtml = route === 'air'
+        ? '<span style="position:absolute;top:2px;right:4px;font-size:8px;color:#80c0ff" title="Air">\u2708</span>'
+        : route === 'tunnel'
+        ? '<span style="position:absolute;top:2px;right:4px;font-size:8px;color:#c09060" title="Tunnel">\u26CF</span>'
+        : '';
+
       div.innerHTML = `
         <div class="utier" style="color:${tier.color}">${tier.label}${glHtml}</div>
+        ${routeHtml}
         ${iconHtml}
         <div class="uname">${d.name}</div>
-        <div class="ucost">\u2B21${d.cost}</div>
-        <div class="utag">${d.desc}</div>
+        <div class="ucost" style="position:absolute;bottom:3px;right:5px;font-size:9px">\u2B21${d.cost}</div>
       `;
       div.onclick = () => this.eventBus.emit('deployUnit', { key });
 
-      tray.appendChild(div);
+      slots.appendChild(div);
       this.cardEls[key] = div;
     });
 
-    return tray;
+    return slots;
   }
 
   private buildAbilities(): HTMLElement {
     const container = document.createElement('div');
-    container.style.cssText = 'display:flex; gap:4px; padding:4px 6px; background:#090910; border-bottom:1px solid #1a1a28; max-width:600px; margin:0 auto; width:100%; pointer-events:auto;';
+    container.style.cssText = 'display:flex; gap:4px; padding:4px 6px; background:#090910; border-bottom:1px solid #1a1a28; width:100%; pointer-events:auto;';
 
     this.abilityBtns = {};
     Object.entries(ABILITY_DEFS).forEach(([key, def]) => {

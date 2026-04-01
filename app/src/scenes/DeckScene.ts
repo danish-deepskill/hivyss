@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { W, H } from '../config/Constants';
 import { UNIT_DEFS, TIER_DEFS, GENELINE_DEFS, drawUnit } from '../units/registry';
+import { resolveColors } from '../config/Palettes';
 import { SaveManager } from '../systems/SaveManager';
 import type { RenderUnit } from '../types';
 
@@ -118,7 +119,8 @@ export class DeckScene extends Phaser.Scene {
       const g: Phaser.GameObjects.Graphics = this.add.graphics();
       const renderUnit: RenderUnit = {
         w: uw, h: uh,
-        col: def.col, dk: def.dk,
+        ...resolveColors(def),
+        palette: def.palette,
         facing: 1, bob: 0, state: 'march' as const, atkCd: 0, atkRate: def.atkRate,
         trait: def.trait, hp: def.hp, maxHp: def.hp, burrowed: false, foreswingTimer: 0, backswingTimer: 0,
       };

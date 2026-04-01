@@ -8,6 +8,7 @@ interface BattleSceneData {
   deck?: string[];
   startWave?: number;
   worldW?: number;
+  theme?: string;
 }
 
 export class BattleScene extends Phaser.Scene {
@@ -31,9 +32,10 @@ export class BattleScene extends Phaser.Scene {
     const startWave = (data && data.startWave) || (urlWave ? parseInt(urlWave, 10) : 1);
 
     const worldW = data?.worldW;
+    const theme = data?.theme;
 
     // Launch WorldScene (owns game logic, rendering, camera)
-    this.scene.launch('WorldScene', { deck: deckKeys, startWave, worldW });
+    this.scene.launch('WorldScene', { deck: deckKeys, startWave, worldW, theme });
     this.scene.launch('HUDScene');
     this.worldScene = this.scene.get('WorldScene') as WorldScene;
 

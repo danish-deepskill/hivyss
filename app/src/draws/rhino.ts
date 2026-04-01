@@ -1,17 +1,9 @@
-import type { UnitDef, RenderUnit } from '../types';
-import { hexToInt } from './renderUtils';
+import type { DrawFunction } from '../types';
+import { hexToInt, makeRot, fillRotEllipse as fillRotEllipseShared } from '../units/renderUtils';
 
-export const def: UnitDef = {
-  name: 'Rhino', ico: '\u{1F98F}', hp: 280, atk: 45, spd: 1.42, range: 34, atkRate: 0.7,
-  cost: 95, reward: 42, w: 57, h: 34, col: 0x908060, dk: 0x504030,
-  trait: 'knockback', desc: 'Rams Enemies', route: 'land', attackRange: 'melee',
-  tier: 'C', incubation: 13, caste: 'soldier',
-  knockForce: 100, knockResist: 30,
-};
-
-export function draw(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, uy: number): void {
-  const col = hexToInt(u.col);
-  const dk = hexToInt(u.dk);
+const draw: DrawFunction = (g, u, cx, uy) => {
+  const primary = hexToInt(u.primary);
+  const secondary = hexToInt(u.secondary);
   const deep = 0x2a2018;
   const horn = 0xd4c4b0;
   const hornDk = 0x8a7a6a;
@@ -22,33 +14,9 @@ export function draw(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, 
   const lean = u.state === 'march' ? f * w * 0.03 : 0;
 
   // Body tilt angle (~12 degrees, front rises)
-  const angle = -f * 0.21;
-  const cosA = Math.cos(angle);
-  const sinA = Math.sin(angle);
-  const pivotX = cx + lean;
-  const pivotY = uy + h * 0.55;
-
-  function rot(px: number, py: number): [number, number] {
-    const dx = px - pivotX;
-    const dy = py - pivotY;
-    return [pivotX + dx * cosA - dy * sinA, pivotY + dx * sinA + dy * cosA];
-  }
-
-  // Draw a rotated ellipse as a polygon (16 segments)
-  function fillRotEllipse(ecx: number, ecy: number, ew: number, eh: number): void {
-    const steps = 16;
-    g.beginPath();
-    for (let i = 0; i <= steps; i++) {
-      const t = (i / steps) * Math.PI * 2;
-      const px = ecx + Math.cos(t) * ew * 0.5;
-      const py = ecy + Math.sin(t) * eh * 0.5;
-      const [rx, ry] = rot(px, py);
-      if (i === 0) g.moveTo(rx, ry);
-      else g.lineTo(rx, ry);
-    }
-    g.closePath();
-    g.fillPath();
-  }
+  const rot = makeRot(cx + lean, uy + h * 0.55, -f * 0.21);
+  const fillRotEllipse = (ecx: number, ecy: number, ew: number, eh: number) =>
+    fillRotEllipseShared(g, rot, ecx, ecy, ew, eh);
 
   // --- Legs (short, sturdy) ---
   const lp = u.state === 'march' ? u.bob : 0;
@@ -66,23 +34,23 @@ export function draw(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, 
   // --- Shell / elytra ---
   g.fillStyle(deep);
   fillRotEllipse(cx - f * w * 0.06 + lean, uy + h * 0.58, w * 0.72, h * 0.72);
-  g.fillStyle(dk);
+  g.fillStyle(secondary);
   fillRotEllipse(cx - f * w * 0.06 + lean, uy + h * 0.56, w * 0.68, h * 0.68);
-  g.fillStyle(col);
+  g.fillStyle(primary);
   fillRotEllipse(cx - f * w * 0.06 + lean, uy + h * 0.5, w * 0.58, h * 0.5);
 
   // --- Pronotum (front shield) ---
   g.fillStyle(deep);
   fillRotEllipse(cx + f * w * 0.2 + lean, uy + h * 0.48, w * 0.32, h * 0.58);
-  g.fillStyle(dk);
+  g.fillStyle(secondary);
   fillRotEllipse(cx + f * w * 0.2 + lean, uy + h * 0.46, w * 0.28, h * 0.52);
-  g.fillStyle(col);
+  g.fillStyle(primary);
   fillRotEllipse(cx + f * w * 0.2 + lean, uy + h * 0.42, w * 0.22, h * 0.38);
 
   // --- Head (small, tucked under) ---
   g.fillStyle(deep);
   fillRotEllipse(cx + f * w * 0.34 + lean, uy + h * 0.5, w * 0.16, h * 0.34);
-  g.fillStyle(dk);
+  g.fillStyle(secondary);
   fillRotEllipse(cx + f * w * 0.34 + lean, uy + h * 0.48, w * 0.13, h * 0.28);
 
   // --- Horn (thick, sturdy) ---
@@ -133,6 +101,6 @@ export function draw(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, 
     g.arc(ix, iy, w * 0.12, -Math.PI * 0.4, Math.PI * 0.4, false);
     g.strokePath();
   }
+};
 
-
-}
+export default draw;

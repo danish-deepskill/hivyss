@@ -1,35 +1,17 @@
-import type { UnitDef, CombatHooks, RenderUnit, IUnit } from '../../types';
-import { hexToInt, lerpColor } from '../renderUtils';
+import Phaser from 'phaser';
+import type { DrawFunction, RenderUnit } from '../../types';
+import { hexToInt, lerpColor } from '../../units/renderUtils';
 
-export const def: UnitDef = {
-  name: 'Ravager', ico: '\u{1F41D}', hp: 160, atk: 60, spd: 2.2, range: 20, atkRate: 1.25,
-  cost: 70, reward: 32, w: 22, h: 18, col: 0xc03030, dk: 0x6b1a1a,
-  trait: 'berserk', desc: 'Rage SPD', route: 'air', attackRange: 'melee',
-  tier: 'D', incubation: 6,
-  caste: 'soldier', geneline: 'alpha',
-};
-
-export const combat: CombatHooks = {
-  onUpdate(u: IUnit, dt: number) {
-    // Rage: attack rate increases as HP drops
-    const base = def.atkRate;
-    const hpFrac = u.hp / u.maxHp;
-    if (hpFrac <= 0.5) u.atkRate = base * 1.5;
-    else u.atkRate = base;
-    return false;
-  },
-};
-
-export function draw(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, uy: number): void {
-  const col = hexToInt(u.col);
-  const dk = hexToInt(u.dk);
-  const deep = 0x3d0e0e;
-  const bone = 0xd4c4b0;
+const draw: DrawFunction = (g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, uy: number): void => {
+  const primary = hexToInt(u.primary);
+  const secondary = hexToInt(u.secondary);
+  const deep = u.palette!.shadow;
+  const bone = u.palette!.accent;
   const f = u.facing;
   const w = u.w;
   const h = u.h;
   const hpFrac = u.hp / u.maxHp;
-  const bodyCol = hpFrac < 0.5 ? lerpColor(col, 0xff0000, 0.5) : col;
+  const bodyCol = hpFrac < 0.5 ? lerpColor(primary, 0xff0000, 0.5) : primary;
 
   // Hover offset — floats above ground (wasp-like)
   const hover = Math.sin(u.bob * 2.5) * h * 0.06 - h * 0.2;
@@ -53,7 +35,7 @@ export function draw(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, 
   // --- Abdomen (striped wasp pattern) ---
   g.fillStyle(deep);
   g.fillEllipse(cx - f * w * 0.12, uy + hover + h * 0.62, w * 0.52, h * 0.6);
-  g.fillStyle(dk);
+  g.fillStyle(secondary);
   g.fillEllipse(cx - f * w * 0.12, uy + hover + h * 0.6, w * 0.48, h * 0.56);
   g.fillStyle(bodyCol);
   g.fillEllipse(cx - f * w * 0.12, uy + hover + h * 0.56, w * 0.38, h * 0.42);
@@ -75,7 +57,7 @@ export function draw(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, 
   // --- Thorax ---
   g.fillStyle(deep);
   g.fillEllipse(cx + f * w * 0.12, uy + hover + h * 0.34, w * 0.3, h * 0.32);
-  g.fillStyle(dk);
+  g.fillStyle(secondary);
   g.fillEllipse(cx + f * w * 0.12, uy + hover + h * 0.32, w * 0.26, h * 0.28);
   g.fillStyle(bodyCol);
   g.fillEllipse(cx + f * w * 0.12, uy + hover + h * 0.29, w * 0.18, h * 0.18);
@@ -83,7 +65,7 @@ export function draw(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, 
   // --- Head ---
   g.fillStyle(deep);
   g.fillEllipse(cx + f * w * 0.3, uy + hover + h * 0.24, w * 0.3, h * 0.3);
-  g.fillStyle(dk);
+  g.fillStyle(secondary);
   g.fillEllipse(cx + f * w * 0.3, uy + hover + h * 0.22, w * 0.26, h * 0.26);
   g.fillStyle(bodyCol);
   g.fillEllipse(cx + f * w * 0.3, uy + hover + h * 0.19, w * 0.2, h * 0.18);
@@ -114,9 +96,12 @@ export function draw(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, 
   }
 
   // --- Antennae ---
-  g.lineStyle(w * 0.035, dk);
+  g.lineStyle(w * 0.035, secondary);
   const ax = cx + f * w * 0.26;
   const ay = uy + hover + h * 0.1;
   const wave = Math.sin(u.bob * 1.5) * w * 0.05;
   g.lineBetween(ax, ay, ax + f * w * 0.14 + wave, ay - h * 0.14);
-  g.lineBetween(ax, ay, ax + f * w * 0.06 - wave, ay - h * 0.16);}
+  g.lineBetween(ax, ay, ax + f * w * 0.06 - wave, ay - h * 0.16);
+};
+
+export default draw;

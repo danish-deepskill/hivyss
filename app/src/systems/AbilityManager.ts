@@ -50,7 +50,7 @@ export class AbilityManager {
       u.takeDamage(def.damage!);
       u.dmgFlash = 0.6;
       if (u.dead && particles) {
-        particles.burst(u.x + u.unitW / 2, u.y + u.unitH / 2, u.col, 14);
+        particles.burst(u.x + u.unitW / 2, u.y + u.unitH / 2, u.primary, 14);
         this.events.emit('enemyKilled', { unit: { key: u.key, reward: u.reward, x: u.x, y: u.y } });
         particles.float(u.x + u.unitW / 2, u.y - 18, `+${u.reward}\u2B21`, 0xf0c040);
       }

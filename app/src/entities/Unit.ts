@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import type { UnitDef, Side, UnitState, StatusEffect, RenderUnit, Route, AttackRange } from '../types';
+import type { UnitDef, Side, UnitState, StatusEffect, RenderUnit, Route, AttackRange, GenePalette } from '../types';
+import { resolveColors } from '../config/Palettes';
 import { SPD_MULT } from '../config/Constants';
 import { getGroundY } from '../config/RouteMatrix';
 import { drawUnit } from '../units/registry';
@@ -24,8 +25,9 @@ export class Unit extends Phaser.GameObjects.Container {
   atkCd: number;
   unitW: number;
   unitH: number;
-  col: number;
-  dk: number;
+  primary: number;
+  secondary: number;
+  palette?: GenePalette;
   unitName: string;
   ico: string;
   reward: number;
@@ -84,8 +86,9 @@ export class Unit extends Phaser.GameObjects.Container {
     this.atkCd = 0;
     this.unitW = 0;
     this.unitH = 0;
-    this.col = 0;
-    this.dk = 0;
+    this.primary = 0;
+    this.secondary = 0;
+    this.palette = undefined;
     this.unitName = '';
     this.ico = '';
     this.reward = 0;
@@ -143,8 +146,10 @@ export class Unit extends Phaser.GameObjects.Container {
     this.atkCd = 0;
     this.unitW = def.w;
     this.unitH = def.h;
-    this.col = def.col;
-    this.dk = def.dk;
+    const colors = resolveColors(def);
+    this.primary = colors.primary;
+    this.secondary = colors.secondary;
+    this.palette = def.palette;
     this.unitName = def.name;
     this.ico = def.ico;
     this.reward = def.reward;
@@ -344,14 +349,14 @@ export class Unit extends Phaser.GameObjects.Container {
     const uy = bob;
 
     // Slow tint
-    let col = this.col;
+    let primary = this.primary;
     if (this.slowTimer > 0) {
-      const a = col;
+      const a = primary;
       const b = 0x80c8ff;
       const t = 0.4;
       const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab2 = a & 0xff;
       const br = (b >> 16) & 0xff, bg = (b >> 8) & 0xff, bb = b & 0xff;
-      col = (((ar + t * (br - ar)) | 0) << 16) | (((ag + t * (bg - ag)) | 0) << 8) | ((ab2 + t * (bb - ab2)) | 0);
+      primary = (((ar + t * (br - ar)) | 0) << 16) | (((ag + t * (bg - ag)) | 0) << 8) | ((ab2 + t * (bb - ab2)) | 0);
     }
 
     // Shadow
@@ -363,7 +368,7 @@ export class Unit extends Phaser.GameObjects.Container {
     // Draw the ant body using the renderer
     const renderUnit: RenderUnit = {
       w: this.unitW, h: this.unitH,
-      col: col, dk: this.dk,
+      primary: primary, secondary: this.secondary, palette: this.palette,
       facing: this.facing, bob: this.bob,
       state: this.state, atkCd: this.atkCd, atkRate: this.atkRate,
       trait: this.trait, hp: this.hp, maxHp: this.maxHp,

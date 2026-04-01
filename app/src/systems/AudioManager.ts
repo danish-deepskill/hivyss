@@ -104,12 +104,6 @@ export class AudioManager {
     this._tone(120, 0.15, 'sawtooth', 0.1);
   }
 
-  bossDeath(): void {
-    this._noise(0.3, 0.25);
-    this._tone(100, 0.25, 'sawtooth', 0.15);
-    this._tone(80, 0.35, 'square', 0.1);
-  }
-
   nectarEarn(): void {
     this._tone(1047, 0.04, 'square', 0.06);
     this._tone(1319, 0.06, 'square', 0.05);

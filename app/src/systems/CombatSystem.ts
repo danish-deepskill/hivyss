@@ -165,7 +165,7 @@ export class CombatSystem {
               playerBase.flash(0.2);
               if (particles) particles.float(SBW / 2, GND - 40, `-${dmg}`, DMG_COLORS.base);
             }
-            if (particles) particles.burst(SBW - 2, GND - 20, u.col, 4);
+            if (particles) particles.burst(SBW - 2, GND - 20, u.primary, 4);
             u.atkCd = (1 / u.atkRate) - u.foreswing;
             u.backswingTimer = u.backswing;
           } else if (u.canAttack() && u.backswingTimer <= 0) {
@@ -272,13 +272,9 @@ export class CombatSystem {
 
     if (u.dead) {
       if (ctx.particles) {
-        ctx.particles.burst(u.x + u.unitW / 2, u.y + u.unitH / 2, u.col, 14);
+        ctx.particles.burst(u.x + u.unitW / 2, u.y + u.unitH / 2, u.primary, 14);
       }
-      const isBoss = u.trait === 'boss' || u.trait === 'boss_summon' || u.trait === 'boss_regen';
-      if (this.audio) {
-        if (isBoss) this.audio.bossDeath();
-        else this.audio.unitDeath();
-      }
+      if (this.audio) this.audio.unitDeath();
 
       // onDeath hook (explosion, etc.)
       const handler = COMBAT_MAP[u.trait];

@@ -1,41 +1,12 @@
-import type { UnitDef, RenderUnit } from "../../types";
-import { hexToInt } from "../renderUtils";
+import Phaser from 'phaser';
+import type { DrawFunction, RenderUnit } from '../../types';
+import { hexToInt } from '../../units/renderUtils';
 
-export const def: UnitDef = {
-  name: "Needler",
-  ico: "\u{1F3AF}",
-  hp: 75,
-  atk: 42,
-  spd: 0.9,
-  range: 90,
-  atkRate: 0.75,
-  cost: 50,
-  reward: 22,
-  w: 22,
-  h: 18,
-  col: 0xc03030,
-  dk: 0x6b1a1a,
-  trait: "ranged",
-  desc: "Ranged",
-  route: "land",
-  attackRange: "ranged",
-  tier: "E",
-  incubation: 5,
-  caste: "soldier",
-  geneline: "alpha",
-};
-
-export function draw(
-  g: Phaser.GameObjects.Graphics,
-  u: RenderUnit,
-  cx: number,
-  uy: number,
-): void {
-  const col = hexToInt(u.col);
-  const dk = hexToInt(u.dk);
-  const deep = 0x3d0e0e;
-  const bone = 0xd4c4b0;
-  const darkBone = 0x8a7a6a;
+const draw: DrawFunction = (g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, uy: number): void => {
+  const primary = hexToInt(u.primary);
+  const secondary = hexToInt(u.secondary);
+  const deep = u.palette!.shadow;
+  const bone = u.palette!.accent;
   const f = u.facing;
   const w = u.w;
   const h = u.h;
@@ -57,9 +28,9 @@ export function draw(
   // --- Abdomen (elongated, tapered — needle storage) ---
   g.fillStyle(deep);
   g.fillEllipse(cx - f * w * 0.14, uy + h * 0.66, w * 0.5, h * 0.56);
-  g.fillStyle(dk);
+  g.fillStyle(secondary);
   g.fillEllipse(cx - f * w * 0.14, uy + h * 0.64, w * 0.46, h * 0.52);
-  g.fillStyle(col);
+  g.fillStyle(primary);
   g.fillEllipse(cx - f * w * 0.14, uy + h * 0.6, w * 0.36, h * 0.38);
   // Needle ridges on abdomen (stored chitin needles)
   g.lineStyle(w * 0.02, bone, 0.5);
@@ -72,23 +43,23 @@ export function draw(
   // --- Petiole ---
   g.fillStyle(deep);
   g.fillEllipse(cx + f * w * 0.02, uy + h * 0.44, w * 0.1, h * 0.12);
-  g.fillStyle(dk);
+  g.fillStyle(secondary);
   g.fillEllipse(cx + f * w * 0.02, uy + h * 0.43, w * 0.07, h * 0.09);
 
   // --- Thorax (compact, angular) ---
   g.fillStyle(deep);
   g.fillEllipse(cx + f * w * 0.14, uy + h * 0.36, w * 0.34, h * 0.34);
-  g.fillStyle(dk);
+  g.fillStyle(secondary);
   g.fillEllipse(cx + f * w * 0.14, uy + h * 0.34, w * 0.3, h * 0.3);
-  g.fillStyle(col);
+  g.fillStyle(primary);
   g.fillEllipse(cx + f * w * 0.14, uy + h * 0.31, w * 0.22, h * 0.2);
 
   // --- Head (small, angular) ---
   g.fillStyle(deep);
   g.fillEllipse(cx + f * w * 0.32, uy + h * 0.26, w * 0.28, h * 0.28);
-  g.fillStyle(dk);
+  g.fillStyle(secondary);
   g.fillEllipse(cx + f * w * 0.32, uy + h * 0.24, w * 0.24, h * 0.24);
-  g.fillStyle(col);
+  g.fillStyle(primary);
   g.fillEllipse(cx + f * w * 0.32, uy + h * 0.21, w * 0.18, h * 0.17);
 
   // --- Eye (solid compound eye) ---
@@ -117,10 +88,12 @@ export function draw(
   }
 
   // --- Antennae (medium, swept back) ---
-  g.lineStyle(w * 0.035, dk);
+  g.lineStyle(w * 0.035, secondary);
   const ax = cx + f * w * 0.28;
   const ay = uy + h * 0.12;
   const wave = Math.sin(u.bob) * w * 0.04;
   g.lineBetween(ax, ay, ax + f * w * 0.14 + wave, ay - h * 0.14);
   g.lineBetween(ax, ay, ax + f * w * 0.06 - wave, ay - h * 0.16);
-}
+};
+
+export default draw;

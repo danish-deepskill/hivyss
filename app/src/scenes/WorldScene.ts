@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { W, DEFAULT_WORLD_W, H } from '../config/Constants';
+import { BG_THEMES } from '../config/BackgroundDefs';
 import { LANE } from '../config/Layout';
 const GND = LANE.land.groundY;
 import { ABILITY_DEFS } from '../config/AbilityDefs';
@@ -10,11 +11,13 @@ interface WorldSceneData {
   deck: string[];
   startWave: number;
   worldW?: number;
+  theme?: string;
 }
 
 export class WorldScene extends Phaser.Scene {
   gm!: GameManager;
   private worldW: number = DEFAULT_WORLD_W;
+  private theme: string = 'random';
   private mouseX: number = -1;
   private dragStartX: number = 0;
   private camStartX: number = 0;
@@ -27,6 +30,7 @@ export class WorldScene extends Phaser.Scene {
 
   create(data: WorldSceneData): void {
     this.worldW = data.worldW ?? DEFAULT_WORLD_W;
+    this.theme = data.theme ?? 'random';
 
     this.drawBackground();
 
@@ -173,14 +177,11 @@ export class WorldScene extends Phaser.Scene {
     const ww = this.worldW;
     const bg: Phaser.GameObjects.Graphics = this.add.graphics();
 
-    // Time-of-day palettes
-    const themes = {
-      day:    { sky: 0x5c9ee8, skyLow: 0x8ec4f0, mtn: 0x6a8a5a, ground: 0x4a6a28, groundTop: 0x5c7a34, groundTex: 0x3e5a1e, stars: false },
-      sunset: { sky: 0xd45020, skyLow: 0xf0a040, mtn: 0x4a2a20, ground: 0x2e2a10, groundTop: 0x3e3818, groundTex: 0x36300e, stars: false },
-      night:  { sky: 0x0e0e18, skyLow: 0x0e0e18, mtn: 0x141420, ground: 0x1e1a0c, groundTop: 0x2a2410, groundTex: 0x2e2810, stars: true },
-    };
-    const themeKeys = Object.keys(themes) as (keyof typeof themes)[];
-    const t = themes[themeKeys[Math.floor(Math.random() * themeKeys.length)]];
+    const themeKeys = Object.keys(BG_THEMES);
+    const picked = this.theme === 'random'
+      ? themeKeys[Math.floor(Math.random() * themeKeys.length)]
+      : this.theme;
+    const t = BG_THEMES[picked] ?? BG_THEMES.day;
 
     // Sky — gradient from top to horizon
     const skySteps = 12;

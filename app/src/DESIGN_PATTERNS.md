@@ -72,7 +72,7 @@ this.events.emit('enemyKilled', { unit: { key, reward, x, y } });
 | Event | Data | Emitted by | Consumed by |
 |---|---|---|---|
 | `enemyKilled` | `{ unit: { key, reward, x, y } }` | CombatSystem, AbilityManager | GameManager (nectar + kills) |
-| `unitSpawned` | `{ key, side }` | WaveManager, enemyTraits | GameManager (spawn enemy) |
+| `unitSpawned` | `{ key, side }` | WaveManager | GameManager (spawn enemy) |
 | `waveStart` | `{ wave }` | WaveManager | GameManager (audio + log), MenuUIScene (stage label) |
 | `deployUnit` | `{ key }` | MenuUIScene | WorldScene → GameManager.playerSpawn() |
 | `useAbility` | `{ key }` | MenuUIScene | WorldScene → GameManager.castAbility() |
@@ -189,7 +189,7 @@ During battle, 4 parallel Phaser scenes run simultaneously. BattleScene is a thi
 BattleScene (orchestrator)
   ├── WorldScene     — game world, GameManager, camera, canvas rendering
   ├── HUDScene       — floating HP bars (canvas), synced to WorldScene camera
-  ├── MenuUIScene    — bottom panel DOM UI (resource bar, unit tray, abilities, log)
+  ├── MenuUIScene    — bottom panel DOM UI (resource bar, unit slots, abilities, log)
   └── ModalScene     — game-over overlay (launched on demand)
 ```
 
@@ -282,6 +282,70 @@ if (ctx.sourceUnit && !canAttack(source.route, source.attackRange, target.route)
 ---
 
 ## Planned (Not Yet Implemented)
+
+### Sprite Animation System
+**When:** First sprite sheet delivered by artist
+**Status:** Type foundations in place (`types.ts`, `registry.ts`). No runtime code yet.
+
+Migrates unit rendering from procedural Graphics API to sprite-based animation. Supports both renderers simultaneously — per-unit choice, not global switch.
+
+**Core types** (already in `types.ts`):
+- `SpriteAnimDef` — per-unit anim config (atlas, prefix, clips, transitions, anchor)
+- `AnimClip` — per-state animation (key, frameRate, repeat, yoyo)
+- `AnimTransition` — state machine edge (from, to, trigger, priority)
+- `AnimState` — idle, walk, attack_windup, attack_strike, attack_recovery, death, + custom
+
+**Render mode selection:**
+```ts
+// UnitModule already has optional spriteAnim field
+interface UnitModule {
+  def: UnitDef;
+  combat?: CombatHooks;
+  draw: DrawFunction;            // procedural (always present as fallback)
+  spriteAnim?: SpriteAnimDef;    // sprite (when atlas available)
+}
+
+// Registry already builds SPRITE_ANIM_MAP from UNITS
+// If spriteAnim present + atlas loaded → sprite mode. Otherwise → procedural.
+```
+
+**Animation state machine (data-driven):**
+```
+idle → walk → attack_windup → attack_strike → attack_recovery → walk
+any state → death (priority 100)
+custom states: burrow, surface, rally (unit-specific)
+```
+
+Triggers fire from unit properties each frame: `state:march`, `foreswing_start`, `foreswing_end`, `backswing_end`, `death`, `burrowed:true/false`, `anim_complete`.
+
+**Standard factory** eliminates boilerplate:
+```ts
+// Most units use this — only custom units define full transitions
+export const spriteAnim = makeStandardAnim('atlas_alpha', 'grunt_');
+```
+
+**Asset structure:**
+```
+app/public/assets/sprites/
+  alpha/atlas_alpha.{png,json}    ← per-geneline texture atlas
+  beta/atlas_beta.{png,json}
+  misc/atlas_misc.{png,json}      ← non-geneline units
+```
+
+**Frame naming in atlas:** `{trait}_{state}_{frame:2d}` — e.g. `grunt_walk_00`, `grunt_attack_windup_01`
+
+**Per-geneline atlas** (~10 units × ~6 states × ~4-12 frames = ~400-700 frames, fits 2048×2048). Canvas renderer has no batching benefit — atlas grouping optimizes load time and memory.
+
+**Unit class changes (when implemented):**
+- `Unit` Container gains optional `sprite: Sprite` child alongside `gfx: Graphics`
+- `redraw()` branches: sprite mode calls `updateSpriteAnim()`, procedural mode calls current logic
+- Facing via `sprite.setFlipX(facing === -1)` — all sprites authored facing right
+
+**Unit-specific animations:** Custom `AnimState` strings + overlay sprites for effects (rally chevrons, burrow dust). Combat hooks set boolean properties; overlays check `visibleWhen` conditions.
+
+**Migration path:** Per-unit, incremental. Add `spriteAnim` export → sprite renders. Remove export → procedural fallback. No system changes needed. When full geneline has sprites, consolidate unit files (def + spriteAnim + combat = ~30-50 lines per unit, possible per-geneline grouping).
+
+---
 
 ### Comp System
 **When:** Mutation mechanic development

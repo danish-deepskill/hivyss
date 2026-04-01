@@ -4,6 +4,7 @@ import type {
   UnitModule,
   CombatHooks,
   DrawFunction,
+  SpriteAnimDef,
   TierKey,
   TierDef,
   GeneLineDef,
@@ -11,54 +12,14 @@ import type {
   RenderUnit,
 } from "../types";
 import { drawBasicBody } from "./renderUtils";
-import {
-  drawBoss,
-  drawShield,
-  drawPoison,
-  bossCombat,
-  bossSummonCombat,
-  bossRegenCombat,
-  shieldCombat,
-  poisonCombat,
-} from "./enemyTraits";
 
-import * as grub from "./grub";
-import * as grunt from "./alpha/grunt";
-import * as mandible from "./alpha/mandible";
-import * as bombardier from "./alpha/bombardier";
-import * as zephyr from "./zephyr";
-import * as needler from "./alpha/needler";
-import * as aphid from "./aphid";
-import * as digger from "./digger";
-import * as ember from "./ember";
-import * as guardian from "./guardian";
-import * as mantis from "./mantis";
-import * as legionnaire from "./alpha/legionnaire";
-import * as ravager from "./alpha/ravager";
-import * as centurion from "./alpha/centurion";
-import * as beetle from "./beetle";
-import * as rhino from "./rhino";
-import * as voltfly from "./voltfly";
+import { units as starterUnits } from "./normal";
+import { units as alphaUnits } from "./alpha";
 
 // All unit modules keyed by unit ID
 const UNITS: Record<string, UnitModule> = {
-  grub,
-  grunt,
-  mandible,
-  bombardier,
-  zephyr,
-  needler,
-  aphid,
-  digger,
-  ember,
-  guardian,
-  mantis,
-  legionnaire,
-  ravager,
-  centurion,
-  beetle,
-  rhino,
-  voltfly,
+  ...starterUnits,
+  ...alphaUnits,
 };
 
 // Tier display definitions
@@ -91,12 +52,13 @@ for (const [_key, mod] of Object.entries(UNITS)) {
   DRAW_MAP[mod.def.trait] = mod.draw;
 }
 
-// Enemy-only trait draw functions
-DRAW_MAP.boss = drawBoss;
-DRAW_MAP.boss_summon = drawBoss;
-DRAW_MAP.boss_regen = drawBoss;
-DRAW_MAP.shield = drawShield;
-DRAW_MAP.poison = drawPoison;
+// Build sprite anim map: trait -> sprite animation def (empty until sprites are added)
+export const SPRITE_ANIM_MAP: Record<string, SpriteAnimDef> = {};
+for (const [_key, mod] of Object.entries(UNITS)) {
+  if (mod.spriteAnim) SPRITE_ANIM_MAP[mod.def.trait] = mod.spriteAnim;
+}
+
+
 
 // Build combat map: trait -> combat hooks
 export const COMBAT_MAP: Record<string, CombatHooks> = {};
@@ -104,12 +66,7 @@ for (const [_key, mod] of Object.entries(UNITS)) {
   if (mod.combat) COMBAT_MAP[mod.def.trait] = mod.combat;
 }
 
-// Enemy-only trait combat hooks
-COMBAT_MAP.boss = bossCombat;
-COMBAT_MAP.boss_summon = bossSummonCombat;
-COMBAT_MAP.boss_regen = bossRegenCombat;
-COMBAT_MAP.shield = shieldCombat;
-COMBAT_MAP.poison = poisonCombat;
+
 
 // Draw a unit onto a Graphics object
 export function drawUnit(

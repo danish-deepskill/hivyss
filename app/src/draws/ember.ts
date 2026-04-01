@@ -1,32 +1,9 @@
-import type { UnitDef, CombatHooks, RenderUnit, IUnit, CombatContext } from '../types';
-import { hexToInt, drawCommonParts } from './renderUtils';
+import type { DrawFunction } from '../types';
+import { hexToInt, drawCommonParts } from '../units/renderUtils';
 
-export const def: UnitDef = {
-  name: 'Ember', ico: '\u{1F525}', hp: 80, atk: 40, spd: 1.85, range: 43, atkRate: 0.8,
-  cost: 65, reward: 28, w: 21, h: 20, col: 0xf08020, dk: 0xa04008,
-  trait: 'burn', desc: 'Burns Foes', route: 'land', attackRange: 'melee',
-  tier: 'D', incubation: 8, knockForce: 10, caste: 'soldier',
-};
-
-export const combat: CombatHooks = {
-  afterHit(u: IUnit, target: IUnit, dmg: number, ctx: CombatContext) {
-    // Spread burn to up to 3 nearby enemies
-    const foes = ctx.allAlive.filter(e =>
-      e.side !== u.side && !e.dead && !e.burrowed &&
-      Math.abs((e.x + e.unitW / 2) - (target.x + target.unitW / 2)) < 85
-    ).sort((a, b) =>
-      Math.abs(a.x - target.x) - Math.abs(b.x - target.x)
-    ).slice(0, 3);
-    foes.forEach(e => {
-      e.burnTimer = 8;
-      e.burnDmgAcc = 0;
-    });
-  },
-};
-
-export function draw(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, uy: number): void {
-  const col = hexToInt(u.col);
-  const dk = hexToInt(u.dk);
+const draw: DrawFunction = (g, u, cx, uy) => {
+  const primary = hexToInt(u.primary);
+  const secondary = hexToInt(u.secondary);
   const t = u.bob;
 
   // Heat shimmer aura (warm glow behind body)
@@ -70,7 +47,7 @@ export function draw(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, 
   });
 
   // Dark charred body underneath flames
-  g.fillStyle(dk);
+  g.fillStyle(secondary);
   g.fillEllipse(cx - u.facing * 2, uy + u.h * 0.64, u.w * 0.7, u.h * 0.78);
   // Magma cracks on abdomen
   g.lineStyle(1, 0xff6020, 0.6);
@@ -80,11 +57,11 @@ export function draw(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, 
   g.lineBetween(cx - u.facing * 2, uy + u.h * 0.58, cx + u.facing * 1, uy + u.h * 0.75);
 
   // Thorax (smoldering)
-  g.fillStyle(col);
+  g.fillStyle(primary);
   g.fillEllipse(cx + u.facing * 1, uy + u.h * 0.34, u.w * 0.5, u.h * 0.5);
 
   // Head with glowing eyes
-  g.fillStyle(col);
+  g.fillStyle(primary);
   g.fillEllipse(cx + u.facing * u.w * 0.28, uy + u.h * 0.18, u.w * 0.4, u.h * 0.36);
   // Fiery eyes
   const eyeGlow = 0.7 + Math.sin(t * 6) * 0.3;
@@ -134,4 +111,6 @@ export function draw(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, 
   }
 
   drawCommonParts(g, u, cx, uy);
-}
+};
+
+export default draw;

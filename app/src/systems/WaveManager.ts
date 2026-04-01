@@ -60,13 +60,6 @@ export class WaveManager {
       units.push(pattern.units[i % pattern.units.length]);
     }
 
-    // Boss every 10 waves
-    if ((this.waveIdx + 1) % 10 === 0) {
-      const bossKeys = ['eboss', 'egeneral', 'eempress'];
-      const bossIdx = Math.floor((this.waveIdx + 1) / 10) % bossKeys.length;
-      units.push(bossKeys[bossIdx]);
-    }
-
     this.enemyQueue = units;
     this.enemySpawnInterval = Math.max(0.4, pattern.interval - scale * 0.08);
     this.enemySpawnAcc = 0;

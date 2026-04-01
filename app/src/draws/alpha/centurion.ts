@@ -1,53 +1,12 @@
-import type { UnitDef, CombatHooks, RenderUnit, IUnit, CombatContext } from '../../types';
-import { hexToInt } from '../renderUtils';
+import Phaser from 'phaser';
+import type { DrawFunction, RenderUnit } from '../../types';
+import { hexToInt } from '../../units/renderUtils';
 
-export const def: UnitDef = {
-  name: 'Centurion', ico: '\u{2694}\uFE0F', hp: 250, atk: 26, spd: 0.9, range: 24, atkRate: 0.8,
-  cost: 100, reward: 48, w: 26, h: 22, col: 0xc03030, dk: 0x6b1a1a,
-  trait: 'rally', desc: '+20% Ally ATK', route: 'land', attackRange: 'melee',
-  tier: 'C', incubation: 8, knockResist: 15,
-  caste: 'soldier', geneline: 'alpha',
-};
-
-const AURA_RANGE = 80;
-
-export const combat: CombatHooks = {
-  onUpdate(u: IUnit, dt: number, ctx: CombatContext) {
-    // Rally aura: up to 5 nearest allies within range get +20% ATK
-    const allies = ctx.allAlive.filter(a =>
-      a.side === u.side && a !== u && !a.dead &&
-      Math.abs((a.x + a.unitW / 2) - (u.x + u.unitW / 2)) < AURA_RANGE * ctx.S
-    ).sort((a, b) =>
-      Math.abs(a.x - u.x) - Math.abs(b.x - u.x)
-    ).slice(0, 5);
-
-    for (const a of allies) {
-      if (!(a as any)._rallied) {
-        (a as any)._baseAtk = (a as any)._baseAtk ?? a.atk;
-        a.atk = Math.round((a as any)._baseAtk * 1.2);
-        (a as any)._rallied = true;
-      }
-    }
-    // Store buff count so draw can show chevrons
-    (u as any).rallyCount = allies.length;
-    return false;
-  },
-  onDeath(u: IUnit, ctx: CombatContext) {
-    // Remove rally buff from all allies when centurion dies
-    for (const a of ctx.allAlive) {
-      if (a.side === u.side && (a as any)._rallied) {
-        a.atk = (a as any)._baseAtk ?? a.atk;
-        (a as any)._rallied = false;
-      }
-    }
-  },
-};
-
-export function draw(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, uy: number): void {
-  const col = hexToInt(u.col);
-  const dk = hexToInt(u.dk);
-  const deep = 0x3d0e0e;
-  const bone = 0xd4c4b0;
+const draw: DrawFunction = (g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, uy: number): void => {
+  const primary = hexToInt(u.primary);
+  const secondary = hexToInt(u.secondary);
+  const deep = u.palette!.shadow;
+  const bone = u.palette!.accent;
   const f = u.facing;
   const w = u.w;
   const h = u.h;
@@ -77,12 +36,12 @@ export function draw(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, 
   // --- Abdomen (layered) ---
   g.fillStyle(deep);
   g.fillEllipse(cx - f * w * 0.12, uy + h * 0.64, w * 0.56, h * 0.6);
-  g.fillStyle(dk);
+  g.fillStyle(secondary);
   g.fillEllipse(cx - f * w * 0.12, uy + h * 0.62, w * 0.52, h * 0.56);
-  g.fillStyle(col);
+  g.fillStyle(primary);
   g.fillEllipse(cx - f * w * 0.12, uy + h * 0.58, w * 0.42, h * 0.42);
   // Segment ridges
-  g.fillStyle(dk, 0.5);
+  g.fillStyle(secondary, 0.5);
   for (let s = 0; s < 2; s++) {
     g.fillRect(cx - f * w * 0.12 - w * 0.12, uy + h * (0.5 + s * 0.08), w * 0.24, h * 0.04);
   }
@@ -90,15 +49,15 @@ export function draw(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, 
   // --- Petiole ---
   g.fillStyle(deep);
   g.fillEllipse(cx + f * w * 0.02, uy + h * 0.42, w * 0.1, h * 0.12);
-  g.fillStyle(dk);
+  g.fillStyle(secondary);
   g.fillEllipse(cx + f * w * 0.02, uy + h * 0.41, w * 0.07, h * 0.09);
 
   // --- Thorax (layered, with bone crest) ---
   g.fillStyle(deep);
   g.fillEllipse(cx + f * w * 0.16, uy + h * 0.34, w * 0.4, h * 0.38);
-  g.fillStyle(dk);
+  g.fillStyle(secondary);
   g.fillEllipse(cx + f * w * 0.16, uy + h * 0.32, w * 0.36, h * 0.34);
-  g.fillStyle(col);
+  g.fillStyle(primary);
   g.fillEllipse(cx + f * w * 0.16, uy + h * 0.28, w * 0.28, h * 0.22);
   // Gold crest on thorax (commander insignia)
   g.fillStyle(bone, 0.6);
@@ -107,9 +66,9 @@ export function draw(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, 
   // --- Head (layered) ---
   g.fillStyle(deep);
   g.fillEllipse(cx + f * w * 0.34, uy + h * 0.24, w * 0.34, h * 0.32);
-  g.fillStyle(dk);
+  g.fillStyle(secondary);
   g.fillEllipse(cx + f * w * 0.34, uy + h * 0.22, w * 0.3, h * 0.28);
-  g.fillStyle(col);
+  g.fillStyle(primary);
   g.fillEllipse(cx + f * w * 0.34, uy + h * 0.19, w * 0.24, h * 0.2);
 
   // --- Crest / plume (bone, on top of head — centurion signature) ---
@@ -159,7 +118,7 @@ export function draw(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, 
   }
 
   // --- Antennae (medium, military) ---
-  g.lineStyle(w * 0.04, dk);
+  g.lineStyle(w * 0.04, secondary);
   const ax = cx + f * w * 0.3;
   const ay = uy + h * 0.08;
   const wave = Math.sin(u.bob) * w * 0.04;
@@ -182,4 +141,6 @@ export function draw(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, 
     g.closePath();
     g.fillPath();
   }
-}
+};
+
+export default draw;

@@ -1,43 +1,19 @@
-import type { UnitDef, CombatHooks, RenderUnit, IUnit, CombatContext } from '../types';
-import { hexToInt } from './renderUtils';
+import type { DrawFunction } from '../types';
+import { hexToInt } from '../units/renderUtils';
 
-export const def: UnitDef = {
-  name: 'Mantis', ico: '\u{1F52D}', hp: 100, atk: 120, spd: 0.71, range: 284, atkRate: 0.25,
-  cost: 85, reward: 38, w: 21, h: 20, col: 0xc0a0f0, dk: 0x503080,
-  trait: 'sniper', desc: 'Long Range', route: 'land', attackRange: 'ranged',
-  tier: 'C', incubation: 14, caste: 'soldier',
-};
-
-export const combat: CombatHooks = {
-  onAttack(u: IUnit, target: IUnit, foes: IUnit[], dmg: number, ctx: CombatContext) {
-    // Piercing shot hits up to 2 enemies, second at 50% damage
-    const targets = foes.filter(e => {
-      if (e.burrowed) return false;
-      const d = u.facing > 0 ? (e.x - (u.x + u.unitW)) : (u.x - (e.x + e.unitW));
-      return Math.max(0, d) <= u.range;
-    }).sort((a, b) => {
-      const da = u.facing > 0 ? a.x - u.x : u.x - a.x;
-      const db = u.facing > 0 ? b.x - u.x : u.x - b.x;
-      return da - db;
-    }).slice(0, 2);
-    targets.forEach((e, i) => ctx.hitUnit(e, i === 0 ? dmg : Math.ceil(dmg * 0.5), 'ranged'));
-    ctx.playHitSound('ranged');
-  },
-};
-
-export function draw(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, uy: number): void {
-  const col = hexToInt(u.col);
-  const dk = hexToInt(u.dk);
+const draw: DrawFunction = (g, u, cx, uy) => {
+  const primary = hexToInt(u.primary);
+  const secondary = hexToInt(u.secondary);
 
   // Slim elongated abdomen
-  g.fillStyle(col);
+  g.fillStyle(primary);
   g.fillEllipse(cx - u.facing * 4, uy + u.h * 0.65, u.w * 0.5, u.h * 0.7);
 
   // Long thin thorax
   g.fillEllipse(cx + u.facing * 2, uy + u.h * 0.35, u.w * 0.35, u.h * 0.45);
 
   // Triangular head (praying mantis shape)
-  g.fillStyle(col);
+  g.fillStyle(primary);
   g.beginPath();
   g.moveTo(cx + u.facing * u.w * 0.2, uy + u.h * 0.05);
   g.lineTo(cx + u.facing * u.w * 0.42, uy + u.h * 0.18);
@@ -51,7 +27,7 @@ export function draw(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, 
   g.fillCircle(cx + u.facing * u.w * 0.28, uy + u.h * 0.25, 3);
 
   // Raptorial forelegs (folded sniper arms)
-  g.lineStyle(2, dk);
+  g.lineStyle(2, secondary);
   const armX = cx + u.facing * u.w * 0.15;
   const armY = uy + u.h * 0.3;
   g.lineBetween(armX, armY, armX + u.facing * 10, armY + 3);
@@ -72,7 +48,7 @@ export function draw(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, 
   }
 
   // Hind legs
-  g.lineStyle(1, dk);
+  g.lineStyle(1, secondary);
   const lp = u.state === 'march' ? u.bob : 0;
   for (let l = 0; l < 2; l++) {
     const lx = cx + (l - 1) * u.w * 0.25;
@@ -83,10 +59,12 @@ export function draw(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, 
   }
 
   // Antennae
-  g.lineStyle(1, dk);
+  g.lineStyle(1, secondary);
   const anx = cx + u.facing * u.w * 0.25;
   const any = uy + u.h * 0.05;
   const wave = Math.sin(u.bob) * 2;
   g.lineBetween(anx, any, anx + u.facing * 10 + wave, any - 5);
   g.lineBetween(anx, any, anx + u.facing * 5 - wave, any - 6);
-}
+};
+
+export default draw;

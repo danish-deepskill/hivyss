@@ -1,15 +1,7 @@
 // Shared rendering utilities for bug drawing functions
 import type { RenderUnit } from '../types';
 
-// Alpha geneline palette constants
-export const ALPHA = {
-  col: 0xc03030,     // primary red
-  dk: 0x6b1a1a,      // dark red
-  shadow: 0x3d0e0e,  // deep shadow
-  bone: 0xd4c4b0,    // pale bone/chitin accent
-  darkBone: 0x8a7a6a, // dark bone
-  eye: 0x220000,      // pupil
-} as const;
+/* ── Color utilities ─────────────────────────────────── */
 
 export function hexToInt(hex: number | string): number {
   return typeof hex === 'number' ? hex : parseInt((hex as string).replace('#', ''), 16);
@@ -24,112 +16,68 @@ export function lerpColor(a: number, b: number, t: number): number {
   return (rr << 16) | (rg << 8) | rb;
 }
 
-// Draw Kurzgesagt-style jointed legs (3 pairs, 2-segment, sturdy)
-export function drawLegs(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, uy: number): void {
-  const dk = hexToInt(u.dk);
-  const lp = u.state === 'march' ? u.bob : 0;
-  g.lineStyle(2, dk);
-  const legX = [-u.facing * 5, u.facing * 3, u.facing * 9];
-  const legY = [u.h * 0.76, u.h * 0.54, u.h * 0.42];
-  for (let l = 0; l < 3; l++) {
-    const lx = cx + legX[l];
-    const ly = uy + legY[l];
-    const sw = Math.sin(lp + l * 1.2) * 3;
-    const groundY = uy + u.h + 5;
-    g.lineBetween(lx, ly, lx - 9 - sw, groundY);
-    g.lineBetween(lx, ly, lx + 9 + sw, groundY);
+/* ── Layered ellipse (3-layer depth shading) ─────────── */
+
+export interface EllipseLayer {
+  primaryor: number;
+  alpha?: number;
+  cx: number;
+  cy: number;
+  w: number;
+  h: number;
+}
+
+/** Draw stacked filled ellipses (deep → secondary → primary) for body depth shading. */
+export function layeredEllipse(g: Phaser.GameObjects.Graphics, layers: EllipseLayer[]): void {
+  for (const l of layers) {
+    g.fillStyle(l.primaryor, l.alpha ?? 1);
+    g.fillEllipse(l.cx, l.cy, l.w, l.h);
   }
 }
 
-// Draw bone-colored mandible jaws (Kurzgesagt style)
-export function drawMandibles(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, uy: number): void {
-  const jx = cx + u.facing * u.w * 0.46;
-  const jy = uy + u.h * 0.24;
-  g.lineStyle(2.5, ALPHA.darkBone);
-  if (u.state === 'attack') {
-    g.beginPath(); g.moveTo(jx, jy - 1); g.lineTo(jx + u.facing * 12, jy - 8); g.strokePath();
-    g.beginPath(); g.moveTo(jx, jy + 1); g.lineTo(jx + u.facing * 12, jy + 7); g.strokePath();
-    g.fillStyle(ALPHA.bone, 0.8);
-    g.fillCircle(jx + u.facing * 12, jy - 8, 1.8);
-    g.fillCircle(jx + u.facing * 12, jy + 7, 1.8);
-  } else {
-    g.beginPath(); g.moveTo(jx, jy - 2); g.lineTo(jx + u.facing * 10, jy - 3); g.lineTo(jx + u.facing * 9, jy); g.strokePath();
-    g.beginPath(); g.moveTo(jx, jy + 2); g.lineTo(jx + u.facing * 10, jy + 3); g.lineTo(jx + u.facing * 9, jy); g.strokePath();
+/* ── Rotation helpers (for tilted body poses) ────────── */
+
+export type RotFn = (px: number, py: number) => [number, number];
+
+/** Create a rotation function around a pivot point. */
+export function makeRot(pivotX: number, pivotY: number, angle: number): RotFn {
+  const cosA = Math.cos(angle);
+  const sinA = Math.sin(angle);
+  return (px, py) => {
+    const dx = px - pivotX;
+    const dy = py - pivotY;
+    return [pivotX + dx * cosA - dy * sinA, pivotY + dx * sinA + dy * cosA];
+  };
+}
+
+/** Draw a filled ellipse rotated via a rotation function. */
+export function fillRotEllipse(
+  g: Phaser.GameObjects.Graphics,
+  rot: RotFn,
+  ecx: number, ecy: number, ew: number, eh: number,
+  steps = 16,
+): void {
+  g.beginPath();
+  for (let i = 0; i <= steps; i++) {
+    const t = (i / steps) * Math.PI * 2;
+    const px = ecx + Math.cos(t) * ew * 0.5;
+    const py = ecy + Math.sin(t) * eh * 0.5;
+    const [rx, ry] = rot(px, py);
+    if (i === 0) g.moveTo(rx, ry);
+    else g.lineTo(rx, ry);
   }
+  g.closePath();
+  g.fillPath();
 }
 
-// Draw short stiff antennae (military style)
-export function drawAntennae(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, uy: number): void {
-  const dk = hexToInt(u.dk);
-  g.lineStyle(1.5, dk);
-  const ax = cx + u.facing * u.w * 0.3;
-  const ay = uy + u.h * 0.08;
-  const wave = Math.sin(u.bob) * 2;
-  g.lineBetween(ax, ay, ax + u.facing * 8 + wave, ay - 6);
-  g.lineBetween(ax, ay, ax + u.facing * 3 - wave, ay - 6);
-}
+/* ── Generic draw helpers (starter units) ────────────── */
 
-// Draw small intense eyes (bone sclera + dark pupil)
-export function drawEyes(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, uy: number, size?: number): void {
-  const sz = size || 2;
-  const ex = cx + u.facing * u.w * 0.39;
-  const ey = uy + u.h * 0.18;
-  g.fillStyle(ALPHA.bone, 0.9);
-  g.fillCircle(ex, ey, sz);
-  g.fillStyle(ALPHA.eye);
-  g.fillCircle(ex + u.facing * 0.5, ey, sz * 0.5);
-}
-
-// Draw standard 3-segment insect body (shadow → dk → col layers)
-export function drawBody(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, uy: number): void {
-  const col = hexToInt(u.col);
-  const dk = hexToInt(u.dk);
-  const f = u.facing;
-  const w = u.w;
-  const h = u.h;
-
-  // --- Abdomen (armored) ---
-  g.fillStyle(dk);
-  g.fillEllipse(cx - f * 4, uy + h * 0.64, w * 0.58, h * 0.62);
-  g.fillStyle(col);
-  g.fillEllipse(cx - f * 4, uy + h * 0.6, w * 0.5, h * 0.48);
-  // Segment ridges
-  g.lineStyle(1, dk, 0.6);
-  for (let s = 0; s < 3; s++) {
-    const sy = uy + h * (0.5 + s * 0.08);
-    const sx = cx - f * 4;
-    g.lineBetween(sx - w * 0.15, sy, sx + w * 0.15, sy);
-  }
-
-  // --- Petiole (waist) ---
-  g.fillStyle(dk);
-  g.fillEllipse(cx + f * 1, uy + h * 0.42, w * 0.12, h * 0.14);
-
-  // --- Thorax (armored plate) ---
-  g.fillStyle(dk);
-  g.fillEllipse(cx + f * 5, uy + h * 0.34, w * 0.4, h * 0.38);
-  g.fillStyle(col);
-  g.fillEllipse(cx + f * 5, uy + h * 0.32, w * 0.34, h * 0.28);
-  // Bone armor ridge
-  g.fillStyle(ALPHA.bone, 0.4);
-  g.fillEllipse(cx + f * 5, uy + h * 0.28, w * 0.2, h * 0.08);
-
-  // --- Head (angular, armored) ---
-  g.fillStyle(dk);
-  g.fillEllipse(cx + f * w * 0.34, uy + h * 0.22, w * 0.36, h * 0.34);
-  g.fillStyle(col);
-  g.fillEllipse(cx + f * w * 0.34, uy + h * 0.2, w * 0.3, h * 0.26);
-  // Bone plate on forehead
-  g.fillStyle(ALPHA.bone, 0.35);
-  g.fillEllipse(cx + f * w * 0.32, uy + h * 0.15, w * 0.14, h * 0.08);
-}
-
-// Draw common bug parts: mandibles, antennae, legs (original style — used by existing units)
+// Draw common bug parts: mandibles, antennae, legs (original style — used by starter units)
 export function drawCommonParts(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, uy: number): void {
-  const dk = hexToInt(u.dk);
+  const secondary = hexToInt(u.secondary);
 
   // Mandibles
-  g.lineStyle(1.5, dk);
+  g.lineStyle(1.5, secondary);
   const mhx = cx + u.facing * (u.w * 0.42);
   const mhy = uy + u.h * 0.15;
   if (u.state === 'attack') {
@@ -141,7 +89,7 @@ export function drawCommonParts(g: Phaser.GameObjects.Graphics, u: RenderUnit, c
   }
 
   // Antennae
-  g.lineStyle(1, dk);
+  g.lineStyle(1, secondary);
   const ax = cx + u.facing * u.w * 0.25;
   const ay = uy + u.h * 0.1;
   const wave = Math.sin(u.bob) * 3;
@@ -149,7 +97,7 @@ export function drawCommonParts(g: Phaser.GameObjects.Graphics, u: RenderUnit, c
   g.lineBetween(ax, ay, ax + u.facing * 3 - wave, ay - 7);
 
   // Legs
-  g.lineStyle(1, dk);
+  g.lineStyle(1, secondary);
   const lp = u.state === 'march' ? u.bob : 0;
   for (let l = 0; l < 3; l++) {
     const lx = cx + (l - 1) * u.w * 0.2;
@@ -162,8 +110,8 @@ export function drawCommonParts(g: Phaser.GameObjects.Graphics, u: RenderUnit, c
 
 // Fallback draw for unmapped traits
 export function drawBasicBody(g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, uy: number): void {
-  const col = hexToInt(u.col);
-  g.fillStyle(col);
+  const primary = hexToInt(u.primary);
+  g.fillStyle(primary);
   g.fillEllipse(cx - u.facing * 2, uy + u.h * 0.62, u.w * 0.74, u.h * 0.84);
   g.fillEllipse(cx + u.facing * 1, uy + u.h * 0.34, u.w * 0.54, u.h * 0.54);
   g.fillEllipse(cx + u.facing * u.w * 0.28, uy + u.h * 0.18, u.w * 0.42, u.h * 0.38);

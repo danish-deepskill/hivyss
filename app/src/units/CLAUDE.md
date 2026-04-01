@@ -8,7 +8,6 @@ Each unit is a self-contained module in `src/units/`:
 src/units/
   registry.ts        — Imports all units, exports UNIT_DEFS, TIER_DEFS, COMBAT_MAP, drawUnit
   renderUtils.ts     — Shared drawing helpers (hexToInt, lerpColor, drawCommonParts)
-  enemyTraits.ts     — Draw functions + combat hooks for enemy-only traits (boss, shield, poison)
   <unitname>.ts      — One file per unit (stats + draw function + optional combat hooks)
 ```
 
@@ -40,8 +39,8 @@ export const def: UnitDef = {
   cost: 50,                // Nectar cost to deploy
   reward: 20,              // Nectar earned when enemy version is killed
   w: 16, h: 14,            // Base sprite dimensions (scaled by S automatically)
-  col: 0x50a8f0,           // Primary body color (hex integer)
-  dk: 0x1a4880,            // Dark/accent color for outlines, limbs
+  primary: 0x50a8f0,       // Primary body color (hex integer)
+  secondary: 0x1a4880,     // Dark/accent color for outlines, limbs
   trait: 'unique_trait',   // Must be unique — maps to draw function AND combat hooks
   desc: 'Short Desc',      // Shown on card (keep under ~15 chars)
   tier: 'D',               // F, E, D, C, B, A, S, SS, SSS
@@ -162,8 +161,8 @@ need a `combat` export. CombatSystem uses default melee/ranged attack based on r
 7. **Common parts** — call `drawCommonParts(g, u, cx, uy)` for standard mandibles/antennae/legs, OR draw custom ones
 
 ### Color Usage
-- `hexToInt(u.col)` — primary body fill color
-- `hexToInt(u.dk)` — dark accent for outlines, limbs, details
+- `hexToInt(u.primary)` — primary body fill color
+- `hexToInt(u.secondary)` — dark accent for outlines, limbs, details
 - Fixed colors for effects (fire: 0xff6010, poison: 0x80ff40, electric: 0x80ffff, etc.)
 
 ### Animation

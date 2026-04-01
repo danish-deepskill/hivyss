@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { UnitDef, Side, AbilityKey, RenderUnit } from '../types';
+import { resolveColors } from '../config/Palettes';
 import { W, DEFAULT_WORLD_W, SBW as SBW_CONST } from '../config/Constants';
 // W = viewport width (used for camera), worldW = per-battle battlefield width
 import { UNIT_DEFS, drawUnit } from '../units/registry';
@@ -246,7 +247,8 @@ export class GameManager {
       const g = this.scene.add.graphics();
       const renderUnit: RenderUnit = {
         w: def.w, h: def.h,
-        col: def.col, dk: def.dk,
+        ...resolveColors(def),
+        palette: def.palette,
         facing: 1, bob: 0,
         state: 'march', atkCd: 0, atkRate: def.atkRate,
         trait: def.trait, hp: def.hp, maxHp: def.hp,

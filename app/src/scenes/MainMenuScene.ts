@@ -1,9 +1,11 @@
 import Phaser from 'phaser';
 import { W, H } from '../config/Constants';
+import { BG_THEMES } from '../config/BackgroundDefs';
 import { LANE } from '../config/Layout';
 const GND = LANE.land.groundY;
 import { SaveManager } from '../systems/SaveManager';
 import { UNIT_DEFS, drawUnit } from '../units/registry';
+import { resolveColors } from '../config/Palettes';
 import type { RenderUnit } from '../types';
 
 const UNIT_KEYS: string[] = Object.keys(UNIT_DEFS);
@@ -96,8 +98,7 @@ export class MainMenuScene extends Phaser.Scene {
     playBtn.on('pointerover', () => playBtn.setColor('#ffe080'));
     playBtn.on('pointerout', () => playBtn.setColor('#f0c040'));
     playBtn.on('pointerdown', () => {
-      const startWave = startWaveValue;
-      this.scene.start('BattleScene', { startWave });
+      this.scene.start('BattleScene', { startWave: startWaveValue, theme: themeValue });
     });
 
     // Wave start selector — right of PLAY
@@ -122,6 +123,30 @@ export class MainMenuScene extends Phaser.Scene {
     minusBtn.on('pointerout', () => minusBtn.setColor('#555'));
     plusBtn.on('pointerover', () => plusBtn.setColor('#ccc'));
     plusBtn.on('pointerout', () => plusBtn.setColor('#555'));
+
+    // Theme picker
+    const themeOptions = ['random', ...Object.keys(BG_THEMES)];
+    let themeIdx = 0;
+    let themeValue = themeOptions[themeIdx];
+    const themeLbl = this.add.text(playRight + 28, cy + 72, 'random', {
+      fontFamily: '"Courier New", monospace', fontSize: '14px', color: '#555',
+    }).setOrigin(0.5);
+    const updateThemeLbl = () => {
+      themeValue = themeOptions[themeIdx];
+      themeLbl.setText(themeValue);
+      themeLbl.setColor(themeValue !== 'random' ? '#f0c040' : '#555');
+    };
+    const themeLeft = this.add.text(playRight, cy + 72, '<', btnStyle).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    const themeRight = this.add.text(playRight + 57, cy + 72, '>', btnStyle).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    this.add.text(playRight + 82, cy + 72, 'BG', {
+      fontFamily: '"Courier New", monospace', fontSize: '11px', color: '#444',
+    }).setOrigin(0, 0.5);
+    themeLeft.on('pointerdown', () => { themeIdx = (themeIdx - 1 + themeOptions.length) % themeOptions.length; updateThemeLbl(); });
+    themeRight.on('pointerdown', () => { themeIdx = (themeIdx + 1) % themeOptions.length; updateThemeLbl(); });
+    themeLeft.on('pointerover', () => themeLeft.setColor('#ccc'));
+    themeLeft.on('pointerout', () => themeLeft.setColor('#555'));
+    themeRight.on('pointerover', () => themeRight.setColor('#ccc'));
+    themeRight.on('pointerout', () => themeRight.setColor('#555'));
 
     // Deck button
     const deckBtn = this.add.text(W / 2, cy + 90, '\u2261  DECK', {
@@ -184,7 +209,9 @@ export class MainMenuScene extends Phaser.Scene {
         obj: container, gfx, spd: (0.2 + Math.random() * 0.4) * def.spd, dir,
         bob: Math.random() * Math.PI * 2,
         renderUnit: {
-          w: sw, h: sh, col: def.col, dk: def.dk,
+          w: sw, h: sh,
+          ...resolveColors(def),
+          palette: def.palette,
           facing: dir, bob: 0, state: 'march',
           atkCd: 0, atkRate: def.atkRate,
           trait: def.trait, hp: def.hp, maxHp: def.hp,
