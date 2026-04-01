@@ -16,24 +16,6 @@ export function lerpColor(a: number, b: number, t: number): number {
   return (rr << 16) | (rg << 8) | rb;
 }
 
-/* ── Layered ellipse (3-layer depth shading) ─────────── */
-
-export interface EllipseLayer {
-  primaryor: number;
-  alpha?: number;
-  cx: number;
-  cy: number;
-  w: number;
-  h: number;
-}
-
-/** Draw stacked filled ellipses (deep → secondary → primary) for body depth shading. */
-export function layeredEllipse(g: Phaser.GameObjects.Graphics, layers: EllipseLayer[]): void {
-  for (const l of layers) {
-    g.fillStyle(l.primaryor, l.alpha ?? 1);
-    g.fillEllipse(l.cx, l.cy, l.w, l.h);
-  }
-}
 
 /* ── Rotation helpers (for tilted body poses) ────────── */
 

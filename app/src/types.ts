@@ -4,7 +4,7 @@ import Phaser from 'phaser';
 
 // --- Tier System ---
 
-export type TierKey = 'F' | 'E' | 'D' | 'C' | 'B' | 'A' | 'S' | 'SS' | 'SSS';
+export type TierKey = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
 export type CasteKey = 'soldier' | 'elite' | 'royal';
 export type GeneLine = 'alpha';
 export type Route = 'air' | 'land' | 'tunnel';
@@ -12,6 +12,7 @@ export type AttackRange = 'melee' | 'ranged';
 
 export interface TierDef {
   label: string;
+  name: string;
   color: string;
 }
 
@@ -303,32 +304,12 @@ export interface WaveDef {
   interval: number;
 }
 
-// --- Upgrade System ---
-
-export interface UpgradeDef {
-  name: string;
-  desc: string;
-  maxLevel: number;
-  costPerLevel: number[];
-  effect: UpgradeEffect;
-}
-
-export interface UpgradeEffect {
-  baseHp?: number;
-  income?: number;
-  unitHpPct?: number;
-  unitAtkPct?: number;
-  unlock?: string;
-  abilityCdrPct?: number;
-}
-
 // --- Save System ---
 
 export interface SaveData {
   version: number;
   colonyPoints: number;
   deck: string[];
-  upgrades: Record<string, number>;
   stats: GameStats;
   settings: GameSettings;
 }

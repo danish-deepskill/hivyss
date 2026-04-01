@@ -60,13 +60,16 @@ export class MainMenuScene extends Phaser.Scene {
 
     const cy = H * 0.35;
 
+    // UI depth — above marching units
+    const UI_DEPTH = 10;
+
     // Title
     this.add.text(W / 2, cy - 50, 'Hivyss', {
       fontFamily: '"Press Start 2P", monospace',
       fontSize: '40px',
       color: '#f0c040',
       letterSpacing: 3,
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setDepth(UI_DEPTH);
 
     // Subtitle
     this.add.text(W / 2, cy - 16, 'BUG BATTLE', {
@@ -74,7 +77,7 @@ export class MainMenuScene extends Phaser.Scene {
       fontSize: '17px',
       color: '#666',
       letterSpacing: 5,
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setDepth(UI_DEPTH);
 
     // Stats
     const bestWave = save.data.stats.bestWave;
@@ -83,40 +86,54 @@ export class MainMenuScene extends Phaser.Scene {
         fontFamily: '"Courier New", monospace',
         fontSize: '16px',
         color: '#665520',
-      }).setOrigin(0.5);
+      }).setOrigin(0.5).setDepth(UI_DEPTH);
     }
 
-    // Play button
-    const playBtn = this.add.text(W / 2, cy + 50, '\u25B6  PLAY', {
-      fontFamily: '"Press Start 2P", monospace',
-      fontSize: '20px',
-      color: '#f0c040',
-      backgroundColor: '#150e04',
-      padding: { x: 34, y: 14 },
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    // Button factory
+    const BTN_W = 220;
+    const makeBtn = (y: number, label: string, onClick: () => void, color = '#888', hoverColor = '#ccc') => {
+      const btn = this.add.text(W / 2, y, label, {
+        fontFamily: '"Press Start 2P", monospace',
+        fontSize: '14px',
+        color,
+        backgroundColor: '#0a0a14',
+        padding: { x: 26, y: 11 },
+        fixedWidth: BTN_W,
+        align: 'center',
+      }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(UI_DEPTH);
+      btn.on('pointerover', () => btn.setColor(hoverColor));
+      btn.on('pointerout', () => btn.setColor(color));
+      btn.on('pointerdown', onClick);
+      return btn;
+    };
 
-    playBtn.on('pointerover', () => playBtn.setColor('#ffe080'));
-    playBtn.on('pointerout', () => playBtn.setColor('#f0c040'));
-    playBtn.on('pointerdown', () => {
-      this.scene.start('BattleScene', { startWave: startWaveValue, theme: themeValue });
-    });
+    // Menu buttons
+    let startWaveValue = 1;
+    let themeIdx = 0;
+    const themeOptions = ['random', ...Object.keys(BG_THEMES)];
+    let themeValue = themeOptions[themeIdx];
+
+    const playBtn = makeBtn(cy + 50, 'PLAY',
+      () => this.scene.start('BattleScene', { startWave: startWaveValue, theme: themeValue }),
+      '#f0c040', '#ffe080');
+    makeBtn(cy + 90, 'DECK', () => this.scene.start('DeckScene'));
+    makeBtn(cy + 126, 'SANDBOX', () => this.scene.start('SandboxScene'));
 
     // Wave start selector — right of PLAY
-    let startWaveValue = 1;
-    const playRight = playBtn.x + playBtn.width / 2 + 20;
+    const playRight = playBtn.x + BTN_W / 2 + 20;
+    const pickerStyle = { fontFamily: '"Press Start 2P", monospace', fontSize: '14px', color: '#555' };
     const updateWaveLbl = () => {
       waveLbl.setText(String(startWaveValue));
       waveLbl.setColor(startWaveValue > 1 ? '#f0c040' : '#555');
     };
-    const btnStyle = { fontFamily: '"Press Start 2P", monospace', fontSize: '14px', color: '#555' };
-    const minusBtn = this.add.text(playRight, cy + 50, '<', btnStyle).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    const minusBtn = this.add.text(playRight, cy + 50, '<', pickerStyle).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(UI_DEPTH);
     const waveLbl = this.add.text(playRight + 28, cy + 50, '1', {
       fontFamily: '"Courier New", monospace', fontSize: '16px', color: '#555',
-    }).setOrigin(0.5);
-    const plusBtn = this.add.text(playRight + 57, cy + 50, '>', btnStyle).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    }).setOrigin(0.5).setDepth(UI_DEPTH);
+    const plusBtn = this.add.text(playRight + 57, cy + 50, '>', pickerStyle).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(UI_DEPTH);
     this.add.text(playRight + 82, cy + 50, 'W', {
       fontFamily: '"Courier New", monospace', fontSize: '11px', color: '#444',
-    }).setOrigin(0, 0.5);
+    }).setOrigin(0, 0.5).setDepth(UI_DEPTH);
     minusBtn.on('pointerdown', () => { startWaveValue = Math.max(1, startWaveValue - 1); updateWaveLbl(); });
     plusBtn.on('pointerdown', () => { startWaveValue++; updateWaveLbl(); });
     minusBtn.on('pointerover', () => minusBtn.setColor('#ccc'));
@@ -125,73 +142,25 @@ export class MainMenuScene extends Phaser.Scene {
     plusBtn.on('pointerout', () => plusBtn.setColor('#555'));
 
     // Theme picker
-    const themeOptions = ['random', ...Object.keys(BG_THEMES)];
-    let themeIdx = 0;
-    let themeValue = themeOptions[themeIdx];
     const themeLbl = this.add.text(playRight + 28, cy + 72, 'random', {
       fontFamily: '"Courier New", monospace', fontSize: '14px', color: '#555',
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setDepth(UI_DEPTH);
     const updateThemeLbl = () => {
       themeValue = themeOptions[themeIdx];
       themeLbl.setText(themeValue);
       themeLbl.setColor(themeValue !== 'random' ? '#f0c040' : '#555');
     };
-    const themeLeft = this.add.text(playRight, cy + 72, '<', btnStyle).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    const themeRight = this.add.text(playRight + 57, cy + 72, '>', btnStyle).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    const themeLeft = this.add.text(playRight, cy + 72, '<', pickerStyle).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(UI_DEPTH);
+    const themeRight = this.add.text(playRight + 57, cy + 72, '>', pickerStyle).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(UI_DEPTH);
     this.add.text(playRight + 82, cy + 72, 'BG', {
       fontFamily: '"Courier New", monospace', fontSize: '11px', color: '#444',
-    }).setOrigin(0, 0.5);
+    }).setOrigin(0, 0.5).setDepth(UI_DEPTH);
     themeLeft.on('pointerdown', () => { themeIdx = (themeIdx - 1 + themeOptions.length) % themeOptions.length; updateThemeLbl(); });
     themeRight.on('pointerdown', () => { themeIdx = (themeIdx + 1) % themeOptions.length; updateThemeLbl(); });
     themeLeft.on('pointerover', () => themeLeft.setColor('#ccc'));
     themeLeft.on('pointerout', () => themeLeft.setColor('#555'));
     themeRight.on('pointerover', () => themeRight.setColor('#ccc'));
     themeRight.on('pointerout', () => themeRight.setColor('#555'));
-
-    // Deck button
-    const deckBtn = this.add.text(W / 2, cy + 90, '\u2261  DECK', {
-      fontFamily: '"Press Start 2P", monospace',
-      fontSize: '14px',
-      color: '#888',
-      backgroundColor: '#0a0a14',
-      padding: { x: 26, y: 11 },
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-
-    deckBtn.on('pointerover', () => deckBtn.setColor('#ccc'));
-    deckBtn.on('pointerout', () => deckBtn.setColor('#888'));
-    deckBtn.on('pointerdown', () => {
-      this.scene.start('DeckScene');
-    });
-
-    // Upgrades button
-    const upgradeBtn = this.add.text(W / 2, cy + 126, '\u2B21  UPGRADES', {
-      fontFamily: '"Press Start 2P", monospace',
-      fontSize: '14px',
-      color: '#888',
-      backgroundColor: '#0a0a14',
-      padding: { x: 26, y: 11 },
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-
-    upgradeBtn.on('pointerover', () => upgradeBtn.setColor('#ccc'));
-    upgradeBtn.on('pointerout', () => upgradeBtn.setColor('#888'));
-    upgradeBtn.on('pointerdown', () => {
-      this.scene.start('UpgradeScene');
-    });
-
-    // Sandbox button
-    const sandboxBtn = this.add.text(W / 2, cy + 162, '\u2694  SANDBOX', {
-      fontFamily: '"Press Start 2P", monospace',
-      fontSize: '14px',
-      color: '#888',
-      backgroundColor: '#0a0a14',
-      padding: { x: 26, y: 11 },
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-
-    sandboxBtn.on('pointerover', () => sandboxBtn.setColor('#ccc'));
-    sandboxBtn.on('pointerout', () => sandboxBtn.setColor('#888'));
-    sandboxBtn.on('pointerdown', () => {
-      this.scene.start('SandboxScene');
-    });
 
     // Marching bugs decoration — random units, live animated
     this.marchAnts = [];
@@ -202,7 +171,7 @@ export class MainMenuScene extends Phaser.Scene {
       const dir = Math.random() > 0.5 ? 1 : -1;
       const sw = def.w;
       const sh = def.h;
-      const container = this.add.container(Math.random() * W, GND - sh);
+      const container = this.add.container(Math.random() * W, GND - sh).setDepth(0);
       const gfx = this.add.graphics();
       container.add(gfx);
       this.marchAnts.push({

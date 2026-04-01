@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { UNIT_DEFS, TIER_DEFS, GENELINE_DEFS } from '../units/registry';
+import { UNIT_DEFS } from '../units/registry';
+import { createUnitCard } from '../ui/UnitCard';
 import { ABILITY_DEFS } from '../config/AbilityDefs';
 import { MAX_CHAMBERS, MAX_LARVAE, LARVA_SPAWN_RATE } from '../systems/IncubationManager';
 import type { Chamber } from '../systems/IncubationManager';
@@ -182,7 +183,11 @@ export class MenuUIScene extends Phaser.Scene {
     this.larvaeNum = this.el('span', 'font-size:13px; color:#c0b888; min-width:30px; text-align:right;', '3/10');
     this.larvaeTimer = this.el('span', 'font-size:9px; color:#555;');
 
-    bar.append(this.stageLbl, nectarLbl, nectarTrack, this.nectarNum, this.incomeLbl, sep, larvaeLbl, this.larvaeNum, this.larvaeTimer);
+    const spacer = document.createElement('div');
+    spacer.style.cssText = 'flex:1;';
+    const escHint = this.el('span', 'font-size:9px; color:#444; letter-spacing:1px;', 'ESC PAUSE');
+
+    bar.append(this.stageLbl, nectarLbl, nectarTrack, this.nectarNum, this.incomeLbl, sep, larvaeLbl, this.larvaeNum, this.larvaeTimer, spacer, escHint);
     return bar;
   }
 
@@ -223,41 +228,16 @@ export class MenuUIScene extends Phaser.Scene {
   private buildUnitSlots(previews: Record<string, string>): HTMLElement {
     const cols = this.deckKeys.length;
     const slots = document.createElement('div');
-    slots.style.cssText = `display:grid; grid-template-columns:repeat(${cols},1fr); gap:3px; padding:5px 6px; background:#0a0a12; border-bottom:1px solid #1a1a28; width:100%; pointer-events:auto;`;
+    slots.style.cssText = `display:flex; flex-wrap:wrap; justify-content:center; gap:3px; padding:5px 6px; background:#0a0a12; border-bottom:1px solid #1a1a28; width:100%; pointer-events:auto;`;
 
     this.cardEls = {};
     this.deckKeys.forEach(key => {
-      const d = UNIT_DEFS[key];
-      if (!d) return;
+      if (!UNIT_DEFS[key]) return;
 
-      const div = document.createElement('div');
-      div.className = 'ucard';
-
-      const iconHtml = previews[key]
-        ? `<img class="uico-img" src="${previews[key]}" alt="${d.name}">`
-        : `<div class="uico">${d.ico}</div>`;
-
-      const tier = TIER_DEFS[d.tier] || TIER_DEFS.F;
-      const gl = d.geneline ? GENELINE_DEFS[d.geneline] : null;
-      const glHtml = gl
-        ? ` <span style="display:inline-block;width:10px;height:10px;line-height:10px;text-align:center;border-radius:50%;background:${gl.color};color:#d4c4b0;font-size:7px;font-weight:bold;vertical-align:baseline">${gl.symbol}</span>`
-        : '';
-
-      const route = d.route ?? 'land';
-      const routeHtml = route === 'air'
-        ? '<span style="position:absolute;top:2px;right:4px;font-size:8px;color:#80c0ff" title="Air">\u2708</span>'
-        : route === 'tunnel'
-        ? '<span style="position:absolute;top:2px;right:4px;font-size:8px;color:#c09060" title="Tunnel">\u26CF</span>'
-        : '';
-
-      div.innerHTML = `
-        <div class="utier" style="color:${tier.color}">${tier.label}${glHtml}</div>
-        ${routeHtml}
-        ${iconHtml}
-        <div class="uname">${d.name}</div>
-        <div class="ucost" style="position:absolute;bottom:3px;right:5px;font-size:9px">\u2B21${d.cost}</div>
-      `;
-      div.onclick = () => this.eventBus.emit('deployUnit', { key });
+      const div = createUnitCard(key, {
+        preview: previews[key],
+        onClick: () => this.eventBus.emit('deployUnit', { key }),
+      });
 
       slots.appendChild(div);
       this.cardEls[key] = div;

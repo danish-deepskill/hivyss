@@ -6,18 +6,6 @@ const DEFAULT_SAVE: SaveData = {
   version: 1,
   colonyPoints: 0,
   deck: [],
-  upgrades: {
-    baseHp: 0,
-    incomeRate: 0,
-    unitHpAll: 0,
-    unitAtkAll: 0,
-    unlockHornet: 0,
-    unlockBeetle: 0,
-    unlockDigger: 0,
-    unlockGuardian: 0,
-    unlockEmber: 0,
-    abilityCdr: 0,
-  },
   stats: {
     totalKills: 0,
     totalGamesPlayed: 0,
@@ -43,19 +31,18 @@ export class SaveManager {
   load(): SaveData {
     try {
       const raw = localStorage.getItem(SAVE_KEY);
-      if (!raw) return { ...DEFAULT_SAVE, upgrades: { ...DEFAULT_SAVE.upgrades }, stats: { ...DEFAULT_SAVE.stats }, settings: { ...DEFAULT_SAVE.settings } };
+      if (!raw) return { ...DEFAULT_SAVE, stats: { ...DEFAULT_SAVE.stats }, settings: { ...DEFAULT_SAVE.settings } };
       const parsed = JSON.parse(raw);
       // Merge with defaults for forward compatibility
       return {
         ...DEFAULT_SAVE,
         ...parsed,
         deck: parsed.deck || [],
-        upgrades: { ...DEFAULT_SAVE.upgrades, ...parsed.upgrades },
         stats: { ...DEFAULT_SAVE.stats, ...parsed.stats },
         settings: { ...DEFAULT_SAVE.settings, ...parsed.settings },
       };
     } catch {
-      return { ...DEFAULT_SAVE, upgrades: { ...DEFAULT_SAVE.upgrades }, stats: { ...DEFAULT_SAVE.stats }, settings: { ...DEFAULT_SAVE.settings } };
+      return { ...DEFAULT_SAVE, stats: { ...DEFAULT_SAVE.stats }, settings: { ...DEFAULT_SAVE.settings } };
     }
   }
 
@@ -68,12 +55,8 @@ export class SaveManager {
   }
 
   reset(): void {
-    this.data = { ...DEFAULT_SAVE, upgrades: { ...DEFAULT_SAVE.upgrades }, stats: { ...DEFAULT_SAVE.stats }, settings: { ...DEFAULT_SAVE.settings } };
+    this.data = { ...DEFAULT_SAVE, stats: { ...DEFAULT_SAVE.stats }, settings: { ...DEFAULT_SAVE.settings } };
     this.save();
-  }
-
-  getUpgradeLevel(id: string): number {
-    return this.data.upgrades[id] || 0;
   }
 
   getDeck(): string[] {

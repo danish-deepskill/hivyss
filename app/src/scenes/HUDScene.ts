@@ -21,7 +21,9 @@ export class HUDScene extends Phaser.Scene {
 
   update(): void {
     const scrollX: number = this.registry.get('cam.scrollX') ?? 0;
+    const zoom: number = this.registry.get('cam.zoom') ?? 1;
     this.cameras.main.scrollX = scrollX;
+    this.cameras.main.zoom = zoom;
 
     const playerHp: number = this.registry.get('playerBase.hp') ?? 1000;
     const playerMax: number = this.registry.get('playerBase.maxHp') ?? 1000;

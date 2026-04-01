@@ -31,17 +31,19 @@
     .lc-empty { color: #c04040; }
 
     /* Unit cards (used by MenuUIScene DOM) */
-    .ucard { background: #0e0e1a; border: 1px solid #222; border-radius: 4px; padding: 4px 3px; cursor: pointer; user-select: none; transition: border-color .1s, filter .1s; display: flex; flex-direction: column; align-items: center; gap: 1px; position: relative; }
+    .ucard { width: 90px; height: 80px; background: #0e0e1a; border: 1px solid #222; border-radius: 4px; padding: 4px 3px; cursor: pointer; user-select: none; transition: border-color .1s, filter .1s; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; position: relative; overflow: hidden; }
     .ucard:hover:not(.disabled) { border-color: #555; filter: brightness(1.25); }
     .ucard:active:not(.disabled) { transform: scale(0.97); }
     .ucard.disabled { opacity: .35; cursor: not-allowed; }
     .ucard .uico { font-size: 20px; line-height: 1; }
     .ucard .uico-img { width: 36px; height: 32px; object-fit: contain; image-rendering: pixelated; }
-    .ucard .uname { font-size: 9px; font-weight: bold; text-align: center; line-height: 1.2; }
-    .ucard .ucost { font-size: 10px; color: #f0c040; }
+    .ucard .uname { font-size: 9px; font-weight: bold; text-align: center; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ucard .ucost { font-size: 9px; color: #f0c040; text-align: center; }
     .ucard .utier { position: absolute; top: 2px; left: 4px; font-family: 'Press Start 2P', monospace; font-size: 7px; font-weight: bold; opacity: 0.8; }
     .ucard .ucd-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: #f0c040; border-radius: 0 0 3px 3px; transform-origin: left; transition: transform .05s; display: none; }
     .ucard .utag { font-size: 8px; color: #888; text-align: center; }
+    .ucard.selected { border-color: #60c040; background: #1a2a1a; }
+    .ucard.selected:hover { border-color: #80e060; }
 
     /* Ability buttons (used by MenuUIScene DOM) */
     .abl-btn { flex: 1; padding: 5px 4px; font-family: 'Courier New', monospace; font-size: 11px; cursor: pointer; border: 1px solid #333; background: #0d0d18; border-radius: 3px; color: #ccc; transition: filter .1s, border-color .1s; position: relative; overflow: hidden; text-align: center; }

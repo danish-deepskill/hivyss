@@ -359,9 +359,11 @@ export class Unit extends Phaser.GameObjects.Container {
       primary = (((ar + t * (br - ar)) | 0) << 16) | (((ag + t * (bg - ag)) | 0) << 8) | ((ab2 + t * (bb - ab2)) | 0);
     }
 
-    // Shadow
-    g.fillStyle(0x000000, 0.25);
-    g.fillEllipse(this.unitW / 2, getGroundY(this.currentRoute) - this.y + 1, this.unitW / 2 + 2, 3);
+    // Shadow (skip for tunnel units — they're underground)
+    if (this.currentRoute !== 'tunnel') {
+      g.fillStyle(0x000000, 0.25);
+      g.fillEllipse(this.unitW / 2, getGroundY('land') - this.y + 1, this.unitW / 2 + 2, 3);
+    }
 
     if (this.slowTimer > 0) g.setAlpha(0.85);
 

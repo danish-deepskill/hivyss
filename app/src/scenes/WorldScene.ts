@@ -23,6 +23,7 @@ export class WorldScene extends Phaser.Scene {
   private camStartX: number = 0;
   private dragging: boolean = false;
   private panKeys!: { left: Phaser.Input.Keyboard.Key; right: Phaser.Input.Keyboard.Key };
+  private zoomKeys!: { zIn: Phaser.Input.Keyboard.Key; zInEq: Phaser.Input.Keyboard.Key; zOut: Phaser.Input.Keyboard.Key; zOutEq: Phaser.Input.Keyboard.Key };
 
   constructor() {
     super('WorldScene');
@@ -67,16 +68,34 @@ export class WorldScene extends Phaser.Scene {
       this.gm.events.off('cancelIncubation', onCancel);
     });
 
-    // Arrow keys for camera pan
+    // Arrow keys for camera pan + zoom
     this.panKeys = {
       left: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT),
       right: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT),
     };
+    this.zoomKeys = {
+      zIn: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.PLUS),
+      zInEq: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_ADD),
+      zOut: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.MINUS),
+      zOutEq: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_SUBTRACT),
+    };
+
+    // ESC — toggle pause overlay
+    this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC).on('down', () => {
+      if (this.scene.isPaused()) {
+        this.scene.resume();
+        this.scene.stop('PauseScene');
+      } else {
+        this.scene.pause();
+        this.scene.launch('PauseScene');
+      }
+    });
 
     // Camera setup — scrollable world wider than viewport
     const cam = this.cameras.main;
+    cam.setZoom(1.5);
     cam.setBounds(0, 0, this.worldW, H);
-    cam.setScroll(0, 0);
+    cam.centerOn(W / (2 * 1.5), H / 2); // start centered on player hive
 
     // Track mouse position via canvas event (bypasses DOM container)
     const canvas = this.sys.game.canvas;
@@ -103,8 +122,7 @@ export class WorldScene extends Phaser.Scene {
       const dx = this.dragStartX - p.x;
       if (Math.abs(dx) > 5) this.dragging = true;
       if (this.dragging) {
-        const viewW = W / cam.zoom;
-        cam.scrollX = Math.max(0, Math.min(this.camStartX + dx, this.worldW - viewW));
+        cam.scrollX = this.camStartX + dx;
         this.gm.manualPanTimer = 2;
       }
     });
@@ -116,6 +134,7 @@ export class WorldScene extends Phaser.Scene {
     // Write shared state to registry every frame (HUDScene + MenuUIScene read these)
     const cam = this.cameras.main;
     this.registry.set('cam.scrollX', cam.scrollX);
+    this.registry.set('cam.zoom', cam.zoom);
     if (this.gm) {
       // Base HP (HUDScene)
       this.registry.set('playerBase.hp', this.gm.playerBase.hp);
@@ -157,18 +176,27 @@ export class WorldScene extends Phaser.Scene {
     // Tick game logic
     this.gm.tick(dt);
 
+    // Camera zoom — +/- keys
+    const MIN_ZOOM = 1;
+    const MAX_ZOOM = 3;
+    const ZOOM_SPEED = 1.5;
+    if (this.zoomKeys.zIn.isDown || this.zoomKeys.zInEq.isDown) {
+      cam.zoom = Math.min(MAX_ZOOM, cam.zoom + ZOOM_SPEED * dt);
+    } else if (this.zoomKeys.zOut.isDown || this.zoomKeys.zOutEq.isDown) {
+      cam.zoom = Math.max(MIN_ZOOM, cam.zoom - ZOOM_SPEED * dt);
+    }
+
     // Camera pan — keyboard or mouse at screen edge
     const panSpeed = 2000;
-    const edgeZone = 40;
+    const edgeZone = 200;
     const atLeftEdge = this.mouseX >= 0 && this.mouseX < edgeZone;
     const atRightEdge = this.mouseX > W - edgeZone && this.mouseX <= W;
 
     if (this.panKeys.left.isDown || atLeftEdge) {
-      cam.scrollX = Math.max(0, cam.scrollX - panSpeed * dt);
+      cam.scrollX -= panSpeed * dt;
       this.gm.manualPanTimer = 1;
     } else if (this.panKeys.right.isDown || atRightEdge) {
-      const viewW = W / cam.zoom;
-      cam.scrollX = Math.min(this.worldW - viewW, cam.scrollX + panSpeed * dt);
+      cam.scrollX += panSpeed * dt;
       this.gm.manualPanTimer = 1;
     }
   }

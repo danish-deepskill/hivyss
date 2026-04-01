@@ -24,15 +24,17 @@ const UNITS: Record<string, UnitModule> = {
 
 // Tier display definitions
 export const TIER_DEFS: Record<TierKey, TierDef> = {
-  F: { label: "F", color: "#888888" },
-  E: { label: "E", color: "#60a060" },
-  D: { label: "D", color: "#50a0e0" },
-  C: { label: "C", color: "#c080f0" },
-  B: { label: "B", color: "#f0c040" },
-  A: { label: "A", color: "#f06040" },
-  S: { label: "S", color: "#ff4060" },
-  SS: { label: "SS", color: "#ff2080" },
-  SSS: { label: "SSS", color: "#ff10f0" },
+  1:  { label: 'V', name: 'Vyss',       color: '#888888' },
+  2:  { label: 'K', name: 'Kilovyss',   color: '#60a060' },
+  3:  { label: 'M', name: 'Megavyss',   color: '#50a0e0' },
+  4:  { label: 'G', name: 'Gigavyss',   color: '#c080f0' },
+  5:  { label: 'T', name: 'Teravyss',   color: '#f0c040' },
+  6:  { label: 'P', name: 'Petavyss',   color: '#f06040' },
+  7:  { label: 'E', name: 'Exavyss',    color: '#ff4060' },
+  8:  { label: 'Z', name: 'Zettavyss',  color: '#ff2080' },
+  9:  { label: 'Y', name: 'Yottavyss',  color: '#ff10f0' },
+  10: { label: 'R', name: 'Ronnavyss',  color: '#ff00ff' },
+  11: { label: 'Q', name: 'Quettavyss', color: '#ffffff' },
 };
 
 // Geneline display definitions

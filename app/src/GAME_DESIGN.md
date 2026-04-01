@@ -443,6 +443,24 @@ Unit dies → cap frees up → can spawn again.
 
 24 genelines (Greek letters: alpha through omega). Each geneline has a unique theme, palette, and gameplay identity.
 
+### Vyssid Naming Convention
+
+Names should feel like insect species — not job titles. Blend geneline theme with bug identity.
+
+**Styles (all produce single-word names):**
+- **Simple compound**: Two words glued — Shellguard, Ironmaw, Stonegrub, Lancewing
+- **Fusion**: Syllables merge into a new word — Primite (Primal+Mite), Hiveperator (Hive+Imperator), Formant (Formation+Ant)
+- **Standalone**: Real or invented bug word — Mandible, Crawlid, Gruzzer
+
+**Guidelines:**
+- Name should evoke the geneline's theme at a glance
+- Geneline prefix/theme vocabulary makes the unit's faction obvious (Iron- = Armored, Fang- = Feral)
+- Universal units stay unprefixed/plain — no geneline flavor (Grunt, Needler, Hardshell)
+- Single word for soldiers/workers; two words allowed for elites/royals for gravitas
+- Short, punchy, 2-3 syllables preferred
+- Avoid pure military ranks or fantasy terms with no bug feel
+- Reference: Hollow Knight (Vengefly, Crawlid, Husk Guard), Rimworld insects (compound style)
+
 ### Power Scaling
 - NOT equal power — later layers introduce stronger genelines
 - Enemies scale with layers, so stronger units are needed
