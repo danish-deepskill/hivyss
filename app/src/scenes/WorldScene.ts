@@ -5,13 +5,16 @@ import { LANE } from '../config/Layout';
 const GND = LANE.land.groundY;
 import { ABILITY_DEFS } from '../config/AbilityDefs';
 import { GameManager } from '../systems/GameManager';
-import type { AbilityKey } from '../types';
+import type { AbilityKey, WaveDef } from '../types';
+import type { RunBuff } from '../systems/RunState';
 
 interface WorldSceneData {
   deck: string[];
   startWave: number;
   worldW?: number;
   theme?: string;
+  customWaves?: WaveDef[];
+  runBuffs?: RunBuff[];
 }
 
 export class WorldScene extends Phaser.Scene {
@@ -36,7 +39,7 @@ export class WorldScene extends Phaser.Scene {
     this.drawBackground();
 
     // Create game manager (owns all systems, entities, and game state)
-    this.gm = new GameManager(this, data.deck, data.startWave, this.worldW);
+    this.gm = new GameManager(this, data.deck, data.startWave, this.worldW, data.customWaves, data.runBuffs);
 
     // Store shared data on registry for HUDScene + MenuUIScene
     this.registry.set('worldW', this.worldW);
@@ -61,8 +64,9 @@ export class WorldScene extends Phaser.Scene {
     this.gm.events.on('useAbility', onAbility);
     this.gm.events.on('cancelIncubation', onCancel);
 
-    // Cleanup EventBus listeners on shutdown
+    // Cleanup on shutdown
     this.events.once('shutdown', () => {
+      this.gm.cleanupDebugCommands();
       this.gm.events.off('deployUnit', onDeploy);
       this.gm.events.off('useAbility', onAbility);
       this.gm.events.off('cancelIncubation', onCancel);

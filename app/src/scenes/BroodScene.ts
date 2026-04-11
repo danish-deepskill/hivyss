@@ -2,10 +2,19 @@ import Phaser from 'phaser';
 import { UNIT_DEFS, TIER_DEFS, GENELINE_DEFS, drawUnit } from '../units/registry';
 import { resolveColors } from '../config/Palettes';
 import { SaveManager } from '../systems/SaveManager';
+import { createRunState } from '../systems/RunState';
+import type { RunMode } from '../systems/RunState';
 import { createUnitCard } from '../ui/UnitCard';
 import type { RenderUnit } from '../types';
 
 const MAX_DECK_SIZE = 10;
+const RUN_DECK_SIZE = 3;
+
+interface BroodSceneData {
+  mode?: 'run';
+  seed?: string;
+  runMode?: RunMode;
+}
 
 const TRAIT_DESC: Record<string, string> = {
   grub: 'Cheap fodder, no special ability',
@@ -31,7 +40,7 @@ function getDefaultDeck(max: number): string[] {
   return keys.slice(0, max);
 }
 
-export class DeckScene extends Phaser.Scene {
+export class BroodScene extends Phaser.Scene {
   private save!: SaveManager;
   private pool!: string[];
   private deckSize!: number;
@@ -41,16 +50,31 @@ export class DeckScene extends Phaser.Scene {
   private deckLabel!: HTMLElement;
   private deckSlotsEl!: HTMLElement;
   private tooltip!: HTMLElement;
+  private isRunMode = false;
+  private runSeed = '';
+  private runMode: RunMode = 'permadeath';
 
   constructor() {
-    super('DeckScene');
+    super('BroodScene');
   }
 
-  create(): void {
+  create(data?: BroodSceneData): void {
     this.save = new SaveManager();
+    this.isRunMode = data?.mode === 'run';
+    this.runSeed = data?.seed || '';
+    this.runMode = data?.runMode || 'permadeath';
 
-    this.pool = Object.keys(UNIT_DEFS);
-    this.deckSize = Math.min(MAX_DECK_SIZE, this.pool.length);
+    if (this.isRunMode) {
+      // Run mode: normal (non-geneline) vyssids tier 1-2, pick 3
+      this.pool = Object.keys(UNIT_DEFS).filter(k => {
+        const def = UNIT_DEFS[k];
+        return !def.geneline && (def.tier as number) <= 2;
+      });
+      this.deckSize = Math.min(RUN_DECK_SIZE, this.pool.length);
+    } else {
+      this.pool = Object.keys(UNIT_DEFS);
+      this.deckSize = Math.min(MAX_DECK_SIZE, this.pool.length);
+    }
 
     let savedDeck = this.save.getDeck().filter(k => this.pool.includes(k));
     if (savedDeck.length === 0) savedDeck = getDefaultDeck(this.deckSize).filter(k => this.pool.includes(k));
@@ -76,19 +100,26 @@ export class DeckScene extends Phaser.Scene {
 
     const title = document.createElement('span');
     title.style.cssText = 'font-family:"Press Start 2P",monospace; font-size:13px; color:#f0c040; letter-spacing:2px;';
-    title.textContent = 'SELECT VYSSIDS';
+    title.textContent = this.isRunMode ? 'PICK 3 STARTING VYSSIDS' : 'SELECT VYSSIDS';
 
     const spacer = document.createElement('div');
     spacer.style.cssText = 'flex:1;';
 
     const backBtn = document.createElement('button');
     backBtn.style.cssText = 'font-family:"Press Start 2P",monospace; font-size:10px; color:#888; background:#0a0a14; border:1px solid #333; border-radius:3px; padding:6px 14px; cursor:pointer;';
-    backBtn.textContent = 'BACK';
-    backBtn.onmouseenter = () => { backBtn.style.color = '#ccc'; };
-    backBtn.onmouseleave = () => { backBtn.style.color = '#888'; };
+    backBtn.textContent = this.isRunMode ? 'START RUN' : 'BACK';
+    backBtn.style.color = this.isRunMode ? '#f0c040' : '#888';
+    backBtn.onmouseenter = () => { backBtn.style.color = this.isRunMode ? '#ffe080' : '#ccc'; };
+    backBtn.onmouseleave = () => { backBtn.style.color = this.isRunMode ? '#f0c040' : '#888'; };
     backBtn.onclick = () => {
-      this.save.setDeck([...this.selected]);
-      this.scene.start('MainMenuScene');
+      if (this.isRunMode) {
+        if (this.selected.size < this.deckSize) return; // must pick all slots
+        const state = createRunState(this.runSeed, [...this.selected], this.runMode);
+        this.scene.start('NodeMapScene', { runState: state });
+      } else {
+        this.save.setDeck([...this.selected]);
+        this.scene.start('MainMenuScene');
+      }
     };
 
     header.append(title, spacer, backBtn);
@@ -139,7 +170,7 @@ export class DeckScene extends Phaser.Scene {
     this.add.dom(640, 360, outer);
 
     this.input.keyboard!.on('keydown-ESC', () => {
-      this.save.setDeck([...this.selected]);
+      if (!this.isRunMode) this.save.setDeck([...this.selected]);
       this.scene.start('MainMenuScene');
     });
 
@@ -215,7 +246,9 @@ export class DeckScene extends Phaser.Scene {
       this.deckSlotsEl.appendChild(empty);
     }
 
-    this.deckLabel.textContent = `VYSSIDS (${this.selected.size}/${this.deckSize})`;
+    this.deckLabel.textContent = this.isRunMode
+      ? `STARTING BROOD (${this.selected.size}/${this.deckSize})`
+      : `VYSSIDS (${this.selected.size}/${this.deckSize})`;
     this.deckLabel.style.color = full ? '#60c040' : '#f0c040';
 
     // Update pool card states

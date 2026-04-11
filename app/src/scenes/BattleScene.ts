@@ -3,17 +3,24 @@ import { UNIT_DEFS } from '../units/registry';
 import { SaveManager } from '../systems/SaveManager';
 import { WorldScene } from './WorldScene';
 import { ModalScene } from './ModalScene';
+import type { WaveDef } from '../types';
+import type { RunState, RunBuff } from '../systems/RunState';
+import { onBattleResult } from '../systems/RunController';
 
 interface BattleSceneData {
   deck?: string[];
   startWave?: number;
   worldW?: number;
   theme?: string;
+  customWaves?: WaveDef[];
+  runBuffs?: RunBuff[];
+  runState?: RunState;
 }
 
 export class BattleScene extends Phaser.Scene {
   private worldScene!: WorldScene;
   private gameOverTriggered = false;
+  private runState?: RunState;
 
   constructor() {
     super('BattleScene');
@@ -21,10 +28,11 @@ export class BattleScene extends Phaser.Scene {
 
   create(data?: BattleSceneData): void {
     this.gameOverTriggered = false;
+    this.runState = data?.runState;
 
-    // Load deck from scene data or save
+    // Load deck from scene data, run state roster, or save
     const save: SaveManager = new SaveManager();
-    let deckKeys: string[] = (data && data.deck) || save.getDeck();
+    let deckKeys: string[] = this.runState?.roster || (data && data.deck) || save.getDeck();
     if (!deckKeys.length) deckKeys = Object.keys(UNIT_DEFS).filter(k => !UNIT_DEFS[k].unlock).slice(0, 10);
 
     // Check for start wave from scene data or URL param (?wave=30)
@@ -35,7 +43,11 @@ export class BattleScene extends Phaser.Scene {
     const theme = data?.theme;
 
     // Launch WorldScene (owns game logic, rendering, camera)
-    this.scene.launch('WorldScene', { deck: deckKeys, startWave, worldW, theme });
+    this.scene.launch('WorldScene', {
+      deck: deckKeys, startWave, worldW, theme,
+      customWaves: data?.customWaves,
+      runBuffs: data?.runBuffs,
+    });
     this.scene.launch('HUDScene');
     this.worldScene = this.scene.get('WorldScene') as WorldScene;
 
@@ -50,6 +62,7 @@ export class BattleScene extends Phaser.Scene {
       this.scene.stop('HUDScene');
       this.scene.stop('MenuUIScene');
       this.scene.stop('ModalScene');
+      this.scene.stop('PauseScene');
     });
   }
 
@@ -59,10 +72,23 @@ export class BattleScene extends Phaser.Scene {
 
     if (!gm.running && gm.won && !this.gameOverTriggered) {
       this.gameOverTriggered = true;
-      this.time.delayedCall(400, () => this.showGameOver());
+      if (this.runState) {
+        this.time.delayedCall(400, () => this.handleRunResult());
+      } else {
+        this.time.delayedCall(400, () => this.showGameOver());
+      }
     }
   }
 
+  // Roguelike run: delegate routing to RunController
+  private handleRunResult(): void {
+    if (!this.runState) return;
+    const won = this.worldScene.gm.won === 'player';
+    const transition = onBattleResult(this.runState, won);
+    this.scene.start(transition.scene, transition.data);
+  }
+
+  // Legacy endless mode: show game over modal
   private showGameOver(): void {
     const gm = this.worldScene.gm;
     const points = gm.saveAndGetPoints();

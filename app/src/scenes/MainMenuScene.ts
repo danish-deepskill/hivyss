@@ -6,6 +6,7 @@ const GND = LANE.land.groundY;
 import { SaveManager } from '../systems/SaveManager';
 import { UNIT_DEFS, drawUnit } from '../units/registry';
 import { resolveColors } from '../config/Palettes';
+import { generateSeedString, formatSeedInput } from '../systems/SeededRNG';
 import type { RenderUnit } from '../types';
 
 const UNIT_KEYS: string[] = Object.keys(UNIT_DEFS);
@@ -113,11 +114,72 @@ export class MainMenuScene extends Phaser.Scene {
     const themeOptions = ['random', ...Object.keys(BG_THEMES)];
     let themeValue = themeOptions[themeIdx];
 
-    const playBtn = makeBtn(cy + 50, 'PLAY',
-      () => this.scene.start('BattleScene', { startWave: startWaveValue, theme: themeValue }),
+    // NEW RUN button — primary action
+    let currentSeed = generateSeedString();
+    let runMode: 'permadeath' | 'persistent' = 'permadeath';
+    makeBtn(cy + 50, 'NEW RUN',
+      () => this.scene.start('BroodScene', { mode: 'run', seed: currentSeed, runMode }),
       '#f0c040', '#ffe080');
-    makeBtn(cy + 90, 'DECK', () => this.scene.start('DeckScene'));
-    makeBtn(cy + 126, 'SANDBOX', () => this.scene.start('SandboxScene'));
+
+    // Seed input (right of NEW RUN)
+    const seedX = W / 2 + BTN_W / 2 + 20;
+    const seedContainer = document.createElement('div');
+    seedContainer.style.cssText = 'display:flex; align-items:center; gap:4px; pointer-events:auto;';
+
+    const seedInput = document.createElement('input');
+    seedInput.type = 'text';
+    seedInput.value = currentSeed;
+    seedInput.maxLength = 9;
+    seedInput.style.cssText = 'width:100px; height:20px; font-family:"Courier New",monospace; font-size:12px; color:#f0c040; background:#0a0a14; border:1px solid #333; border-radius:3px; padding:0 6px; text-align:center; outline:none; box-sizing:border-box;';
+    seedInput.addEventListener('input', () => {
+      const formatted = formatSeedInput(seedInput.value);
+      seedInput.value = formatted;
+      currentSeed = formatted;
+    });
+    seedInput.addEventListener('focus', () => { seedInput.style.borderColor = '#f0c040'; });
+    seedInput.addEventListener('blur', () => { seedInput.style.borderColor = '#333'; });
+
+    const btnStyle = 'font-family:"Courier New",monospace; font-size:9px; height:20px; background:none; border:1px solid #333; border-radius:3px; padding:0 6px; cursor:pointer; color:#888; box-sizing:border-box;';
+
+    const randomBtn = document.createElement('button');
+    randomBtn.style.cssText = btnStyle;
+    randomBtn.textContent = 'RNG';
+    randomBtn.title = 'Random seed';
+    randomBtn.onclick = () => { currentSeed = generateSeedString(); seedInput.value = currentSeed; };
+    randomBtn.onmouseenter = () => { randomBtn.style.borderColor = '#f0c040'; };
+    randomBtn.onmouseleave = () => { randomBtn.style.borderColor = '#333'; };
+
+    const copyBtn = document.createElement('button');
+    copyBtn.style.cssText = btnStyle;
+    copyBtn.textContent = 'COPY';
+    copyBtn.onclick = () => {
+      navigator.clipboard.writeText(currentSeed);
+      copyBtn.textContent = 'OK!';
+      setTimeout(() => { copyBtn.textContent = 'COPY'; }, 1000);
+    };
+    copyBtn.onmouseenter = () => { copyBtn.style.borderColor = '#f0c040'; };
+    copyBtn.onmouseleave = () => { copyBtn.style.borderColor = '#333'; };
+
+    seedContainer.append(seedInput, randomBtn, copyBtn);
+    this.add.dom(seedX + 82, cy + 50, seedContainer).setDepth(UI_DEPTH);
+
+    // Mode toggle
+    const modeLbl = this.add.text(seedX, cy + 74, 'PERMADEATH', {
+      fontFamily: '"Press Start 2P", monospace', fontSize: '8px', color: '#c04040',
+    }).setOrigin(0, 0.5).setDepth(UI_DEPTH).setInteractive({ useHandCursor: true });
+    modeLbl.on('pointerdown', () => {
+      runMode = runMode === 'permadeath' ? 'persistent' : 'permadeath';
+      modeLbl.setText(runMode === 'permadeath' ? 'PERMADEATH' : 'PERSISTENT');
+      modeLbl.setColor(runMode === 'permadeath' ? '#c04040' : '#4080c0');
+    });
+    modeLbl.on('pointerover', () => modeLbl.setAlpha(0.7));
+    modeLbl.on('pointerout', () => modeLbl.setAlpha(1));
+
+    // Legacy buttons
+    const playBtn = makeBtn(cy + 96, 'PLAY',
+      () => this.scene.start('BattleScene', { startWave: startWaveValue, theme: themeValue }));
+    makeBtn(cy + 132, 'BROOD', () => this.scene.start('BroodScene'));
+    makeBtn(cy + 168, 'SANDBOX', () => this.scene.start('SandboxScene'));
 
     // Wave start selector — right of PLAY
     const playRight = playBtn.x + BTN_W / 2 + 20;
@@ -126,12 +188,12 @@ export class MainMenuScene extends Phaser.Scene {
       waveLbl.setText(String(startWaveValue));
       waveLbl.setColor(startWaveValue > 1 ? '#f0c040' : '#555');
     };
-    const minusBtn = this.add.text(playRight, cy + 50, '<', pickerStyle).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(UI_DEPTH);
-    const waveLbl = this.add.text(playRight + 28, cy + 50, '1', {
+    const minusBtn = this.add.text(playRight, cy + 96, '<', pickerStyle).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(UI_DEPTH);
+    const waveLbl = this.add.text(playRight + 28, cy + 96, '1', {
       fontFamily: '"Courier New", monospace', fontSize: '16px', color: '#555',
     }).setOrigin(0.5).setDepth(UI_DEPTH);
-    const plusBtn = this.add.text(playRight + 57, cy + 50, '>', pickerStyle).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(UI_DEPTH);
-    this.add.text(playRight + 82, cy + 50, 'W', {
+    const plusBtn = this.add.text(playRight + 57, cy + 96, '>', pickerStyle).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(UI_DEPTH);
+    this.add.text(playRight + 82, cy + 96, 'W', {
       fontFamily: '"Courier New", monospace', fontSize: '11px', color: '#444',
     }).setOrigin(0, 0.5).setDepth(UI_DEPTH);
     minusBtn.on('pointerdown', () => { startWaveValue = Math.max(1, startWaveValue - 1); updateWaveLbl(); });
@@ -142,7 +204,7 @@ export class MainMenuScene extends Phaser.Scene {
     plusBtn.on('pointerout', () => plusBtn.setColor('#555'));
 
     // Theme picker
-    const themeLbl = this.add.text(playRight + 28, cy + 72, 'random', {
+    const themeLbl = this.add.text(playRight + 28, cy + 118, 'random', {
       fontFamily: '"Courier New", monospace', fontSize: '14px', color: '#555',
     }).setOrigin(0.5).setDepth(UI_DEPTH);
     const updateThemeLbl = () => {
@@ -150,9 +212,9 @@ export class MainMenuScene extends Phaser.Scene {
       themeLbl.setText(themeValue);
       themeLbl.setColor(themeValue !== 'random' ? '#f0c040' : '#555');
     };
-    const themeLeft = this.add.text(playRight, cy + 72, '<', pickerStyle).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(UI_DEPTH);
-    const themeRight = this.add.text(playRight + 57, cy + 72, '>', pickerStyle).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(UI_DEPTH);
-    this.add.text(playRight + 82, cy + 72, 'BG', {
+    const themeLeft = this.add.text(playRight, cy + 118, '<', pickerStyle).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(UI_DEPTH);
+    const themeRight = this.add.text(playRight + 57, cy + 118, '>', pickerStyle).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(UI_DEPTH);
+    this.add.text(playRight + 82, cy + 118, 'BG', {
       fontFamily: '"Courier New", monospace', fontSize: '11px', color: '#444',
     }).setOrigin(0, 0.5).setDepth(UI_DEPTH);
     themeLeft.on('pointerdown', () => { themeIdx = (themeIdx - 1 + themeOptions.length) % themeOptions.length; updateThemeLbl(); });

@@ -29,6 +29,10 @@ export class EconomyManager {
     }
   }
 
+  addBaseIncome(amount: number): void {
+    this.income += amount;
+  }
+
   canAfford(cost: number): boolean {
     return this.nectar >= cost;
   }

@@ -78,7 +78,7 @@ const aphidDef: UnitDef = {
   desc: "Heals Allies",
   route: "land",
   attackRange: "ranged",
-  tier: 3,
+  tier: 2,
   incubation: 8,
   knockResist: 5,
   caste: "soldier",

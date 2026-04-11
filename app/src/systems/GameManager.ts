@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
-import type { UnitDef, Side, AbilityKey, RenderUnit } from '../types';
+import type { UnitDef, WaveDef, Side, AbilityKey, RenderUnit } from '../types';
 import { resolveColors } from '../config/Palettes';
 import { W, DEFAULT_WORLD_W, SBW as SBW_CONST } from '../config/Constants';
+import type { RunBuff } from './RunState';
 // W = viewport width (used for camera), worldW = per-battle battlefield width
 import { UNIT_DEFS, drawUnit } from '../units/registry';
 import { ENEMY_DEFS } from '../config/EnemyDefs';
@@ -19,6 +20,7 @@ import { EventBus } from './EventBus';
 import { UnitPool } from './UnitPool';
 import { CocoonVisuals } from '../entities/CocoonVisuals';
 import { LarvaVisuals } from '../entities/LarvaVisuals';
+import { registerDebugCommand, unregisterDebugCommand } from './DebugConsole';
 
 export interface SpawnResult {
   success: boolean;
@@ -54,7 +56,7 @@ export class GameManager {
   // Camera
   manualPanTimer: number;
 
-  constructor(scene: Phaser.Scene, deckKeys: string[], startWave: number = 1, worldW: number = DEFAULT_WORLD_W) {
+  constructor(scene: Phaser.Scene, deckKeys: string[], startWave: number = 1, worldW: number = DEFAULT_WORLD_W, customWaves?: WaveDef[], runBuffs?: RunBuff[]) {
     this.scene = scene;
     this.events = new EventBus();
     this.worldW = worldW;
@@ -76,7 +78,7 @@ export class GameManager {
     // Systems
     this.audio = new AudioManager();
     this.combat = new CombatSystem(scene, this.events, worldW);
-    this.waves = new WaveManager(scene, startWave, this.events);
+    this.waves = new WaveManager(scene, startWave, this.events, customWaves);
     this.economy = new EconomyManager(scene);
     this.abilities = new AbilityManager(scene, this.events, worldW);
     this.particles = new ParticleManager(scene);
@@ -84,12 +86,37 @@ export class GameManager {
     this.cocoons = new CocoonVisuals(scene);
     this.larvae = new LarvaVisuals(scene);
 
+    // Apply run buffs (hive buildings from roguelike rewards)
+    if (runBuffs) {
+      for (const buff of runBuffs) {
+        if (buff.type === 'nectar_income') this.economy.addBaseIncome(buff.value);
+      }
+    }
+
     // Game state
     this.running = true;
     this.won = null;
     this.kills = 0;
     this.elapsed = 0;
     this.manualPanTimer = 0;
+
+    // Debug commands (dev only — tree-shaken in production)
+    if (import.meta.env.DEV) {
+      registerDebugCommand('win', 'Instant victory', () => { this.debugWin(); return 'Victory triggered.'; });
+      registerDebugCommand('nectar', 'Set nectar (e.g. nectar 999)', (args) => {
+        const n = parseInt(args[0]); if (isNaN(n)) return 'Usage: nectar <amount>';
+        this.economy.nectar = n; return `Nectar set to ${n}`;
+      });
+      registerDebugCommand('wave', 'Skip to wave end', () => {
+        this.waves.enemyQueue.length = 0;
+        this.waves.waveTimer = this.waves.waveInterval - 0.1;
+        return 'Wave skipped.';
+      });
+      registerDebugCommand('hp', 'Set player base HP (e.g. hp 9999)', (args) => {
+        const n = parseInt(args[0]); if (isNaN(n)) return 'Usage: hp <amount>';
+        this.playerBase.setHp(n); return `Base HP set to ${n}`;
+      });
+    }
 
     // Wire up event listeners
     this.events.on('enemyKilled', (data) => {
@@ -154,11 +181,21 @@ export class GameManager {
     this.playerBase.update(dt);
     this.enemyBase.update(dt);
 
-    // Check game over
+    // Check defeat
     if (this.playerBase.hp <= 0) {
       this.running = false;
       this.won = 'enemy';
       this.audio.defeat();
+    }
+
+    // Check victory (finite mode: all waves cleared + no living enemies)
+    if (!this.won && this.waves.isComplete) {
+      const livingEnemies = this.units.some(u => u.side === 'enemy' && !u.dead);
+      if (!livingEnemies) {
+        this.running = false;
+        this.won = 'player';
+        this.audio.waveStart(); // reuse as victory fanfare for now
+      }
     }
   }
 
@@ -272,6 +309,22 @@ export class GameManager {
       won: this.won === 'player',
       elapsed: this.elapsed,
     };
+  }
+
+  debugWin(): void {
+    // Kill all enemies, skip all waves — triggers victory condition next tick
+    this.units.forEach(u => { if (u.side === 'enemy' && !u.dead) u.kill(); });
+    this.waves.enemyQueue.length = 0;
+    this.waves.waveIdx = this.waves.totalWaves;
+  }
+
+  cleanupDebugCommands(): void {
+    if (import.meta.env.DEV) {
+      unregisterDebugCommand('win');
+      unregisterDebugCommand('nectar');
+      unregisterDebugCommand('wave');
+      unregisterDebugCommand('hp');
+    }
   }
 
   saveAndGetPoints(): number {

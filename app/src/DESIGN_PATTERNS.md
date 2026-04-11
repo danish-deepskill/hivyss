@@ -19,10 +19,13 @@ All content (units, enemies, waves, abilities) is defined as pure data objects c
 - `AbilityDef` — ability stats and costs
 
 **How to add a new unit:**
-1. Create `units/<unitname>.ts` with `def`, `draw`, and optional `combat` exports
-2. Add `import * as <unitname> from './<unitname>'` in `registry.ts`
-3. Add `<unitname>` to the `UNITS` object in `registry.ts`
-4. That's it — UNIT_DEFS, DRAW_MAP, COMBAT_MAP auto-build from UNITS
+Units are consolidated per geneline (`units/alpha.ts`, `units/normal.ts`). Each file exports a `units` record of `UnitModule` objects.
+
+1. Add the def to the appropriate geneline file (use `alphaDef()` helper for geneline units)
+2. Create a draw function in `draws/<geneline>/<unit>.ts`
+3. Add combat hooks (optional) in the same geneline file
+4. Add to the `units` export record
+5. That's it — registry auto-builds UNIT_DEFS, DRAW_MAP, COMBAT_MAP from all geneline files
 
 ---
 
@@ -188,8 +191,9 @@ During battle, 4 parallel Phaser scenes run simultaneously. BattleScene is a thi
 ```
 BattleScene (orchestrator)
   ├── WorldScene     — game world, GameManager, camera, canvas rendering
-  ├── HUDScene       — floating HP bars (canvas), synced to WorldScene camera
+  ├── HUDScene       — floating HP bars (canvas), synced to WorldScene camera + zoom
   ├── MenuUIScene    — bottom panel DOM UI (resource bar, unit slots, abilities, log)
+  ├── PauseScene     — ESC pause overlay with resume/quit (launched on demand)
   └── ModalScene     — game-over overlay (launched on demand)
 ```
 
@@ -220,6 +224,8 @@ BattleScene (orchestrator)
 **Files:** `config/GameConfig.ts` (`dom: { createContainer: true }`), `scenes/MenuUIScene.ts`, `scenes/ModalScene.ts`
 
 Phaser's DOM container overlays an invisible `<div>` on top of the canvas. Scenes create DOM elements via `this.add.dom(x, y, element)` for text-heavy UI that would be expensive to render on canvas.
+
+**DOM-based scenes:** MenuUIScene (battle HUD), ModalScene (game over), BroodScene (vyssid selection), PauseScene (pause overlay).
 
 **Pointer events:** The DOM container has `pointer-events: none` by default. Individual UI panels set `pointer-events: auto`. Clicks on transparent areas pass through to the canvas below.
 
@@ -278,6 +284,90 @@ if (ctx.sourceUnit && !canAttack(source.route, source.attackRange, target.route)
 - Add route checks inside individual combat hooks — `hitUnit()` handles enforcement
 - Create separate combat systems per route — one CombatSystem, one matrix
 - Hardcode route interactions in if/else — use the data matrix
+
+---
+
+## 10. GenePalette System
+
+**Status:** Implemented
+**Files:** `config/Palettes.ts`, `types.ts` (GenePalette), `entities/Unit.ts`
+
+Each geneline has a shared color palette defined once in `config/Palettes.ts`. Unit defs reference the palette instead of hardcoding colors. Draw functions read colors from `u.palette`.
+
+```ts
+// config/Palettes.ts — single source of truth for geneline colors
+export const PALETTES: Record<string, GenePalette> = {
+  alpha: { primary: 0xc03030, secondary: 0xd4c4b0, accent: 0x6b1a1a, shadow: 0x3d0e0e },
+};
+```
+
+**Data flow:**
+```
+config/Palettes.ts → UnitDef.palette → Unit.init() resolves colors → RenderUnit.palette → draw function
+```
+
+- **Geneline units:** Use `palette: PALETTES.alpha` on def (no per-unit primary/secondary)
+- **Starter units:** Use per-unit `primary`/`secondary` directly on def (no palette)
+- **`resolveColors(def)`:** Single utility that resolves `primary`/`secondary` from either source
+
+**Adding a new geneline:** Add one entry to `PALETTES`. All units in that geneline reference it.
+
+---
+
+## 11. Shared UI Components
+
+**Status:** Implemented
+**Files:** `ui/UnitCard.ts`, `index.html` (`.ucard` CSS)
+
+Reusable DOM components used across multiple scenes. Each component owns its HTML structure, and CSS is defined in `index.html`.
+
+**UnitCard** (`createUnitCard(key, opts)`):
+- Used by: BroodScene (selection grid), MenuUIScene (battle deploy slots)
+- Renders: tier badge, geneline badge, route icon, unit preview image, name, cost
+- Fixed size: 90×80px via `.ucard` CSS
+- States via CSS classes: `.selected`, `.disabled`
+
+**Do not:**
+- Build card HTML inline in scenes — use `createUnitCard()`
+- Add card-specific styles as inline styles — use `.ucard` CSS classes
+
+---
+
+## 12. Numeric Tier System
+
+**Status:** Implemented
+**Files:** `types.ts` (TierKey), `units/registry.ts` (TIER_DEFS)
+
+Tiers are numeric (1-11) internally, with display labels looked up from `TIER_DEFS`. This enables sorting, comparison, and tier-gated mechanics without string mapping.
+
+```ts
+type TierKey = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
+
+TIER_DEFS[3] // → { label: 'M', name: 'Megavyss', color: '#50a0e0' }
+```
+
+Unit defs use `tier: 3`, UI reads `TIER_DEFS[def.tier].label` for display.
+
+---
+
+## 13. Camera Zoom Sync
+
+**Status:** Implemented
+**Files:** `scenes/WorldScene.ts`, `scenes/HUDScene.ts`
+
+WorldScene publishes camera state to the Phaser registry every frame. HUDScene reads and syncs both scroll and zoom so HP bars match the world camera.
+
+```ts
+// WorldScene publishes
+this.registry.set('cam.scrollX', cam.scrollX);
+this.registry.set('cam.zoom', cam.zoom);
+
+// HUDScene syncs
+this.cameras.main.scrollX = this.registry.get('cam.scrollX');
+this.cameras.main.zoom = this.registry.get('cam.zoom');
+```
+
+Default zoom: 1.5x. Player controls: +/- keys (range 1.0–3.0).
 
 ---
 

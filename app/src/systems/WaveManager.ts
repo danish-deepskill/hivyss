@@ -19,10 +19,14 @@ export class WaveManager {
   enemySpawnAcc: number;
   stage: number;
   _infiniteScale: number;
+  private waveDefs: WaveDef[];
+  private finiteMode: boolean;
 
-  constructor(scene: Phaser.Scene, startWave: number = 1, events?: EventBus) {
+  constructor(scene: Phaser.Scene, startWave: number = 1, events?: EventBus, customWaves?: WaveDef[]) {
     this.scene = scene;
     this.events = events || new EventBus();
+    this.waveDefs = customWaves || WAVE_DEFS;
+    this.finiteMode = !!customWaves;
     this.waveIdx = Math.max(0, startWave - 1);
     this.waveTimer = 0;
     this.waveInterval = WAVE_INTERVAL;
@@ -35,13 +39,16 @@ export class WaveManager {
     this.scheduleNextWave();
   }
 
+  get totalWaves(): number { return this.waveDefs.length; }
+  get isComplete(): boolean { return this.waveIdx >= this.waveDefs.length && this.enemyQueue.length === 0; }
+
   scheduleNextWave(): void {
-    if (this.waveIdx >= WAVE_DEFS.length) {
-      // Infinite scaling: generate procedural wave
+    if (this.waveIdx >= this.waveDefs.length) {
+      if (this.finiteMode) return; // finite mode: stop spawning
       this.generateInfiniteWave();
       return;
     }
-    const w = WAVE_DEFS[this.waveIdx];
+    const w = this.waveDefs[this.waveIdx];
     this.enemyQueue = [...w.units];
     this.enemySpawnInterval = w.interval;
     this.enemySpawnAcc = 0;
@@ -67,7 +74,7 @@ export class WaveManager {
   }
 
   getScaleFactor(): number {
-    if (this.waveIdx < WAVE_DEFS.length) return 1;
+    if (this.waveIdx < this.waveDefs.length) return 1;
     return this._infiniteScale || 1;
   }
 
