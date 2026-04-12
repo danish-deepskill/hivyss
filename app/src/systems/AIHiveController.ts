@@ -11,6 +11,8 @@ import { EventBus } from './EventBus';
 import { SeededRNG } from './SeededRNG';
 import { IncubationManager } from './IncubationManager';
 import type { Chamber } from './IncubationManager';
+import { capUsed, capRemaining } from './Capacity';
+import type { Unit } from '../entities/Unit';
 
 // Personality-specific tuning
 const PERSONALITY_CONFIG: Record<AIPersonality, {
@@ -58,6 +60,9 @@ export class AIHiveController implements IWaveController {
   // AI Brain
   private thinkAcc: number;
 
+  // Live view of all units (player + enemy) — used to compute enemy cap usage
+  private unitsProvider: () => readonly Unit[];
+
   // Debug log (recent actions, capped)
   debugLog: string[] = [];
 
@@ -84,12 +89,19 @@ export class AIHiveController implements IWaveController {
 
   getScaleFactor(): number { return 1; }
 
-  constructor(scene: Phaser.Scene, profile: HiveProfile, events: EventBus, rng: SeededRNG) {
+  constructor(
+    scene: Phaser.Scene,
+    profile: HiveProfile,
+    events: EventBus,
+    rng: SeededRNG,
+    unitsProvider: () => readonly Unit[],
+  ) {
     this.scene = scene;
     this.events = events;
     this.rng = rng;
     this.profile = profile;
     this.config = PERSONALITY_CONFIG[profile.personality];
+    this.unitsProvider = unitsProvider;
 
     // Economy
     this.nectar = profile.startNectar;
@@ -210,11 +222,17 @@ export class AIHiveController implements IWaveController {
   private getAffordableUnits(): { key: string; cost: number; weight: number }[] {
     const results: { key: string; cost: number; weight: number }[] = [];
 
+    // Cap-aware: enemy cap usage = enemy units alive + AI's own incubating chambers.
+    // v1 filter only — AI does NOT plan compositions, just won't queue what won't fit.
+    const aiCapUsed = capUsed(this.unitsProvider(), 'enemy', this.incubation.chambers);
+    const remaining = capRemaining(aiCapUsed);
+
     for (const key of this.profile.roster) {
       const playerKey = key.startsWith('e') ? key.slice(1) : key;
       const def = UNIT_DEFS[playerKey];
       if (!def) continue;
       if (def.cost > this.nectar) continue;
+      if ((def.cap ?? 0) > remaining) continue;
 
       const weight = this.config.roleWeights[def.role] || 1;
       const cheapBonus = this.profile.personality === 'swarm'

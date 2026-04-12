@@ -44,6 +44,7 @@ export interface UnitDef {
   range: number;           // [px] attack range in pixels
   atkRate: number;         // [num] attacks per second (interval = 1/atkRate seconds)
   cost: number;            // [num] nectar cost to deploy
+  cap?: number;            // [num] capacity weight (omit = 0; bases/tokens uncapped)
   reward: number;          // [num] nectar earned when enemy version is killed
   w: number;               // [px] sprite width in pixels
   h: number;               // [px] sprite height in pixels

@@ -35,10 +35,18 @@
     .ucard:hover:not(.disabled) { border-color: #555; filter: brightness(1.25); }
     .ucard:active:not(.disabled) { transform: scale(0.97); }
     .ucard.disabled { opacity: .35; cursor: not-allowed; }
+    .ucard.cap-blocked { cursor: not-allowed; border-color: #c03030; background: #1a0808; animation: cap-blocked-pulse 1.4s ease-in-out infinite; }
+    .ucard.cap-blocked .uico, .ucard.cap-blocked .uico-img { opacity: 0.2; filter: grayscale(1); }
+    .ucard.cap-blocked .uname { color: #f06060; }
+    .ucard.cap-blocked .ucap { color: #ff8080; font-weight: bold; }
+    .ucard.cap-blocked::after { content: 'HIVE FULL'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -65%); font-size: 8px; font-weight: bold; color: #ff5050; letter-spacing: 1px; font-family: 'Press Start 2P', monospace; pointer-events: none; text-shadow: 0 0 4px #000, 0 0 2px #000; white-space: nowrap; }
+    @keyframes cap-blocked-pulse { 0%,100% { border-color: #c03030; box-shadow: inset 0 0 0 1px #c03030; } 50% { border-color: #ff5050; box-shadow: inset 0 0 0 1px #ff5050, 0 0 8px rgba(255,80,80,0.4); } }
     .ucard .uico { font-size: 20px; line-height: 1; }
     .ucard .uico-img { width: 36px; height: 32px; object-fit: contain; image-rendering: pixelated; }
     .ucard .uname { font-size: 9px; font-weight: bold; text-align: center; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ucard .ucost-row { display: flex; align-items: center; justify-content: center; gap: 6px; }
     .ucard .ucost { font-size: 9px; color: #f0c040; text-align: center; }
+    .ucard .ucap { font-size: 9px; color: #40c0e0; text-align: center; font-family: 'Courier New', monospace; }
     .ucard .utier { position: absolute; top: 2px; left: 4px; font-family: 'Press Start 2P', monospace; font-size: 7px; font-weight: bold; opacity: 0.8; }
     .ucard .ucd-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: #f0c040; border-radius: 0 0 3px 3px; transform-origin: left; transition: transform .05s; display: none; }
     .ucard .utag { font-size: 8px; color: #888; text-align: center; }

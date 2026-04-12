@@ -7,4 +7,5 @@ export const SBW = 85; // scaled base width (was Math.round(BASE_W * 1.422))
 export const SPD_MULT = 0.5; // global speed multiplier for all units (tune gameplay pace)
 export const BASE_HP = 1000;
 export const MAX_NECTAR = 300;
+export const MAX_CAPACITY = 20;
 export const DEFAULT_WORLD_W = 2560; // default battlefield width — override via BattleSceneData.worldW

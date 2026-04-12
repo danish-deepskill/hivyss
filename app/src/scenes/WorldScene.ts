@@ -5,6 +5,7 @@ import { LANE } from '../config/Layout';
 const GND = LANE.land.groundY;
 import { ABILITY_DEFS } from '../config/AbilityDefs';
 import { GameManager } from '../systems/GameManager';
+import { capUsed, MAX_CAPACITY } from '../systems/Capacity';
 import type { AbilityKey, WaveDef, HiveProfile } from '../types';
 import type { RunBuff } from '../systems/RunState';
 
@@ -164,6 +165,11 @@ export class WorldScene extends Phaser.Scene {
       this.registry.set('eco.maxNectar', this.gm.economy.maxNectar);
       this.registry.set('eco.income', this.gm.economy.income);
       this.registry.set('eco.nectarPct', this.gm.economy.getNectarPercent());
+
+      // Capacity (MenuUIScene) — derived per-frame from live units + chambers
+      const playerCapUsed = capUsed(this.gm.units, 'player', this.gm.incubation.chambers);
+      this.registry.set('cap.used', playerCapUsed);
+      this.registry.set('cap.max', MAX_CAPACITY);
 
       // Incubation (MenuUIScene)
       this.registry.set('inc.chambers', this.gm.incubation.chambers);

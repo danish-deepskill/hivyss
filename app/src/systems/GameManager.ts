@@ -18,6 +18,7 @@ import { ParticleManager } from './ParticleManager';
 import { AudioManager } from './AudioManager';
 import { SaveManager } from './SaveManager';
 import { IncubationManager, MAX_CHAMBERS } from './IncubationManager';
+import { capUsed, canDeploy } from './Capacity';
 import { EventBus } from './EventBus';
 import { UnitPool } from './UnitPool';
 import { CocoonVisuals } from '../entities/CocoonVisuals';
@@ -83,7 +84,7 @@ export class GameManager {
     this.audio = new AudioManager();
     this.combat = new CombatSystem(scene, this.events, worldW);
     this.waves = hiveProfile && hiveSeed !== undefined
-      ? new AIHiveController(scene, hiveProfile, this.events, new SeededRNG(hiveSeed))
+      ? new AIHiveController(scene, hiveProfile, this.events, new SeededRNG(hiveSeed), () => this.units)
       : new WaveManager(scene, startWave, this.events, customWaves);
     this.economy = new EconomyManager(scene);
     this.abilities = new AbilityManager(scene, this.events, worldW);
@@ -285,6 +286,10 @@ export class GameManager {
     }
     if (this.incubation.isFull()) {
       return { success: false, message: 'All chambers full!' };
+    }
+    const used = capUsed(this.units, 'player', this.incubation.chambers);
+    if (!canDeploy(def, used)) {
+      return { success: false, message: 'HIVE FULL' };
     }
     this.economy.spend(def.cost);
     // Capture larva position before consuming it

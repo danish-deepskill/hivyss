@@ -4,6 +4,7 @@ import { createUnitCard } from '../ui/UnitCard';
 import { ABILITY_DEFS } from '../config/AbilityDefs';
 import { MAX_CHAMBERS, MAX_LARVAE, LARVA_SPAWN_RATE } from '../systems/IncubationManager';
 import type { Chamber } from '../systems/IncubationManager';
+import { MAX_CAPACITY, canDeploy } from '../systems/Capacity';
 import type { EventBus } from '../systems/EventBus';
 
 export class MenuUIScene extends Phaser.Scene {
@@ -17,6 +18,8 @@ export class MenuUIScene extends Phaser.Scene {
   private incomeLbl!: HTMLElement;
   private larvaeNum!: HTMLElement;
   private larvaeTimer!: HTMLElement;
+  private capFill!: HTMLElement;
+  private capNum!: HTMLElement;
 
   // Larva mound
   private larvaCounter!: HTMLElement;
@@ -107,6 +110,8 @@ export class MenuUIScene extends Phaser.Scene {
     const canQueue: boolean = this.registry.get('inc.canQueue') ?? true;
     const chambers: (Chamber | null)[] = this.registry.get('inc.chambers') ?? [];
     const numChambers: number = this.registry.get('inc.numChambers') ?? 6;
+    const capUsedNow: number = this.registry.get('cap.used') ?? 0;
+    const capMax: number = this.registry.get('cap.max') ?? MAX_CAPACITY;
     const running: boolean = this.registry.get('game.running') ?? true;
     const ablCanCast: Record<string, boolean> = this.registry.get('abl.canCast') ?? {};
     const ablCdPct: Record<string, number> = this.registry.get('abl.cooldownPct') ?? {};
@@ -121,6 +126,21 @@ export class MenuUIScene extends Phaser.Scene {
     } else {
       this.larvaeTimer.textContent = 'MAX';
     }
+
+    // Capacity bar — turns amber/red as it approaches max
+    const capPct = capMax > 0 ? (capUsedNow / capMax) * 100 : 0;
+    this.capFill.style.width = capPct + '%';
+    if (capUsedNow >= capMax) {
+      this.capFill.style.background = 'linear-gradient(90deg,#a04040,#f06060)';
+      this.capNum.style.color = '#f06060';
+    } else if (capPct >= 80) {
+      this.capFill.style.background = 'linear-gradient(90deg,#806020,#f0a040)';
+      this.capNum.style.color = '#f0a040';
+    } else {
+      this.capFill.style.background = 'linear-gradient(90deg,#106080,#40c0e0)';
+      this.capNum.style.color = '#40c0e0';
+    }
+    this.capNum.textContent = capUsedNow + ' / ' + capMax;
 
     // Larva mound
     this.larvaCounter.textContent = `Larvae: ${larvaCount}/${MAX_LARVAE}`;
@@ -174,13 +194,20 @@ export class MenuUIScene extends Phaser.Scene {
       }
     }
 
-    // Unit cards
+    // Unit cards — three failure states, distinct visuals:
+    //   .disabled    = can't afford OR no chamber/larva (greyed out)
+    //   .cap-blocked = would exceed hive capacity (red — telegraphs the actual blocker)
+    // Cap-blocked is the most important warning: the cap bar tells you WHAT,
+    // the card tells you WHY a specific pick is unusable.
     this.deckKeys.forEach(key => {
       const d = UNIT_DEFS[key];
       if (!d) return;
       const card = this.cardEls[key];
       if (!card) return;
-      card.classList.toggle('disabled', nectar < d.cost || !canQueue);
+      const wouldExceedCap = !canDeploy(d, capUsedNow, capMax);
+      const cantAfford = nectar < d.cost || !canQueue;
+      card.classList.toggle('disabled', cantAfford && !wouldExceedCap);
+      card.classList.toggle('cap-blocked', wouldExceedCap);
     });
 
     // Abilities
@@ -196,10 +223,14 @@ export class MenuUIScene extends Phaser.Scene {
 
   private buildResourceBar(): HTMLElement {
     const bar = document.createElement('div');
-    bar.style.cssText = 'display:flex; align-items:center; gap:8px; padding:4px 10px; background:#0e0e16; border-bottom:1px solid #1a1a28; pointer-events:auto;';
+    bar.style.cssText = 'display:flex; flex-direction:column; gap:2px; padding:4px 10px; background:#0e0e16; border-bottom:1px solid #1a1a28; pointer-events:auto;';
+
+    // Row 1 — stage label + nectar bar + larvae
+    const row1 = document.createElement('div');
+    row1.style.cssText = 'display:flex; align-items:center; gap:8px;';
 
     this.stageLbl = this.el('span', 'font-size:10px; color:#666; letter-spacing:2px; margin-right:8px;', 'STAGE 1');
-    const nectarLbl = this.el('span', 'font-size:9px; color:#666; letter-spacing:0.5px;', 'NECTAR');
+    const nectarLbl = this.el('span', 'font-size:9px; color:#666; letter-spacing:0.5px; min-width:42px;', 'NECTAR');
 
     const nectarTrack = document.createElement('div');
     nectarTrack.style.cssText = 'width:200px; height:10px; background:#1a1a22; border-radius:5px; border:1px solid #2a2a3a; overflow:hidden;';
@@ -220,7 +251,24 @@ export class MenuUIScene extends Phaser.Scene {
     spacer.style.cssText = 'flex:1;';
     const escHint = this.el('span', 'font-size:9px; color:#444; letter-spacing:1px;', 'ESC PAUSE');
 
-    bar.append(this.stageLbl, nectarLbl, nectarTrack, this.nectarNum, this.incomeLbl, sep, larvaeLbl, this.larvaeNum, this.larvaeTimer, spacer, escHint);
+    row1.append(this.stageLbl, nectarLbl, nectarTrack, this.nectarNum, this.incomeLbl, sep, larvaeLbl, this.larvaeNum, this.larvaeTimer, spacer, escHint);
+
+    // Row 2 — capacity bar (shorter, slim, distinct cyan/teal)
+    const row2 = document.createElement('div');
+    row2.style.cssText = 'display:flex; align-items:center; gap:8px; padding-left:60px;'; // align under nectar label
+
+    const capLbl = this.el('span', 'font-size:9px; color:#446677; letter-spacing:0.5px; min-width:42px;', 'HIVE');
+
+    const capTrack = document.createElement('div');
+    capTrack.style.cssText = 'width:160px; height:6px; background:#0a1418; border-radius:3px; border:1px solid #1a2a32; overflow:hidden;';
+    this.capFill = this.el('div', 'height:100%; background:linear-gradient(90deg,#106080,#40c0e0); border-radius:3px; transition:width .1s, background .15s; width:0%;');
+    capTrack.appendChild(this.capFill);
+
+    this.capNum = this.el('span', 'font-size:11px; color:#40c0e0; min-width:48px; text-align:right;', '0 / ' + MAX_CAPACITY);
+
+    row2.append(capLbl, capTrack, this.capNum);
+
+    bar.append(row1, row2);
     return bar;
   }
 

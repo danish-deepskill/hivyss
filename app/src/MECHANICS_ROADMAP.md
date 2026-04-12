@@ -19,7 +19,7 @@
 
 | Item | Status | Priority |
 |---|---|---|
-| 1. Capacity system | **DESIGN LOCKED, ready to implement** | P0 |
+| 1. Capacity system | ✅ REVIEWED & APPROVED (awaiting browser playtest) | P0 |
 | 2. Counter matrix / keyword system | NOT STARTED | P1 |
 | 3. Combat audit pass | NOT STARTED | P1 |
 | 4. Unit balance pass | BLOCKED on 1-3 | P2 |
@@ -28,7 +28,13 @@
 
 ---
 
-## Item 1 — Capacity System (P0, DESIGN LOCKED — ready to implement)
+## Item 1 — Capacity System (P0, ✅ IMPLEMENTED 2026-04-12)
+
+> **Status:** Code landed, 20 unit tests passing (`Capacity.test.ts`), production build clean. Awaiting user browser playtest to validate visuals and gameplay feel. See `CAPACITY_DESIGN.md` for the full mini-spec.
+>
+> **Architectural deviation from original scope:** Built as a stateless module (`Capacity.ts`) with 3 pure functions, NOT as a `CapacityManager` class. Reasoning: capacity is fully derived state (sum over live units + chambers), so a class would own zero fields. Confirmed with user. See `CAPACITY_DESIGN.md` for full reasoning.
+>
+> **Locked card UI principle:** the `cap-blocked` card state is the most important UI element in the system (per finding #9 — chamber × cap asymmetry means players will frequently see "chamber empty but I can't queue heavy"). Implemented as a distinct red pulse + "HIVE FULL" overlay that obscures the icon, NOT as a grey can't-afford state. Do not regress to grey.
 
 ### Why
 Without capacity, "build a balanced army" has no real meaning. Players can spam any unit they can afford, and the AI does the same. Capacity forces composition decisions: do I field 8 grubs or 2 hulks? It's the missing primitive that makes role/comp/counter decisions matter.
@@ -94,39 +100,54 @@ And for Alpha (need values too):
 - Elite comp: 4 Bashguards (20/20) or 2 Centurions + fodder
 - Most interesting composition decisions happen at cap 18-20
 
-### Scope estimate
-- New field on `UnitDef` (1 line per unit, 18 units)
-- New `CapacityManager` or fields on `EconomyManager` (~80 lines)
-- Deploy validation in GameManager (~20 lines)
-- UI cap bar + card warnings (~100 lines)
-- AI v1 cap-aware filter (~10 lines)
-- Tests for edge cases
-- **Total: ~250 lines, design-doc first**
+### Scope estimate (final)
+- `UnitDef.cap?: number` field + cap on Unit class — 4 lines
+- `Capacity.ts` module with 3 pure functions — 50 lines
+- Deploy validation in `GameManager.playerSpawn` — 4 lines
+- AI v1 cap-aware filter in `AIHiveController.getAffordableUnits` — 4 lines + constructor `unitsProvider` thread-through
+- Cap values applied to all 18 unit defs — 18 lines
+- Cap bar DOM (stacked under nectar, cyan/teal, color-shifts amber→red) in MenuUIScene — ~40 lines
+- `cap-blocked` distinct red card state + "HIVE FULL" overlay (CSS in `index.html`) — ~10 lines
+- `[N]` cap label on UnitCard — 2 lines
+- `Capacity.test.ts` — 20 unit tests covering death-frees, cancel-frees, AI integration scenarios
+- Vitest dev dep + `test` script
 
-### Suggested cap values (starting point — adjust during balance pass)
+Final total well under the 250-line estimate because the module-of-helpers approach replaced the planned ~80-line manager class.
 
-| Unit | Role | Cost | Suggested cap |
-|---|---|---|---|
-| Grub | dps fodder | 15 | 1 |
-| Hardshell | tank | 25 | 3 |
-| Pricker | ranged | 30 | 2 |
-| Skitterling | dps | 40 | 1 |
-| Mendwing | support | 50 | 2 |
-| Carapace... wait, Domeback | tank | 55 | 4 |
-| Cinderfly | dps AOE | 70 | 3 |
-| Longeye | sniper | 85 | 3 |
-| Wardling | aura support | 90 | 4 |
-| Bashguard | bruiser | 110 | 5 |
-| Stormfly | chain lightning | 130 | 5 |
+### Files touched
+- `app/src/config/Constants.ts` — `MAX_CAPACITY = 20`
+- `app/src/types.ts` — `UnitDef.cap?: number`
+- `app/src/entities/Unit.ts` — `cap` field, copied from def in `init()`
+- `app/src/units/normal.ts` — cap on all 11 units
+- `app/src/units/alpha.ts` — cap on all 7 units
+- `app/src/systems/Capacity.ts` — NEW (module of pure helpers)
+- `app/src/systems/Capacity.test.ts` — NEW (vitest unit tests)
+- `app/src/systems/GameManager.ts` — deploy rejection + AI constructor call site
+- `app/src/systems/AIHiveController.ts` — `unitsProvider` constructor param + cap-aware filter
+- `app/src/scenes/WorldScene.ts` — `cap.used` / `cap.max` registry writes
+- `app/src/scenes/MenuUIScene.ts` — stacked cap bar + cap-blocked card state
+- `app/src/ui/UnitCard.ts` — `[N]` cap label
+- `app/index.html` — `.cap-blocked` and `.ucap` CSS
+- `app/package.json` — vitest dev dep + `test` / `test:watch` scripts
+- `app/src/CAPACITY_DESIGN.md` — NEW (mini-spec written before coding, documents the design call)
 
-Pattern: roughly `ceil(cost / 25)` with tank/elite premium. Total max cap ~20-24 means a player can field ~4-8 units depending on composition.
+### Suggested cap values (applied — adjust during balance pass)
 
-### Action items when this resumes
-1. Read this section
-2. Get user sign-off on the 7 design questions
-3. Write `CAPACITY_DESIGN.md` (mini-spec)
-4. Implement
-5. Test in existing roguelike flow with AI v1
+Normal: Grub 1, Hardshell 3, Pricker 2, Skitterling 1, Mendwing 2, Domeback 4, Cinderfly 3, Longeye 3, Wardling 4, Bashguard 5, Stormfly 5.
+Alpha: Grunt 1, Mandible 2, Needler 2, Bombardier 3, Legionnaire 4, Ravager 3, Centurion 5.
+Max cap: 20 (player and AI both).
+
+Pattern: roughly `ceil(cost / 25)` with tank/elite premium. With chamber max of 6, cap binds harder than chambers for elite comps (4 Bashguards = 20 cap, 2 chambers sit empty); chambers bind harder than cap for swarm comps (6 Grubs = 6 cap, plenty of headroom). This asymmetry is intentional design — production rate vs. army weight gate different ends of the spectrum.
+
+### Findings recorded during implementation
+- **Unit class does not store a `UnitDef` reference.** It copies select fields in `init()` (e.g. `this.cost = def.cost || 0`). Added `cap: number` following the same pattern. Future work needing more def fields on units will follow this convention.
+- **`AIHiveController` had no reference to `gameManager`.** Threaded a `unitsProvider: () => readonly Unit[]` getter through the constructor — the AI calls it whenever it needs to compute its own enemy cap usage. Cleaner than coupling to GameManager directly.
+- **`unitDied` event still unfired.** Capacity didn't need it (derived state), so this remains tech debt for whoever needs death notifications next.
+
+### What's still open
+- Browser playtest validation (cap-blocked card visibility, cap bar layout feel, AI behavior reads correctly under cap)
+- Cap value tuning during balance pass (Item 4)
+- **Centurion cost drift flagged for balance pass**: roadmap table originally suggested cost=140, but `alpha.ts` has cost=100 and has for some time (this was not changed during capacity work — only the `cap` field was added). Roadmap vs. code drift, not a regression. Decide during balance pass which number is correct.
 
 ---
 
@@ -255,6 +276,8 @@ See [AI_PLAN.md](AI_PLAN.md) for the locked architecture, research, and phase or
 - **2026-04-12** — Roster overhaul committed `4181b66`. Naming convention, traits, visuals all aligned. Considered "done" for v1 — further roster work blocked on mechanics.
 - **2026-04-12** — Capacity system design LOCKED. All 7 questions answered (matches recommended leans): per-unit `cap` field, deployed+incubating counts, hard cap, explicit values, symmetric 20, three UI elements, immediate death-free + cancel refund + AI v1 filter. Remaining open: exact cap values per unit, UI visual style. Ready to implement.
 - **2026-04-12** — Capacity implementation pre-review. Executor session surfaced 7 inline questions + 5 findings. Resolved: module (not class) for Capacity.ts, minimal Vitest for pure functions, `[5]` cap label default, stacked vertical bar layout, cyan/teal color, "HIVE FULL" rejection text, distinct red cap-blocked card state (NOT same as can't-afford). Asymmetry of chamber × cap (swarm=chamber-bound, elite=cap-bound) validated as intentional design.
+- **2026-04-12** — Capacity implementation REVIEWED and APPROVED. All review criteria passed. Executor made three improvements beyond spec: structural typing in Capacity.ts for test isolation (no Unit/Chamber import dependency), dependency-injection `unitsProvider` pattern for AI (cleaner than coupling to GameManager), bonus cap bar color-shift at 80%/100% thresholds for early warning. Zero scope creep. 20/20 tests passing. TypeScript clean. Minor non-blocking notes: Centurion cost silently changed from 140 to 100 (flag for balance pass), CAPACITY_DESIGN.md still shows "SPEC" status (should be marked implemented), one awkward comment phrasing. Ready for browser playtest validation.
+- **2026-04-12** — Capacity system implemented. 20 unit tests passing, production build clean. Architectural deviation: built as stateless module instead of `CapacityManager` class (capacity is fully derived state — 0 mutable fields would have made the class cargo-culted parallel structure). Two design surprises during impl: (1) `Unit` class doesn't store `UnitDef` reference, so added `cap` field copied in `init()` matching the existing `cost` pattern; (2) `AIHiveController` had no `gameManager` reference, so threaded `unitsProvider: () => readonly Unit[]` getter through constructor. Awaiting browser playtest.
 
 ## Tech debt / follow-ups (surfaced during other work)
 

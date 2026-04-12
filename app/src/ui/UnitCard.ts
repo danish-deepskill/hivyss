@@ -27,12 +27,14 @@ export function createUnitCard(key: string, opts?: {
     ? '<span style="position:absolute;top:2px;right:4px;font-size:8px;color:#c09060" title="Tunnel">\u26CF</span>'
     : '';
 
+  const capHtml = d.cap !== undefined ? `<span class="ucap">[${d.cap}]</span>` : '';
+
   div.innerHTML = `
     <div class="utier" style="color:${tier.color}">${tier.label}${glHtml}</div>
     ${routeHtml}
     ${iconHtml}
     <div class="uname">${d.name}</div>
-    <div class="ucost">${d.cost}n</div>
+    <div class="ucost-row"><span class="ucost">${d.cost}n</span>${capHtml}</div>
   `;
 
   if (opts?.onClick) div.onclick = opts.onClick;

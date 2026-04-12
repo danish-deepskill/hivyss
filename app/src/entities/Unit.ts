@@ -33,6 +33,7 @@ export class Unit extends Phaser.GameObjects.Container {
   reward: number;
   trait: string;
   cost: number;
+  cap: number;
   route: Route;
   currentRoute: Route;
   attackRange: AttackRange;
@@ -94,6 +95,7 @@ export class Unit extends Phaser.GameObjects.Container {
     this.reward = 0;
     this.trait = '';
     this.cost = 0;
+    this.cap = 0;
     this.route = 'land';
     this.currentRoute = 'land';
     this.attackRange = 'melee';
@@ -155,6 +157,7 @@ export class Unit extends Phaser.GameObjects.Container {
     this.reward = def.reward;
     this.trait = def.trait;
     this.cost = def.cost || 0;
+    this.cap = def.cap ?? 0;
     this.route = def.route ?? 'land';
     this.currentRoute = this.route;
     this.attackRange = def.attackRange ?? 'melee';
