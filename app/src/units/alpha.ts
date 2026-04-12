@@ -249,7 +249,10 @@ const ravagerCombat: CombatHooks = {
 
 const centurionCombat: CombatHooks = {
   onUpdate(u, _dt, ctx) {
-    // Rally aura: up to 5 nearest allies within range get +20% ATK
+    // Rally aura: up to 5 nearest allies within range get +20% ATK.
+    // Buff fades when an ally leaves range. Each rallied ally remembers which
+    // centurion buffed it via `_ralliedByUid` so multi-centurion scenarios
+    // don't cross-wipe each other's buffs.
     const allies = ctx.allAlive
       .filter(
         (a) =>
@@ -262,23 +265,49 @@ const centurionCombat: CombatHooks = {
       .sort((a, b) => Math.abs(a.x - u.x) - Math.abs(b.x - u.x))
       .slice(0, 5);
 
+    const rallied = new Set(allies);
     for (const a of allies) {
       if (!(a as any)._rallied) {
         (a as any)._baseAtk = (a as any)._baseAtk ?? a.atk;
         a.atk = Math.round((a as any)._baseAtk * 1.2);
         (a as any)._rallied = true;
+        (a as any)._ralliedByUid = u.id;
       }
     }
+
+    // Fade: any ally this centurion previously buffed but is no longer in the
+    // current in-range set (walked out of aura, or pushed out of the top-5
+    // nearest by another ally) has its buff restored to base.
+    for (const a of ctx.allAlive) {
+      if (
+        a.side === u.side &&
+        (a as any)._rallied &&
+        (a as any)._ralliedByUid === u.id &&
+        !rallied.has(a)
+      ) {
+        a.atk = (a as any)._baseAtk ?? a.atk;
+        (a as any)._rallied = false;
+        (a as any)._ralliedByUid = undefined;
+      }
+    }
+
     // Store buff count so draw can show chevrons
     (u as any).rallyCount = allies.length;
     return false;
   },
   onDeath(u, ctx) {
-    // Remove rally buff from all allies when centurion dies
+    // Remove rally buff from allies THIS centurion was buffing.
+    // Filter by `_ralliedByUid` so a dying centurion doesn't clear another
+    // centurion's buffs in multi-centurion compositions.
     for (const a of ctx.allAlive) {
-      if (a.side === u.side && (a as any)._rallied) {
+      if (
+        a.side === u.side &&
+        (a as any)._rallied &&
+        (a as any)._ralliedByUid === u.id
+      ) {
         a.atk = (a as any)._baseAtk ?? a.atk;
         (a as any)._rallied = false;
+        (a as any)._ralliedByUid = undefined;
       }
     }
   },
