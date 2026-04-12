@@ -254,6 +254,11 @@ See [AI_PLAN.md](AI_PLAN.md) for the locked architecture, research, and phase or
 - **2026-04-12** — User questioned whether AI Hive v2 was premature given missing mechanics (capacity, combat completeness). I agreed. Pivoted to mechanics-first roadmap. AI_PLAN.md marked DEFERRED. This doc created.
 - **2026-04-12** — Roster overhaul committed `4181b66`. Naming convention, traits, visuals all aligned. Considered "done" for v1 — further roster work blocked on mechanics.
 - **2026-04-12** — Capacity system design LOCKED. All 7 questions answered (matches recommended leans): per-unit `cap` field, deployed+incubating counts, hard cap, explicit values, symmetric 20, three UI elements, immediate death-free + cancel refund + AI v1 filter. Remaining open: exact cap values per unit, UI visual style. Ready to implement.
+- **2026-04-12** — Capacity implementation pre-review. Executor session surfaced 7 inline questions + 5 findings. Resolved: module (not class) for Capacity.ts, minimal Vitest for pure functions, `[5]` cap label default, stacked vertical bar layout, cyan/teal color, "HIVE FULL" rejection text, distinct red cap-blocked card state (NOT same as can't-afford). Asymmetry of chamber × cap (swarm=chamber-bound, elite=cap-bound) validated as intentional design.
+
+## Tech debt / follow-ups (surfaced during other work)
+
+- **`unitDied` event declared but never fired** (surfaced 2026-04-12 during capacity explore). Not blocking capacity (derived state doesn't need it). Latent issue — any future system needing death notifications will hit this gap. Fix when first real consumer appears, or during combat audit (Item 3). Location: `EventBus` declares event, no `emit('unitDied', ...)` call exists in codebase.
 
 ## How to resume in a new conversation
 
