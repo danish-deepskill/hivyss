@@ -1,15 +1,32 @@
 import type { DrawFunction } from '../types';
 import { hexToInt, drawCommonParts } from '../units/renderUtils';
 
+// Cinderfly — burning fly with translucent ember wings (the "fly" in the name)
 const draw: DrawFunction = (g, u, cx, uy) => {
   const primary = hexToInt(u.primary);
   const secondary = hexToInt(u.secondary);
   const t = u.bob;
+  const f = u.facing;
 
   // Heat shimmer aura (warm glow behind body)
   const glowPulse = 0.12 + Math.sin(t * 3) * 0.06;
   g.fillStyle(0xff4010, glowPulse);
   g.fillCircle(cx, uy + u.h * 0.5, u.w * 0.6);
+
+  // FLAMING WINGS — translucent fire-tinted, flapping
+  const flap = Math.sin(t * 8) * 0.4;
+  // Outer wing glow
+  g.fillStyle(0xff6020, 0.25);
+  g.fillEllipse(cx - f * u.w * 0.18, uy + u.h * 0.18 - flap * 3, u.w * 0.42, u.h * 0.5 + flap * 4);
+  g.fillEllipse(cx + f * u.w * 0.06, uy + u.h * 0.16 - flap * 3, u.w * 0.42, u.h * 0.5 + flap * 4);
+  // Inner wing membrane
+  g.fillStyle(0xffaa30, 0.35);
+  g.fillEllipse(cx - f * u.w * 0.18, uy + u.h * 0.22 - flap * 3, u.w * 0.32, u.h * 0.4 + flap * 3);
+  g.fillEllipse(cx + f * u.w * 0.06, uy + u.h * 0.2 - flap * 3, u.w * 0.32, u.h * 0.4 + flap * 3);
+  // Wing edges (ember outline)
+  g.lineStyle(1, 0xffdd40, 0.6);
+  g.strokeEllipse(cx - f * u.w * 0.18, uy + u.h * 0.18 - flap * 3, u.w * 0.42, u.h * 0.5 + flap * 4);
+  g.strokeEllipse(cx + f * u.w * 0.06, uy + u.h * 0.16 - flap * 3, u.w * 0.42, u.h * 0.5 + flap * 4);
 
   // Animated flame tongues rising from abdomen (layered, back to front)
   // Each flame is a teardrop shape that flickers independently

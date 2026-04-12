@@ -16,23 +16,32 @@ interface BroodSceneData {
   runMode?: RunMode;
 }
 
+// Trait descriptions — keyed by behavior pattern, not unit name.
+// Multiple units can share a trait if they share the same combat hook.
+// Note: 'ranged' and 'sniper' are dynamically overridden below with def.range.
 const TRAIT_DESC: Record<string, string> = {
+  // Plain / fodder
   grub: 'Cheap fodder, no special ability',
+  grunt: 'Cheap fodder, no special ability',
   basic: 'No special ability',
-  area: 'Explodes on death dealing 65 AOE damage (up to 5)',
-  swift: 'Very fast movement speed',
-  healer: 'Heals nearest wounded ally every 2s',
+  // Tanks
+  wall: 'Slow durable wall, high knock resist',
+  shell: 'Mid-tier shelled tank',
   massive: 'Extremely high HP tank',
+  // DPS
+  swift: 'Glass cannon — extreme speed, very fragile',
   berserk: 'Attack speed increases below 50% HP',
-  rally: '+20% ATK to 5 nearest allies in range',
-  shield: 'Absorbs 50% damage for 3s after spawn',
-  shield_poison: 'Shield (50% absorb 3s) + Poison on hit',
-  poison: 'Attacks apply poison (5 dmg/s for 3s)',
-  burrow: 'Goes underground on spawn, surfaces behind enemy lines',
+  burn: 'Attacks set up to 3 nearby enemies on fire',
+  knockback: 'Heavy bruiser, rams enemies backward on hit',
+  area: 'Explodes on death dealing 65 AOE damage (up to 5)',
+  // Ranged
+  poker: 'Fragile ranged poker, single target',
+  // Support
+  healer: 'Heals nearest wounded ally every 2s',
   aura: 'Nearby allies take 20% less damage',
-  burn: 'Attacks set enemies on fire (8 dmg/s for 2s)',
-  knockback: 'Rams enemies backward on each hit',
-  lightning: 'Chain hits 3 foes, 25% stun, every 4th hit = 2x dmg',
+  rally: '+20% ATK to 5 nearest allies in range',
+  // AOE / chain
+  lightning: 'Chain lightning — hits 3 foes, 25% stun, 4th hit = 2x dmg',
 };
 
 function getDefaultDeck(max: number): string[] {

@@ -1,84 +1,104 @@
 import type { DrawFunction } from '../types';
 import { hexToInt } from '../units/renderUtils';
 
+// Grub — chubby segmented larva, simple but with character
+// Distinct features: round dimpled body segments, hungry mouth, twitchy antennae
 const draw: DrawFunction = (g, u, cx, uy) => {
   const primary = hexToInt(u.primary);
   const secondary = hexToInt(u.secondary);
-  const deep = 0x1e3008;
+  const deep = 0x14260a;
   const f = u.facing;
   const w = u.w;
   const h = u.h;
 
-  // --- Stubby legs (short, simple) ---
-  const lp = u.state === 'march' ? u.bob : 0;
-  g.lineStyle(w * 0.05, deep);
-  const groundY = uy + h + h * 0.12;
-  for (let l = 0; l < 3; l++) {
-    const lx = cx + (l - 1) * w * 0.2 * f;
-    const ly = uy + h * 0.7;
-    const sw = Math.sin(lp + l * 1.3) * w * 0.04;
-    g.lineBetween(lx, ly, lx - w * 0.08 - sw, groundY);
-    g.lineBetween(lx, ly, lx + w * 0.08 + sw, groundY);
-  }
+  // Soft ground shadow
+  g.fillStyle(0x000000, 0.22);
+  g.fillEllipse(cx, uy + h * 0.96, w * 0.78, h * 0.12);
 
-  // --- Body segments (3 overlapping, back to front) ---
-  // Rear segment
+  // Pulsing slight wiggle on march (vertical sine)
+  const wiggle = u.state === 'march' ? Math.sin(u.bob * 4) * 0.015 : 0;
+
+  // 4 plump body segments — each a little ball, smallest at rear
+  // Drawn back to front
+  const segments = [
+    { ox: -0.32, sz: 0.28 }, // tail
+    { ox: -0.12, sz: 0.36 }, // mid-rear
+    { ox:  0.08, sz: 0.4  }, // mid-front
+    { ox:  0.28, sz: 0.36 }, // shoulder
+  ];
+
+  segments.forEach((seg, i) => {
+    const sx = cx + f * w * seg.ox;
+    const sy = uy + h * (0.6 + wiggle * (i + 1));
+    const sw = w * seg.sz;
+    const sh = h * (seg.sz * 1.1);
+
+    // Deep shadow
+    g.fillStyle(deep);
+    g.fillEllipse(sx, sy + 1, sw, sh);
+    // Mid tone
+    g.fillStyle(secondary);
+    g.fillEllipse(sx, sy, sw * 0.92, sh * 0.92);
+    // Highlight
+    g.fillStyle(primary);
+    g.fillEllipse(sx, sy - sh * 0.08, sw * 0.78, sh * 0.7);
+    // Tiny dimple highlight (shiny grub skin)
+    g.fillStyle(0xffffff, 0.25);
+    g.fillEllipse(sx + sw * 0.1, sy - sh * 0.18, sw * 0.18, sh * 0.14);
+  });
+
+  // Head segment — biggest, with face
+  const hx = cx + f * w * 0.4;
+  const hy = uy + h * 0.5;
   g.fillStyle(deep);
-  g.fillEllipse(cx - f * w * 0.18, uy + h * 0.65, w * 0.42, h * 0.58);
+  g.fillEllipse(hx, hy + 1, w * 0.42, h * 0.52);
   g.fillStyle(secondary);
-  g.fillEllipse(cx - f * w * 0.18, uy + h * 0.63, w * 0.38, h * 0.54);
+  g.fillEllipse(hx, hy, w * 0.38, h * 0.46);
   g.fillStyle(primary);
-  g.fillEllipse(cx - f * w * 0.18, uy + h * 0.59, w * 0.3, h * 0.38);
+  g.fillEllipse(hx, hy - h * 0.04, w * 0.32, h * 0.36);
 
-  // Middle segment
-  g.fillStyle(deep);
-  g.fillEllipse(cx, uy + h * 0.58, w * 0.4, h * 0.55);
-  g.fillStyle(secondary);
-  g.fillEllipse(cx, uy + h * 0.56, w * 0.36, h * 0.5);
-  g.fillStyle(primary);
-  g.fillEllipse(cx, uy + h * 0.52, w * 0.28, h * 0.36);
-
-  // Front segment
-  g.fillStyle(deep);
-  g.fillEllipse(cx + f * w * 0.16, uy + h * 0.52, w * 0.38, h * 0.5);
-  g.fillStyle(secondary);
-  g.fillEllipse(cx + f * w * 0.16, uy + h * 0.5, w * 0.34, h * 0.46);
-  g.fillStyle(primary);
-  g.fillEllipse(cx + f * w * 0.16, uy + h * 0.46, w * 0.26, h * 0.32);
-
-  // --- Head (small, round) ---
-  g.fillStyle(deep);
-  g.fillEllipse(cx + f * w * 0.32, uy + h * 0.42, w * 0.28, h * 0.32);
-  g.fillStyle(secondary);
-  g.fillEllipse(cx + f * w * 0.32, uy + h * 0.4, w * 0.24, h * 0.28);
-  g.fillStyle(primary);
-  g.fillEllipse(cx + f * w * 0.32, uy + h * 0.37, w * 0.18, h * 0.2);
-
-  // --- Eye (solid compound eye) ---
-  const ex = cx + f * w * 0.36;
-  const ey = uy + h * 0.37;
-  g.fillStyle(0xffffff);
-  g.fillCircle(ex, ey, w * 0.04);
-
-  // --- Small mandibles (tiny nippers) ---
-  const jx = cx + f * w * 0.42;
-  const jy = uy + h * 0.42;
-  g.lineStyle(w * 0.045, secondary);
+  // Hungry round mouth — opens on attack
   if (u.state === 'attack') {
-    g.beginPath(); g.moveTo(jx, jy - h * 0.03); g.lineTo(jx + f * w * 0.14, jy - h * 0.1); g.strokePath();
-    g.beginPath(); g.moveTo(jx, jy + h * 0.03); g.lineTo(jx + f * w * 0.14, jy + h * 0.08); g.strokePath();
+    g.fillStyle(deep);
+    g.fillCircle(hx + f * w * 0.14, hy + h * 0.06, w * 0.08);
+    g.fillStyle(0x602010);
+    g.fillCircle(hx + f * w * 0.14, hy + h * 0.06, w * 0.05);
+    // Tiny inner teeth
+    g.fillStyle(0xffffff, 0.7);
+    g.fillCircle(hx + f * w * 0.12, hy + h * 0.04, 0.6);
+    g.fillCircle(hx + f * w * 0.16, hy + h * 0.08, 0.6);
   } else {
-    g.beginPath(); g.moveTo(jx, jy - h * 0.02); g.lineTo(jx + f * w * 0.12, jy); g.strokePath();
-    g.beginPath(); g.moveTo(jx, jy + h * 0.02); g.lineTo(jx + f * w * 0.12, jy); g.strokePath();
+    // Closed mouth — small line
+    g.lineStyle(1, deep);
+    g.lineBetween(
+      hx + f * w * 0.1, hy + h * 0.06,
+      hx + f * w * 0.18, hy + h * 0.06
+    );
   }
 
-  // --- Short antennae (stubby) ---
-  g.lineStyle(w * 0.04, secondary);
-  const ax = cx + f * w * 0.3;
-  const ay = uy + h * 0.3;
-  const wave = Math.sin(u.bob) * w * 0.04;
-  g.lineBetween(ax, ay, ax + f * w * 0.12 + wave, ay - h * 0.12);
-  g.lineBetween(ax, ay, ax + f * w * 0.04 - wave, ay - h * 0.14);
+  // Pair of dot eyes
+  g.fillStyle(0x000000);
+  g.fillCircle(hx + f * w * 0.08, hy - h * 0.04, 1.3);
+  g.fillStyle(0xffffff, 0.9);
+  g.fillCircle(hx + f * w * 0.085, hy - h * 0.05, 0.5);
+
+  // Twitchy short antennae
+  const wave = Math.sin(u.bob * 3) * 1.5;
+  g.lineStyle(1, deep);
+  const ax = hx + f * w * 0.06;
+  const ay = hy - h * 0.18;
+  g.lineBetween(ax, ay, ax + f * 4 + wave, ay - 5);
+  g.lineBetween(ax, ay, ax - f * 1 - wave, ay - 6);
+
+  // Tiny stubby legs (5 pairs along the body)
+  g.lineStyle(1, deep);
+  const lp = u.state === 'march' ? u.bob : 0;
+  for (let l = 0; l < 5; l++) {
+    const lx = cx + (l - 2) * w * 0.16;
+    const ly = uy + h * 0.82;
+    const sw = Math.sin(lp + l * 0.7) * w * 0.025;
+    g.lineBetween(lx, ly, lx + sw, uy + h);
+  }
 };
 
 export default draw;

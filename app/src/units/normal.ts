@@ -1,29 +1,63 @@
-import type { UnitDef, CombatHooks, UnitModule } from "../types";
-import { getGroundY } from "../config/RouteMatrix";
-import drawGrub from "../draws/grub";
-import drawZephyr from "../draws/zephyr";
-import drawAphid from "../draws/aphid";
-import drawBeetle from "../draws/beetle";
-import drawDigger from "../draws/digger";
-import drawEmber from "../draws/ember";
-import drawGuardian from "../draws/guardian";
-import drawMantis from "../draws/mantis";
-import drawRhino from "../draws/rhino";
-import drawVoltfly from "../draws/voltfly";
+// Normal geneline — baseline (universal) units, no special palette.
+// Designed for AI Lab testing: clean tier curve (T1-T4), role coverage at every
+// tier, deliberate speed/cost spreads. 11 units, 3-3-3-2 across tiers.
+//
+// Naming follows Vyssid Naming Convention (GAME_DESIGN.md §Vyssid Naming):
+// universal/plain insect-feel names, no military ranks, no fantasy terms.
 
-// --- Grub ---
+import type { UnitDef, CombatHooks, UnitModule } from "../types";
+import drawHardshell from "../draws/hardshell";
+import drawGrub from "../draws/grub";
+import drawPricker from "../draws/pricker";
+import drawDomeback from "../draws/domeback";
+import drawSkitterling from "../draws/skitterling";
+import drawMendwing from "../draws/mendwing";
+import drawCinderfly from "../draws/cinderfly";
+import drawLongeye from "../draws/longeye";
+import drawWardling from "../draws/wardling";
+import drawBashguard from "../draws/bashguard";
+import drawStormfly from "../draws/stormfly";
+
+// =========================================================
+// TIER 1 — Baseline (15-30n) — available to D1 hives
+// Roles: tank, dps, ranged (no support yet)
+// =========================================================
+
+const hardshellDef: UnitDef = {
+  name: "Hardshell",
+  ico: "\u{1FAA8}",
+  hp: 180,
+  atk: 14,
+  spd: 0.85,
+  range: 22,
+  atkRate: 0.7,
+  cost: 25,
+  reward: 12,
+  w: 24, h: 18,
+  primary: 0xa8a098,
+  secondary: 0x504848,
+  trait: "wall",
+  role: "tank",
+  desc: "Slow Wall",
+  route: "land",
+  attackRange: "melee",
+  tier: 1,
+  incubation: 5,
+  knockResist: 30,
+  caste: "soldier",
+};
+
 const grubDef: UnitDef = {
   name: "Grub",
   ico: "\u{1F41B}",
-  hp: 55,
-  atk: 12,
-  spd: 2.28,
-  range: 28,
+  hp: 50,
+  atk: 16,
+  spd: 2.2,
+  range: 26,
   atkRate: 1.1,
   cost: 15,
   reward: 8,
-  w: 23,
-  h: 20,
+  w: 22, h: 19,
   primary: 0x80d040,
   secondary: 0x3a6010,
   trait: "grub",
@@ -32,48 +66,96 @@ const grubDef: UnitDef = {
   route: "land",
   attackRange: "melee",
   tier: 1,
-  incubation: 2,
-  caste: "soldier",
-};
-
-// --- Zephyr ---
-const zephyrDef: UnitDef = {
-  name: "Zephyr",
-  ico: "\u{1F4A8}",
-  hp: 40,
-  atk: 40,
-  spd: 4.98,
-  range: 26,
-  atkRate: 1.2,
-  cost: 40,
-  reward: 15,
-  w: 18,
-  h: 17,
-  primary: 0x80f8c0,
-  secondary: 0x208050,
-  trait: "swift",
-  role: "dps",
-  desc: "Very Fast",
-  route: "land",
-  attackRange: "melee",
-  tier: 2,
   incubation: 3,
   caste: "soldier",
 };
 
-// --- Aphid ---
-const aphidDef: UnitDef = {
-  name: "Aphid",
+const prickerDef: UnitDef = {
+  name: "Pricker",
+  ico: "\u{1F41D}",
+  hp: 32,
+  atk: 22,
+  spd: 1.0,
+  range: 95,
+  atkRate: 0.8,
+  cost: 30,
+  reward: 14,
+  w: 18, h: 16,
+  primary: 0xf0c020,
+  secondary: 0x402008,
+  trait: "poker",
+  role: "ranged",
+  desc: "Fragile Poker",
+  route: "land",
+  attackRange: "ranged",
+  tier: 1,
+  incubation: 5,
+  caste: "soldier",
+};
+
+// =========================================================
+// TIER 2 — Extended baseline (40-55n) — D2 hives gain these
+// Adds: support role, glass-cannon dps, mid tank
+// =========================================================
+
+const domebackDef: UnitDef = {
+  name: "Domeback",
+  ico: "\u{1FAB2}",
+  hp: 280,
+  atk: 22,
+  spd: 1.0,
+  range: 24,
+  atkRate: 0.65,
+  cost: 55,
+  reward: 26,
+  w: 26, h: 22,
+  primary: 0x788060,
+  secondary: 0x303820,
+  trait: "shell",
+  role: "tank",
+  desc: "Shell Wall",
+  route: "land",
+  attackRange: "melee",
+  tier: 2,
+  incubation: 9,
+  knockResist: 20,
+  caste: "soldier",
+};
+
+const skitterlingDef: UnitDef = {
+  name: "Skitterling",
+  ico: "\u{1F4A8}",
+  hp: 38,
+  atk: 42,
+  spd: 4.8,
+  range: 24,
+  atkRate: 1.3,
+  cost: 40,
+  reward: 18,
+  w: 18, h: 17,
+  primary: 0x80f8c0,
+  secondary: 0x208050,
+  trait: "swift",
+  role: "dps",
+  desc: "Glass Cannon",
+  route: "land",
+  attackRange: "melee",
+  tier: 2,
+  incubation: 4,
+  caste: "soldier",
+};
+
+const mendwingDef: UnitDef = {
+  name: "Mendwing",
   ico: "\u{1F33F}",
-  hp: 120,
-  atk: 8,
-  spd: 1.14,
-  range: 85,
-  atkRate: 0.6,
+  hp: 100,
+  atk: 6,
+  spd: 1.2,
+  range: 90,
+  atkRate: 0.5,
   cost: 50,
-  reward: 25,
-  w: 23,
-  h: 21,
+  reward: 22,
+  w: 22, h: 20,
   primary: 0xf060c0,
   secondary: 0x801060,
   trait: "healer",
@@ -87,75 +169,27 @@ const aphidDef: UnitDef = {
   caste: "soldier",
 };
 
-// --- Beetle ---
-const beetleDef: UnitDef = {
-  name: "Beetle",
-  ico: "\u{1F6E1}\uFE0F",
-  hp: 450,
-  atk: 30,
-  spd: 1.0,
-  range: 78,
-  atkRate: 0.55,
-  cost: 120,
-  reward: 55,
-  w: 31,
-  h: 27,
-  primary: 0x6090c0,
-  secondary: 0x304060,
-  trait: "shield_poison",
-  role: "tank",
-  desc: "Shield + Poison",
-  route: "land",
-  attackRange: "melee",
-  tier: 4,
-  incubation: 15,
-  knockResist: 25,
-  caste: "soldier",
-};
+// =========================================================
+// TIER 3 — Specialists (70-90n) — D3 hives gain these
+// Adds: AOE dps, sniper ranged, aura support
+// =========================================================
 
-// --- Digger ---
-const diggerDef: UnitDef = {
-  name: "Digger",
-  ico: "\u{1F573}\uFE0F",
-  hp: 100,
-  atk: 35,
-  spd: 3.56,
-  range: 28,
-  atkRate: 1.0,
-  cost: 55,
-  reward: 20,
-  w: 20,
-  h: 18,
-  primary: 0xc09050,
-  secondary: 0x604020,
-  trait: "burrow",
-  role: "dps",
-  desc: "Burrows Past",
-  route: "tunnel",
-  attackRange: "melee",
-  tier: 3,
-  incubation: 7,
-  caste: "soldier",
-};
-
-// --- Ember ---
-const emberDef: UnitDef = {
-  name: "Ember",
+const cinderflyDef: UnitDef = {
+  name: "Cinderfly",
   ico: "\u{1F525}",
-  hp: 80,
-  atk: 40,
-  spd: 1.85,
-  range: 43,
-  atkRate: 0.8,
-  cost: 65,
-  reward: 28,
-  w: 21,
-  h: 20,
+  hp: 90,
+  atk: 30,
+  spd: 1.8,
+  range: 30,
+  atkRate: 0.85,
+  cost: 70,
+  reward: 30,
+  w: 21, h: 20,
   primary: 0xf08020,
   secondary: 0xa04008,
   trait: "burn",
   role: "dps",
-  desc: "Burns Foes",
+  desc: "Burn AOE",
   route: "land",
   attackRange: "melee",
   tier: 3,
@@ -164,19 +198,40 @@ const emberDef: UnitDef = {
   caste: "soldier",
 };
 
-// --- Guardian ---
-const guardianDef: UnitDef = {
-  name: "Guardian",
+const longeyeDef: UnitDef = {
+  name: "Longeye",
+  ico: "\u{1F52D}",
+  hp: 100,
+  atk: 60,
+  spd: 0.85,
+  range: 240,
+  atkRate: 0.4,
+  cost: 85,
+  reward: 36,
+  w: 21, h: 20,
+  primary: 0xc0a0f0,
+  secondary: 0x503080,
+  trait: "sniper",
+  role: "ranged",
+  desc: "Sniper",
+  route: "land",
+  attackRange: "ranged",
+  tier: 3,
+  incubation: 14,
+  caste: "soldier",
+};
+
+const wardlingDef: UnitDef = {
+  name: "Wardling",
   ico: "\u{1F6E1}\uFE0F",
-  hp: 300,
-  atk: 15,
+  hp: 280,
+  atk: 14,
   spd: 1.0,
-  range: 36,
+  range: 30,
   atkRate: 0.5,
-  cost: 70,
-  reward: 35,
-  w: 31,
-  h: 28,
+  cost: 90,
+  reward: 38,
+  w: 28, h: 26,
   primary: 0xe0c040,
   secondary: 0x806020,
   trait: "aura",
@@ -185,76 +240,51 @@ const guardianDef: UnitDef = {
   route: "land",
   attackRange: "melee",
   tier: 3,
-  incubation: 10,
+  incubation: 11,
   knockResist: 20,
   caste: "soldier",
 };
 
-// --- Mantis ---
-const mantisDef: UnitDef = {
-  name: "Mantis",
-  ico: "\u{1F52D}",
-  hp: 100,
-  atk: 120,
-  spd: 0.71,
-  range: 284,
-  atkRate: 0.25,
-  cost: 85,
-  reward: 38,
-  w: 21,
-  h: 20,
-  primary: 0xc0a0f0,
-  secondary: 0x503080,
-  trait: "sniper",
-  role: "ranged",
-  desc: "Long Range",
-  route: "land",
-  attackRange: "ranged",
-  tier: 4,
-  incubation: 14,
-  caste: "soldier",
-};
+// =========================================================
+// TIER 4 — Elites (110-130n) — D4 hives gain these
+// =========================================================
 
-// --- Rhino ---
-const rhinoDef: UnitDef = {
-  name: "Rhino",
+const bashguardDef: UnitDef = {
+  name: "Bashguard",
   ico: "\u{1F98F}",
-  hp: 280,
-  atk: 45,
-  spd: 1.42,
-  range: 34,
+  hp: 320,
+  atk: 50,
+  spd: 1.4,
+  range: 32,
   atkRate: 0.7,
-  cost: 95,
-  reward: 42,
-  w: 57,
-  h: 34,
+  cost: 110,
+  reward: 48,
+  w: 50, h: 32,
   primary: 0x908060,
   secondary: 0x504030,
   trait: "knockback",
-  role: "tank",
-  desc: "Rams Enemies",
+  role: "dps",
+  desc: "Knockback Bruiser",
   route: "land",
   attackRange: "melee",
   tier: 4,
-  incubation: 13,
+  incubation: 14,
   caste: "soldier",
   knockForce: 100,
   knockResist: 30,
 };
 
-// --- Voltfly ---
-const voltflyDef: UnitDef = {
-  name: "Voltfly",
+const stormflyDef: UnitDef = {
+  name: "Stormfly",
   ico: "\u{26A1}",
-  hp: 240,
-  atk: 55,
-  spd: 1.56,
-  range: 128,
-  atkRate: 0.6,
+  hp: 220,
+  atk: 50,
+  spd: 1.5,
+  range: 130,
+  atkRate: 0.55,
   cost: 130,
-  reward: 50,
-  w: 24,
-  h: 21,
+  reward: 56,
+  w: 24, h: 21,
   primary: 0x40c0f0,
   secondary: 0x1060a0,
   trait: "lightning",
@@ -262,16 +292,18 @@ const voltflyDef: UnitDef = {
   desc: "Chain Lightning",
   route: "land",
   attackRange: "ranged",
-  tier: 5,
+  tier: 4,
   incubation: 18,
   knockForce: 20,
   knockResist: 10,
   caste: "elite",
 };
 
-// --- Combat Hooks ---
+// =========================================================
+// Combat Hooks
+// =========================================================
 
-const aphidCombat: CombatHooks = {
+const mendwingCombat: CombatHooks = {
   onUpdate(u, dt, ctx) {
     // Heal nearest wounded ally every 2 seconds
     u.healTimer = (u.healTimer || 0) + dt;
@@ -297,72 +329,12 @@ const aphidCombat: CombatHooks = {
         }
       }
     }
-    return false; // doesn't skip normal AI
+    return false;
   },
 };
 
-const beetleCombat: CombatHooks = {
-  modifyDamage(u, dmg, ctx) {
-    // Shield: absorb 50% damage for first 3 seconds
-    if (u.shieldAbsorbTimer === undefined) u.shieldAbsorbTimer = 3;
-    if (u.shieldAbsorbTimer > 0) return Math.ceil(dmg * 0.5);
-    return dmg;
-  },
-  afterHit(u, target, dmg, ctx) {
-    // Poison on hit
-    target.poisonTimer = 3;
-    target.poisonDmgAcc = 0;
-  },
-};
-
-const diggerCombat: CombatHooks = {
-  onSpawn(u, ctx) {
-    u.burrowed = true;
-    u.burrowTimer = 5; // max burrow time (safety cap)
-  },
-  onUpdate(u, dt, ctx) {
-    if (!u.burrowed) return false; // not handled, proceed normally
-    u.burrowTimer -= dt;
-    u.x += u.facing * u.getSpeed() * 60 * dt * 1.5;
-
-    // Surface once past at least one enemy, or safety timer expires
-    const foes = ctx.allAlive.filter((e) => e.side !== u.side && !e.dead);
-    const gap = 43; // surface a short distance behind the enemy
-    const passed = foes.some((e) => (u.x - e.x) * u.facing > gap);
-
-    if (passed || u.burrowTimer <= 0) {
-      u.burrowed = false;
-      u.currentRoute = "land"; // surface onto land route
-      u.y = getGroundY("land") - u.unitH; // move to land Y
-      u.ambush = true; // first hit deals critical damage
-      if (ctx.particles) {
-        ctx.particles.burst(
-          u.x + u.unitW / 2,
-          u.y + u.unitH / 2,
-          u.primary,
-          10,
-        );
-        ctx.particles.float(u.x + u.unitW / 2, u.y - 14, "SURFACE!", 0x906030);
-      }
-    }
-    return true; // handled, skip normal AI
-  },
-  getAtk(u) {
-    if (u.ambush) return u.atk * 2; // ambush crit
-    return u.atk;
-  },
-  afterHit(u, _target, dmg, ctx) {
-    if (u.ambush) {
-      u.ambush = false;
-      if (ctx.particles) {
-        ctx.particles.float(u.x + u.unitW / 2, u.y - 14, "AMBUSH!", 0xff4444);
-      }
-    }
-  },
-};
-
-const emberCombat: CombatHooks = {
-  afterHit(u, target, dmg, ctx) {
+const cinderflyCombat: CombatHooks = {
+  afterHit(u, target, _dmg, ctx) {
     // Spread burn to up to 3 nearby enemies
     const foes = ctx.allAlive
       .filter(
@@ -381,23 +353,9 @@ const emberCombat: CombatHooks = {
   },
 };
 
-const guardianCombat: CombatHooks = {
-  modifyAllyDamage(auraUnit, target, dmg, ctx) {
-    // Reduce damage to nearby allies by 20%
-    if (
-      Math.abs(
-        auraUnit.x + auraUnit.unitW / 2 - (target.x + target.unitW / 2),
-      ) < 114
-    ) {
-      return Math.ceil(dmg * 0.8);
-    }
-    return dmg;
-  },
-};
-
-const mantisCombat: CombatHooks = {
-  onAttack(u, target, foes, dmg, ctx) {
-    // Piercing shot hits up to 2 enemies, second at 50% damage
+const longeyeCombat: CombatHooks = {
+  onAttack(u, _target, foes, dmg, ctx) {
+    // Piercing shot — hits up to 2 enemies, second at 50% damage
     const targets = foes
       .filter((e) => {
         if (e.burrowed) return false;
@@ -417,9 +375,23 @@ const mantisCombat: CombatHooks = {
   },
 };
 
-const voltflyCombat: CombatHooks = {
+const wardlingCombat: CombatHooks = {
+  modifyAllyDamage(auraUnit, target, dmg, _ctx) {
+    // Allies within ~114px take 20% less damage
+    if (
+      Math.abs(
+        auraUnit.x + auraUnit.unitW / 2 - (target.x + target.unitW / 2),
+      ) < 114
+    ) {
+      return Math.ceil(dmg * 0.8);
+    }
+    return dmg;
+  },
+};
+
+const stormflyCombat: CombatHooks = {
   onAttack(u, target, foes, dmg, ctx) {
-    // Chain lightning: hit primary + up to 2 nearby foes
+    // Chain lightning: hit primary + up to 2 nearby foes, every 4th hit overcharges
     u.hitCount = (u.hitCount || 0) + 1;
     const isOvercharge = u.hitCount % 4 === 0;
     const chainDmg = isOvercharge ? dmg * 2 : dmg;
@@ -442,18 +414,11 @@ const voltflyCombat: CombatHooks = {
     chainTargets.forEach((t, i) => {
       const d = Math.max(1, Math.round(chainDmg * dmgScale[i]));
       ctx.hitUnit(t, d, "ranged");
-      // 25% stun per target
       if (!t.dead && Math.random() < 0.25) {
         t.stunTimer = 0.6;
         if (ctx.particles)
-          ctx.particles.float(
-            t.x + t.unitW / 2,
-            t.y - 18,
-            "STUNNED!",
-            0x80ffff,
-          );
+          ctx.particles.float(t.x + t.unitW / 2, t.y - 18, "STUNNED!", 0x80ffff);
       }
-      // Chain arc particles
       if (i > 0 && ctx.particles) {
         const prev = chainTargets[i - 1];
         ctx.particles.burst(
@@ -471,16 +436,27 @@ const voltflyCombat: CombatHooks = {
   },
 };
 
-// --- Export as UnitModule records ---
+// =========================================================
+// Export — ordered by tier for AI Lab roster planning
+// =========================================================
+
 export const units: Record<string, UnitModule> = {
+  // T1 — Baseline (15-30n)
+  hardshell: { def: hardshellDef, draw: drawHardshell },
   grub: { def: grubDef, draw: drawGrub },
-  zephyr: { def: zephyrDef, draw: drawZephyr },
-  aphid: { def: aphidDef, combat: aphidCombat, draw: drawAphid },
-  beetle: { def: beetleDef, combat: beetleCombat, draw: drawBeetle },
-  digger: { def: diggerDef, combat: diggerCombat, draw: drawDigger },
-  ember: { def: emberDef, combat: emberCombat, draw: drawEmber },
-  guardian: { def: guardianDef, combat: guardianCombat, draw: drawGuardian },
-  mantis: { def: mantisDef, combat: mantisCombat, draw: drawMantis },
-  rhino: { def: rhinoDef, draw: drawRhino },
-  voltfly: { def: voltflyDef, combat: voltflyCombat, draw: drawVoltfly },
+  pricker: { def: prickerDef, draw: drawPricker },
+
+  // T2 — Extended baseline (40-55n)
+  domeback: { def: domebackDef, draw: drawDomeback },
+  skitterling: { def: skitterlingDef, draw: drawSkitterling },
+  mendwing: { def: mendwingDef, combat: mendwingCombat, draw: drawMendwing },
+
+  // T3 — Specialists (70-90n)
+  cinderfly: { def: cinderflyDef, combat: cinderflyCombat, draw: drawCinderfly },
+  longeye: { def: longeyeDef, combat: longeyeCombat, draw: drawLongeye },
+  wardling: { def: wardlingDef, combat: wardlingCombat, draw: drawWardling },
+
+  // T4 — Elites (110-130n)
+  bashguard: { def: bashguardDef, draw: drawBashguard },
+  stormfly: { def: stormflyDef, combat: stormflyCombat, draw: drawStormfly },
 };
