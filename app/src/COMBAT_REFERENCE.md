@@ -1,5 +1,7 @@
 # Combat Reference
 
+> **Status: Legacy combat system reference.** This document describes the **current** combat system as of 2026-04-12 (commit `ea29e1f`). The project plans to replace this system with the 5-layer architecture described in [DESIGN_PATTERNS.md §460](DESIGN_PATTERNS.md#combat-system-architecture-5-layers) and [GAME_DESIGN.md §715](GAME_DESIGN.md#combat-system). This doc exists to document what the replacement must replicate (or deliberately deprecate) during the combat rewrite. See `COMBAT_REWRITE_PLAN.md` (forthcoming) for the replacement plan.
+
 > **Scope:** This document describes the *actual* behavior of the combat system as it exists in code, not the aspirational behavior from `units/CLAUDE.md` or individual hook docs. Every claim has a `file:line` reference. If the code and this doc disagree, the code is right and this doc is stale — open an issue.
 >
 > **Audience:** Anyone designing a feature that sits on top of the damage pipeline (Item 2 counter matrix, future status effects, new combat hooks). Read the damage pipeline section first.
@@ -209,7 +211,7 @@ Source: [CombatSystem.ts:295-314].
 
 - Unit balance numbers (stats, costs, caps) — see `units/normal.ts`, `units/alpha.ts`
 - Trait descriptions — see `units/CLAUDE.md`
-- Counter matrix design — see Item 2 in `MECHANICS_ROADMAP.md` (not designed yet)
+- Combat rewrite design (5-layer architecture) — see `DESIGN_PATTERNS.md §460`, `GAME_DESIGN.md §715`, and `COMBAT_REWRITE_PLAN.md` (forthcoming). The counter system is one outcome of Layers 1-2; the full rewrite also replaces ability logic, effect lifecycle, modifier stacking, and the damage pipeline itself.
 - Refactoring recommendations — out of scope; this is a reference, not a review
 
 ## Tech debt surfaced during Item 3 audit
