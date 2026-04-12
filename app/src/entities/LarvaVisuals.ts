@@ -32,10 +32,9 @@ export class LarvaVisuals {
   bobTime: number;
   larvae: LarvaState[];
 
-  constructor(scene: Phaser.Scene) {
+  constructor(scene: Phaser.Scene, hiveX?: number) {
     this.scene = scene;
-    const bw = SBW;
-    this.hiveCenter = bw / 2;
+    this.hiveCenter = hiveX !== undefined ? hiveX + SBW / 2 : SBW / 2;
     this.bobTime = 0;
     this.graphics = [];
     this.larvae = [];

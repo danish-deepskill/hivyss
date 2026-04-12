@@ -1,6 +1,8 @@
 // Data-driven layer definitions — one entry per layer variant
 // Adding a new layer = adding data here, no code changes
 
+import type { AIPersonality } from '../types';
+
 export interface NodeDef {
   type: 'battle' | 'vhyst';
   geneline: string;           // enemy geneline ('normal', 'alpha', etc.)
@@ -8,6 +10,7 @@ export interface NodeDef {
   next: number[];             // indices into nodes array (branching)
   nextLayer?: string;         // terminal nodes: which layer variant follows
   preview: string;            // player-facing label
+  aiPersonality?: AIPersonality; // override seed-picked personality for specific nodes
 }
 
 export interface LayerDef {

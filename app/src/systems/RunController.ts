@@ -6,8 +6,7 @@ import type { RunState, RunBuff } from './RunState';
 import { advanceNode, advanceLayer, markNodeWon, markNodeLost, addToRoster, addBuff } from './RunState';
 import { LAYER_DEFS } from '../config/LayerDefs';
 import type { RewardOption } from '../config/RewardDefs';
-import { generateNodeWaves } from './WaveGenerator';
-import type { WaveDef } from '../types';
+import { generateHiveProfile } from './HiveProfileGenerator';
 
 // Check if a node is available for the player to enter
 export function isNodeAvailable(state: RunState, nodeIdx: number): boolean {
@@ -47,12 +46,14 @@ export function onNodeSelected(state: RunState, nodeIdx: number): SceneTransitio
     return { scene: 'RewardScene', data: { runState: won, geneline: node.geneline } };
   }
 
-  const waves = generateNodeWaves(updated.seedNum, nodeIdx, node);
+  const hiveProfile = generateHiveProfile(updated.seedNum, nodeIdx, node);
+  const hiveSeed = updated.seedNum + nodeIdx * 1000 + 777;
   return {
     scene: 'BattleScene',
     data: {
       runState: updated,
-      customWaves: waves,
+      hiveProfile,
+      hiveSeed,
       runBuffs: updated.buffs,
       deck: updated.roster,
     },

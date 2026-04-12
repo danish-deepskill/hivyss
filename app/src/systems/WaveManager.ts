@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { WaveDef, IParticleManager } from '../types';
+import type { WaveDef, IParticleManager, IWaveController } from '../types';
 import { WAVE_DEFS, WAVE_INTERVAL } from '../config/WaveDefs';
 import { ENEMY_DEFS } from '../config/EnemyDefs';
 import { W } from '../config/Constants';
@@ -8,7 +8,7 @@ const GND = LANE.land.groundY;
 // W used for camera-relative text positioning
 import { EventBus } from './EventBus';
 
-export class WaveManager {
+export class WaveManager implements IWaveController {
   scene: Phaser.Scene;
   events: EventBus;
   waveIdx: number;

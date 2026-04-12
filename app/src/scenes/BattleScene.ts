@@ -6,6 +6,7 @@ import { ModalScene } from './ModalScene';
 import type { WaveDef } from '../types';
 import type { RunState, RunBuff } from '../systems/RunState';
 import { onBattleResult } from '../systems/RunController';
+import type { HiveProfile } from '../types';
 
 interface BattleSceneData {
   deck?: string[];
@@ -15,6 +16,8 @@ interface BattleSceneData {
   customWaves?: WaveDef[];
   runBuffs?: RunBuff[];
   runState?: RunState;
+  hiveProfile?: HiveProfile;
+  hiveSeed?: number;
 }
 
 export class BattleScene extends Phaser.Scene {
@@ -47,6 +50,8 @@ export class BattleScene extends Phaser.Scene {
       deck: deckKeys, startWave, worldW, theme,
       customWaves: data?.customWaves,
       runBuffs: data?.runBuffs,
+      hiveProfile: data?.hiveProfile,
+      hiveSeed: data?.hiveSeed,
     });
     this.scene.launch('HUDScene');
     this.worldScene = this.scene.get('WorldScene') as WorldScene;

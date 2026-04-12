@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { UnitDef, WaveDef, Side, AbilityKey, RenderUnit } from '../types';
+import type { UnitDef, WaveDef, Side, AbilityKey, RenderUnit, IWaveController, HiveProfile } from '../types';
 import { resolveColors } from '../config/Palettes';
 import { W, DEFAULT_WORLD_W, SBW as SBW_CONST } from '../config/Constants';
 import type { RunBuff } from './RunState';
@@ -10,17 +10,25 @@ import { BaseStructure } from '../entities/BaseStructure';
 import { Unit, resetUid } from '../entities/Unit';
 import { CombatSystem } from './CombatSystem';
 import { WaveManager } from './WaveManager';
+import { AIHiveController } from './AIHiveController';
+import { SeededRNG } from './SeededRNG';
 import { EconomyManager } from './EconomyManager';
 import { AbilityManager } from './AbilityManager';
 import { ParticleManager } from './ParticleManager';
 import { AudioManager } from './AudioManager';
 import { SaveManager } from './SaveManager';
-import { IncubationManager } from './IncubationManager';
+import { IncubationManager, MAX_CHAMBERS } from './IncubationManager';
 import { EventBus } from './EventBus';
 import { UnitPool } from './UnitPool';
 import { CocoonVisuals } from '../entities/CocoonVisuals';
 import { LarvaVisuals } from '../entities/LarvaVisuals';
 import { registerDebugCommand, unregisterDebugCommand } from './DebugConsole';
+
+export interface HiveView {
+  base: BaseStructure;
+  larvae: LarvaVisuals;
+  cocoons: CocoonVisuals;
+}
 
 export interface SpawnResult {
   success: boolean;
@@ -32,15 +40,14 @@ export class GameManager {
   events: EventBus;
   audio: AudioManager;
   combat: CombatSystem;
-  waves: WaveManager;
+  waves: IWaveController;
   economy: EconomyManager;
   abilities: AbilityManager;
   particles: ParticleManager;
   incubation: IncubationManager;
-  cocoons: CocoonVisuals;
-  larvae: LarvaVisuals;
-  playerBase: BaseStructure;
-  enemyBase: BaseStructure;
+  playerHive: HiveView;
+  enemyHive: HiveView;
+  private enemyChamberSnapshot: boolean[];
   unitPool: UnitPool;
   units: Unit[];
   deckKeys: string[];
@@ -56,7 +63,7 @@ export class GameManager {
   // Camera
   manualPanTimer: number;
 
-  constructor(scene: Phaser.Scene, deckKeys: string[], startWave: number = 1, worldW: number = DEFAULT_WORLD_W, customWaves?: WaveDef[], runBuffs?: RunBuff[]) {
+  constructor(scene: Phaser.Scene, deckKeys: string[], startWave: number = 1, worldW: number = DEFAULT_WORLD_W, customWaves?: WaveDef[], runBuffs?: RunBuff[], hiveProfile?: HiveProfile, hiveSeed?: number) {
     this.scene = scene;
     this.events = new EventBus();
     this.worldW = worldW;
@@ -65,11 +72,8 @@ export class GameManager {
     // Deck
     this.deckKeys = deckKeys;
 
-    // Create bases
     const SBW = SBW_CONST;
     this.SBW = SBW;
-    this.playerBase = new BaseStructure(scene, 0, 'player');
-    this.enemyBase = new BaseStructure(scene, worldW - SBW, 'enemy');
 
     // Units
     this.unitPool = new UnitPool(scene);
@@ -78,13 +82,25 @@ export class GameManager {
     // Systems
     this.audio = new AudioManager();
     this.combat = new CombatSystem(scene, this.events, worldW);
-    this.waves = new WaveManager(scene, startWave, this.events, customWaves);
+    this.waves = hiveProfile && hiveSeed !== undefined
+      ? new AIHiveController(scene, hiveProfile, this.events, new SeededRNG(hiveSeed))
+      : new WaveManager(scene, startWave, this.events, customWaves);
     this.economy = new EconomyManager(scene);
     this.abilities = new AbilityManager(scene, this.events, worldW);
     this.particles = new ParticleManager(scene);
     this.incubation = new IncubationManager();
-    this.cocoons = new CocoonVisuals(scene);
-    this.larvae = new LarvaVisuals(scene);
+    const isAIMode = !!(hiveProfile && hiveSeed !== undefined);
+    this.playerHive = {
+      base: new BaseStructure(scene, 0, 'player'),
+      larvae: new LarvaVisuals(scene),
+      cocoons: new CocoonVisuals(scene),
+    };
+    this.enemyHive = {
+      base: new BaseStructure(scene, worldW - SBW, 'enemy'),
+      larvae: isAIMode ? new LarvaVisuals(scene, worldW - SBW_CONST) : new LarvaVisuals(scene, worldW - SBW_CONST),
+      cocoons: new CocoonVisuals(scene),
+    };
+    this.enemyChamberSnapshot = new Array(MAX_CHAMBERS).fill(false);
 
     // Apply run buffs (hive buildings from roguelike rewards)
     if (runBuffs) {
@@ -114,7 +130,40 @@ export class GameManager {
       });
       registerDebugCommand('hp', 'Set player base HP (e.g. hp 9999)', (args) => {
         const n = parseInt(args[0]); if (isNaN(n)) return 'Usage: hp <amount>';
-        this.playerBase.setHp(n); return `Base HP set to ${n}`;
+        this.playerHive.base.setHp(n); return `Base HP set to ${n}`;
+      });
+      registerDebugCommand('ai', 'Toggle live AI hive overlay', () => {
+        if (!(this.waves instanceof AIHiveController)) return 'Not an AI battle.';
+        const existing = document.getElementById('ai-debug-overlay');
+        if (existing) { existing.remove(); return 'AI overlay hidden.'; }
+        const overlay = document.createElement('div');
+        overlay.id = 'ai-debug-overlay';
+        overlay.style.cssText = 'position:fixed; top:4px; right:4px; background:rgba(0,0,0,0.8); color:#0f0; font-family:"Courier New",monospace; font-size:10px; padding:6px 10px; z-index:9999; white-space:pre; pointer-events:none; border:1px solid #333; border-radius:3px;';
+        document.body.appendChild(overlay);
+        const ai = this.waves as AIHiveController;
+        const updateOverlay = () => {
+          if (!document.getElementById('ai-debug-overlay')) return;
+          const chambers = ai.incubation.chambers
+            .filter(c => c !== null)
+            .map(c => `${c!.key} ${Math.ceil(c!.remaining)}s`)
+            .join(', ') || 'empty';
+          const larvaNext = ai.incubation.larvaCount < 10
+            ? `(${Math.ceil(5 - ai.incubation.larvaTimer)}s)`
+            : 'MAX';
+          overlay.textContent = [
+            `AI: ${(ai as any).profile.personality}`,
+            `Nectar: ${Math.floor(ai.nectar)} +${ai.income}/s`,
+            `Larvae: ${ai.incubation.larvaCount} ${larvaNext}`,
+            `Chambers: ${chambers}`,
+            `Base HP: ${this.enemyHive.base.hp}/${this.enemyHive.base.maxHp}`,
+            `Intent: [${ai.intent.action}] ${ai.intent.details}`,
+            `---`,
+            ...ai.debugLog,
+          ].join('\n');
+          requestAnimationFrame(updateOverlay);
+        };
+        updateOverlay();
+        return 'AI overlay shown. Type "ai" again to hide.';
       });
     }
 
@@ -150,16 +199,35 @@ export class GameManager {
     for (const h of hatched) {
       this.createUnit(h.key, 'player', h.def, this.SBW + 2);
     }
-    this.cocoons.update(dt, this.incubation.chambers, this.incubation.numChambers);
-    this.larvae.update(dt, this.incubation.larvaCount);
+    this.playerHive.cocoons.update(dt, this.incubation.chambers, this.incubation.numChambers);
+    this.playerHive.larvae.update(dt, this.incubation.larvaCount);
+
+    // Update enemy visuals (AI hive mode)
+    if (this.waves instanceof AIHiveController) {
+      const ai = this.waves as AIHiveController;
+      const aiInc = ai.incubation;
+
+      // Detect newly filled chambers → set cocoon positions from consumed larvae
+      for (let i = 0; i < aiInc.numChambers; i++) {
+        const wasEmpty = !this.enemyChamberSnapshot[i];
+        const nowFull = aiInc.chambers[i] !== null;
+        if (wasEmpty && nowFull) {
+          const pos = this.enemyHive.larvae.consumeLarva(aiInc.larvaCount + 1);
+          this.enemyHive.cocoons.setCocoonPosition(i, pos.x, pos.y);
+        }
+        this.enemyChamberSnapshot[i] = nowFull;
+      }
+      this.enemyHive.cocoons.update(dt, aiInc.chambers, aiInc.numChambers);
+      this.enemyHive.larvae.update(dt, aiInc.larvaCount);
+    }
 
     // Update wall shield visual
-    this.playerBase.shielded = this.abilities.wallActive > 0;
+    this.playerHive.base.shielded = this.abilities.wallActive > 0;
 
     // Combat resolution
     this.combat.resolve(
       this.units, dt,
-      this.playerBase, this.enemyBase,
+      this.playerHive.base, this.enemyHive.base,
       this.particles,
       this.abilities.wallActive,
       this.audio
@@ -178,23 +246,30 @@ export class GameManager {
     this.particles.update(dt);
 
     // Update bases
-    this.playerBase.update(dt);
-    this.enemyBase.update(dt);
+    this.playerHive.base.update(dt);
+    this.enemyHive.base.update(dt);
 
     // Check defeat
-    if (this.playerBase.hp <= 0) {
+    if (this.playerHive.base.hp <= 0) {
       this.running = false;
       this.won = 'enemy';
       this.audio.defeat();
     }
 
-    // Check victory (finite mode: all waves cleared + no living enemies)
+    // Check victory: enemy base destroyed
+    if (!this.won && this.enemyHive.base.hp <= 0) {
+      this.running = false;
+      this.won = 'player';
+      this.audio.waveStart();
+    }
+
+    // Check victory: attrition (all waves/AI depleted + no living enemies)
     if (!this.won && this.waves.isComplete) {
       const livingEnemies = this.units.some(u => u.side === 'enemy' && !u.dead);
       if (!livingEnemies) {
         this.running = false;
         this.won = 'player';
-        this.audio.waveStart(); // reuse as victory fanfare for now
+        this.audio.waveStart();
       }
     }
   }
@@ -213,10 +288,10 @@ export class GameManager {
     }
     this.economy.spend(def.cost);
     // Capture larva position before consuming it
-    const larvaPos = this.larvae.consumeLarva(this.incubation.larvaCount);
+    const larvaPos = this.playerHive.larvae.consumeLarva(this.incubation.larvaCount);
     const chamberIdx = this.incubation.queue(key, def);
     if (chamberIdx >= 0) {
-      this.cocoons.setCocoonPosition(chamberIdx, larvaPos.x, larvaPos.y);
+      this.playerHive.cocoons.setCocoonPosition(chamberIdx, larvaPos.x, larvaPos.y);
     }
     this.audio.spawn();
     return { success: true, message: `Incubating ${def.name}...` };
@@ -254,11 +329,11 @@ export class GameManager {
     let message = '';
     switch (key) {
       case 'nuke':
-        success = this.abilities.castNuke(this.economy, this.units, this.enemyBase, this.particles);
+        success = this.abilities.castNuke(this.economy, this.units, this.enemyHive.base, this.particles);
         if (success) { message = '\u2622 Acid Nuke hits ALL enemies!'; this.audio.abilityNuke(); }
         break;
       case 'wall':
-        success = this.abilities.castWall(this.economy, this.playerBase, this.particles);
+        success = this.abilities.castWall(this.economy, this.playerHive.base, this.particles);
         if (success) { message = '\u{1F9F1} Steel Wall active! Base invincible!'; this.audio.abilityWall(); }
         break;
       case 'slow':
@@ -266,7 +341,7 @@ export class GameManager {
         if (success) { message = '\u{1F33F} Pheromone! Enemy speed halved!'; this.audio.abilitySlow(); }
         break;
       case 'repair':
-        success = this.abilities.castRepair(this.economy, this.playerBase, this.particles);
+        success = this.abilities.castRepair(this.economy, this.playerHive.base, this.particles);
         if (success) { message = '\u{1F527} Base repaired!'; this.audio.abilityRepair(); }
         break;
     }
@@ -312,10 +387,9 @@ export class GameManager {
   }
 
   debugWin(): void {
-    // Kill all enemies, skip all waves — triggers victory condition next tick
+    // Destroy enemy base — triggers victory condition next tick
+    this.enemyHive.base.setHp(0);
     this.units.forEach(u => { if (u.side === 'enemy' && !u.dead) u.kill(); });
-    this.waves.enemyQueue.length = 0;
-    this.waves.waveIdx = this.waves.totalWaves;
   }
 
   cleanupDebugCommands(): void {
@@ -324,6 +398,7 @@ export class GameManager {
       unregisterDebugCommand('nectar');
       unregisterDebugCommand('wave');
       unregisterDebugCommand('hp');
+      unregisterDebugCommand('ai');
     }
   }
 

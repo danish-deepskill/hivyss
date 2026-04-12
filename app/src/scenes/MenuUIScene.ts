@@ -28,6 +28,12 @@ export class MenuUIScene extends Phaser.Scene {
   // Abilities
   private abilityBtns: Record<string, { btn: HTMLButtonElement; cdBar: HTMLElement }> = {};
 
+  // Enemy HUD
+  private enemyBar!: HTMLElement | null;
+  private enemyNectarLbl!: HTMLElement;
+  private enemyIncomeLbl!: HTMLElement;
+  private enemyIncubationLbl!: HTMLElement;
+
   // Log
   private logTxt!: HTMLElement;
 
@@ -52,6 +58,12 @@ export class MenuUIScene extends Phaser.Scene {
     panel.style.cssText = 'position:absolute; bottom:0; left:0; right:0; display:flex; flex-direction:column; font-family:"Courier New",monospace; color:#ddd; pointer-events:none;';
 
     panel.appendChild(this.buildResourceBar());
+    // Enemy bar only shown in AI hive mode
+    this.enemyBar = null;
+    if (this.registry.get('ai.personality')) {
+      this.enemyBar = this.buildEnemyBar();
+      panel.appendChild(this.enemyBar);
+    }
     panel.appendChild(this.buildLarvaMound());
     panel.appendChild(this.buildUnitSlots(previews));
     panel.appendChild(this.buildAbilities());
@@ -138,6 +150,27 @@ export class MenuUIScene extends Phaser.Scene {
           : `<span class="lm-unit-name">${chamber.def.name}</span>`;
         slot.bar.style.transform = `scaleX(${progress})`;
         slot.timer.textContent = Math.ceil(chamber.remaining) + 's';
+      }
+    }
+
+    // Enemy HUD (AI hive mode only)
+    if (this.enemyBar) {
+      const aiNectar: number = this.registry.get('ai.nectar') ?? 0;
+      const aiIncome: number = this.registry.get('ai.income') ?? 0;
+      const aiChambers: (Chamber | null)[] = this.registry.get('ai.chambers') ?? [];
+      this.enemyNectarLbl.textContent = `${aiNectar}n`;
+      this.enemyIncomeLbl.textContent = `+${aiIncome}/s`;
+      // Show active chambers
+      const active = aiChambers.filter(c => c !== null) as Chamber[];
+      if (active.length > 0) {
+        this.enemyIncubationLbl.textContent = active
+          .map(c => {
+            const name = UNIT_DEFS[c.key.replace(/^e/, '')]?.name || c.key;
+            return `${name} ${Math.ceil(c.remaining)}s`;
+          })
+          .join(' | ');
+      } else {
+        this.enemyIncubationLbl.textContent = 'idle';
       }
     }
 
@@ -273,6 +306,23 @@ export class MenuUIScene extends Phaser.Scene {
     log.appendChild(this.logTxt);
 
     return log;
+  }
+
+  private buildEnemyBar(): HTMLElement {
+    const bar = document.createElement('div');
+    bar.style.cssText = 'display:flex; align-items:center; gap:8px; padding:3px 10px; background:#160e0e; border-bottom:1px solid #2a1a1a; pointer-events:auto;';
+
+    const label = this.el('span', 'font-size:9px; color:#c04040; letter-spacing:1px;', 'ENEMY HIVE');
+    this.enemyNectarLbl = this.el('span', 'font-size:11px; color:#f05050; min-width:40px;', '0n');
+    this.enemyIncomeLbl = this.el('span', 'font-size:9px; color:#804040;', '+0/s');
+
+    const sep = document.createElement('div');
+    sep.style.cssText = 'width:1px; height:12px; background:#332; margin:0 4px;';
+
+    this.enemyIncubationLbl = this.el('span', 'font-size:9px; color:#f08040;', '');
+
+    bar.append(label, this.enemyNectarLbl, this.enemyIncomeLbl, sep, this.enemyIncubationLbl);
+    return bar;
   }
 
   private el(tag: string, css: string, text?: string): HTMLElement {

@@ -5,7 +5,7 @@ import { LANE } from '../config/Layout';
 const GND = LANE.land.groundY;
 import { ABILITY_DEFS } from '../config/AbilityDefs';
 import { GameManager } from '../systems/GameManager';
-import type { AbilityKey, WaveDef } from '../types';
+import type { AbilityKey, WaveDef, HiveProfile } from '../types';
 import type { RunBuff } from '../systems/RunState';
 
 interface WorldSceneData {
@@ -15,6 +15,8 @@ interface WorldSceneData {
   theme?: string;
   customWaves?: WaveDef[];
   runBuffs?: RunBuff[];
+  hiveProfile?: HiveProfile;
+  hiveSeed?: number;
 }
 
 export class WorldScene extends Phaser.Scene {
@@ -39,7 +41,7 @@ export class WorldScene extends Phaser.Scene {
     this.drawBackground();
 
     // Create game manager (owns all systems, entities, and game state)
-    this.gm = new GameManager(this, data.deck, data.startWave, this.worldW, data.customWaves, data.runBuffs);
+    this.gm = new GameManager(this, data.deck, data.startWave, this.worldW, data.customWaves, data.runBuffs, data.hiveProfile, data.hiveSeed);
 
     // Store shared data on registry for HUDScene + MenuUIScene
     this.registry.set('worldW', this.worldW);
@@ -141,11 +143,21 @@ export class WorldScene extends Phaser.Scene {
     this.registry.set('cam.zoom', cam.zoom);
     if (this.gm) {
       // Base HP (HUDScene)
-      this.registry.set('playerBase.hp', this.gm.playerBase.hp);
-      this.registry.set('playerBase.maxHp', this.gm.playerBase.maxHp);
-      this.registry.set('enemyBase.hp', this.gm.enemyBase.hp);
-      this.registry.set('enemyBase.maxHp', this.gm.enemyBase.maxHp);
+      this.registry.set('playerBase.hp', this.gm.playerHive.base.hp);
+      this.registry.set('playerBase.maxHp', this.gm.playerHive.base.maxHp);
+      this.registry.set('enemyBase.hp', this.gm.enemyHive.base.hp);
+      this.registry.set('enemyBase.maxHp', this.gm.enemyHive.base.maxHp);
       this.registry.set('SBW', this.gm.SBW);
+
+      // AI Hive state (MenuUIScene — enemy economy + incubation)
+      if (this.gm.waves && 'incubation' in this.gm.waves) {
+        const ai = this.gm.waves as any;
+        this.registry.set('ai.nectar', Math.floor(ai.nectar));
+        this.registry.set('ai.income', ai.income);
+        this.registry.set('ai.personality', ai.profile.personality);
+        this.registry.set('ai.chambers', ai.incubation.chambers);
+        this.registry.set('ai.numChambers', ai.incubation.numChambers);
+      }
 
       // Economy (MenuUIScene)
       this.registry.set('eco.nectar', this.gm.economy.nectar);

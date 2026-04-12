@@ -140,9 +140,27 @@ export class CombatSystem {
         const spd = u.getSpeed();
         u.x += u.facing * spd * 60 * dt;
 
-        // Player unit reaches enemy base edge — stop
+        // Player unit reaches enemy base — attack it
         if (u.side === 'player' && u.x + u.unitW >= this.worldW - SBW) {
           u.x = this.worldW - SBW - u.unitW;
+          u.startAttack();
+
+          if (u.foreswingTimer > 0) {
+            // Winding up
+          } else if (u._swinging) {
+            u._swinging = false;
+            const baseAtk = (handler && handler.getAtk) ? handler.getAtk(u) : u.atk;
+            const dmg = Math.max(1, baseAtk + ((Math.random() * 4) | 0));
+            enemyBase.setHp(enemyBase.hp - dmg);
+            enemyBase.flash(0.2);
+            if (particles) particles.float(this.worldW - SBW / 2, GND - 40, `-${dmg}`, DMG_COLORS.base);
+            if (particles) particles.burst(this.worldW - SBW + 2, GND - 20, u.primary, 4);
+            u.atkCd = (1 / u.atkRate) - u.foreswing;
+            u.backswingTimer = u.backswing;
+          } else if (u.canAttack() && u.backswingTimer <= 0) {
+            u.foreswingTimer = u.foreswing;
+            u._swinging = true;
+          }
         }
 
         // Enemy unit reaches player base — attack it
@@ -172,8 +190,12 @@ export class CombatSystem {
             u.foreswingTimer = u.foreswing;
             u._swinging = true;
           }
-        } else {
-          // Not attacking base either — cancel any foreswing
+        }
+
+        // Not attacking any base — cancel foreswing
+        const atPlayerBase = u.side === 'enemy' && u.x <= SBW;
+        const atEnemyBase = u.side === 'player' && u.x + u.unitW >= this.worldW - SBW;
+        if (!atPlayerBase && !atEnemyBase) {
           if (u._swinging) { u._swinging = false; u.foreswingTimer = 0; }
         }
       }

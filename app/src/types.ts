@@ -9,6 +9,8 @@ export type CasteKey = 'soldier' | 'elite' | 'royal';
 export type GeneLine = 'alpha';
 export type Route = 'air' | 'land' | 'tunnel';
 export type AttackRange = 'melee' | 'ranged';
+export type UnitRole = 'tank' | 'dps' | 'support' | 'ranged';
+export type AIPersonality = 'aggressive' | 'defensive' | 'swarm';
 
 export interface TierDef {
   label: string;
@@ -61,6 +63,7 @@ export interface UnitDef {
   knockResist?: number;    // [poise] subtracted from incoming knockForce (default: 0)
   route?: Route;           // native route (default: 'land')
   attackRange?: AttackRange; // melee or ranged (default: 'melee')
+  role: UnitRole;           // combat role: tank, dps, support, ranged
   _key?: string;           // injected at runtime by BattleScene
 }
 
@@ -302,6 +305,29 @@ export type AbilityKey = 'nuke' | 'wall' | 'slow' | 'repair';
 export interface WaveDef {
   units: string[];
   interval: number;
+}
+
+export interface IWaveController {
+  stage: number;
+  totalWaves: number;
+  isComplete: boolean;
+  enemyQueue: string[];
+  waveTimer: number;
+  waveInterval: number;
+  waveIdx: number;
+  getScaleFactor(): number;
+  update(dt: number, particles: IParticleManager | null): void;
+}
+
+// --- AI Hive System ---
+
+export interface HiveProfile {
+  roster: string[];              // enemy unit keys (e.g. ['egrunt', 'emandible'])
+  personality: AIPersonality;
+  startNectar: number;
+  baseIncome: number;
+  maxIncome: number;
+  incomeRampTime: number;        // seconds per income step
 }
 
 // --- Save System ---
