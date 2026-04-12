@@ -4,6 +4,27 @@
 >
 > **How to use this doc:** Read top to bottom. Items are in priority order. Each item has a status, scope, open design questions, and (where applicable) my recommended answers. Update status as work progresses. When all items are ✅ done, the AI v2 plan unblocks.
 
+> ## 🚧 PENDING RESTRUCTURE (2026-04-12) — READ BEFORE STARTING ANY ITEM 2+ WORK
+>
+> **Items 2, 4, and 5 below are mis-scoped and will be restructured.** The user discovered mid-session that [DESIGN_PATTERNS.md §460](DESIGN_PATTERNS.md#combat-system-architecture-5-layers) and [GAME_DESIGN.md §715](GAME_DESIGN.md#combat-system) document a **fully-designed 5-layer combat architecture** (damage types, resistance tiers, data-driven abilities, lifecycle effects, modifier stacking, event-driven damage pipeline) that is the intended replacement for the current combat system. The orchestrator (me) missed this when originally scoping Items 2-5 — that's a documented orchestrator failure, see decision log.
+>
+> **The implication:** Item 2 is not a "counter matrix" addition. It is **one layer (Layer 1-2) of a full combat engine rewrite**. The counter system falls out of damage types + resistance tiers; the other 3 layers are unrelated to counters (data-driven abilities, effect lifecycle, modifier stacking) and also need to be built. Items 4 (balance) and 5 (playtest) become meaningless against the legacy system since it's slated for replacement.
+>
+> **Decision locked 2026-04-12: Option 4 → Option 1.**
+>
+> - **Option 4 (next):** Orchestrator does a deep design read of DESIGN_PATTERNS §460-1130 and GAME_DESIGN §715-855. Produces gap analysis vs current code, dependency graph across layers, migration strategy (lean: strangler fig / incremental), open question list, and `COMBAT_REWRITE_PLAN.md` as the concrete migration spec. Restructures this roadmap to replace Items 2-5 with the combat rewrite program.
+> - **Option 1 (after design phase):** Execute the 5-layer rewrite as a program of work, each layer as its own roadmap item (rough draft: 2=Damage Types+Resistance, 3=Ability Data System, 4=Effect Lifecycle, 5=Modifier Stacking, 6=Event-Driven Pipeline, 7=Unit Migration, 8=Balance, 9=Playtest). Each layer is implementable, reviewable, reversible independently.
+>
+> **What this means for fresh sessions:**
+>
+> 1. **DO NOT start Item 2 implementation** on the old "counter matrix" scope. It's wrong.
+> 2. **DO NOT mark Item 2 design questions as open on the old scope.** They've been superseded.
+> 3. **The executor is idle** until the design phase produces the first implementable layer spec. This is orchestrator work.
+> 4. **Next action:** read DESIGN_PATTERNS.md §460-1130 and GAME_DESIGN.md §715-855, then use `COMBAT_REFERENCE.md` as the legacy baseline for gap analysis. Produce `COMBAT_REWRITE_PLAN.md` and restructure the item table below.
+> 5. **AI Hive v2 is still deferred** and its timeline extends further — it now sits after the combat rewrite program completes, not after the old Items 2-5.
+>
+> This block will be removed once `COMBAT_REWRITE_PLAN.md` exists and the item table below is actually restructured. Until then, this warning governs.
+
 ## Current state of the game (snapshot 2026-04-12)
 
 - **Roster**: 11 normal units (committed `4181b66`) + 7 alpha units. Tier curve T1-T4. All 4 roles covered.
