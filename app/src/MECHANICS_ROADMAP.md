@@ -19,7 +19,7 @@
 
 | Item | Status | Priority |
 |---|---|---|
-| 1. Capacity system | ✅ REVIEWED & APPROVED (awaiting browser playtest) | P0 |
+| 1. Capacity system | ✅ DONE 2026-04-12 | P0 |
 | 2. Counter matrix / keyword system | NOT STARTED | P1 |
 | 3. Combat audit pass | NOT STARTED | P1 |
 | 4. Unit balance pass | BLOCKED on 1-3 | P2 |
@@ -28,9 +28,9 @@
 
 ---
 
-## Item 1 — Capacity System (P0, ✅ IMPLEMENTED 2026-04-12)
+## Item 1 — Capacity System (P0, ✅ DONE 2026-04-12)
 
-> **Status:** Code landed, 20 unit tests passing (`Capacity.test.ts`), production build clean. Awaiting user browser playtest to validate visuals and gameplay feel. See `CAPACITY_DESIGN.md` for the full mini-spec.
+> **Status:** Implemented in `b62bd73`, closed out in follow-up commit. 20 unit tests passing, browser playtest passed all 7 scenarios (deploy rejection, cap bar, cap-blocked card visual, death frees cap, cancel refunds cap, AI never over-caps, hive full at exact 20/20). See `CAPACITY_DESIGN.md` for the full mini-spec.
 >
 > **Architectural deviation from original scope:** Built as a stateless module (`Capacity.ts`) with 3 pure functions, NOT as a `CapacityManager` class. Reasoning: capacity is fully derived state (sum over live units + chambers), so a class would own zero fields. Confirmed with user. See `CAPACITY_DESIGN.md` for full reasoning.
 >
@@ -144,9 +144,8 @@ Pattern: roughly `ceil(cost / 25)` with tank/elite premium. With chamber max of 
 - **`AIHiveController` had no reference to `gameManager`.** Threaded a `unitsProvider: () => readonly Unit[]` getter through the constructor — the AI calls it whenever it needs to compute its own enemy cap usage. Cleaner than coupling to GameManager directly.
 - **`unitDied` event still unfired.** Capacity didn't need it (derived state), so this remains tech debt for whoever needs death notifications next.
 
-### What's still open
-- Browser playtest validation (cap-blocked card visibility, cap bar layout feel, AI behavior reads correctly under cap)
-- Cap value tuning during balance pass (Item 4)
+### What's still open (deferred to balance pass)
+- Cap value tuning (Item 4)
 - **Centurion cost drift flagged for balance pass**: roadmap table originally suggested cost=140, but `alpha.ts` has cost=100 and has for some time (this was not changed during capacity work — only the `cap` field was added). Roadmap vs. code drift, not a regression. Decide during balance pass which number is correct.
 
 ---
@@ -278,10 +277,14 @@ See [AI_PLAN.md](AI_PLAN.md) for the locked architecture, research, and phase or
 - **2026-04-12** — Capacity implementation pre-review. Executor session surfaced 7 inline questions + 5 findings. Resolved: module (not class) for Capacity.ts, minimal Vitest for pure functions, `[5]` cap label default, stacked vertical bar layout, cyan/teal color, "HIVE FULL" rejection text, distinct red cap-blocked card state (NOT same as can't-afford). Asymmetry of chamber × cap (swarm=chamber-bound, elite=cap-bound) validated as intentional design.
 - **2026-04-12** — Capacity implementation REVIEWED and APPROVED. All review criteria passed. Executor made three improvements beyond spec: structural typing in Capacity.ts for test isolation (no Unit/Chamber import dependency), dependency-injection `unitsProvider` pattern for AI (cleaner than coupling to GameManager), bonus cap bar color-shift at 80%/100% thresholds for early warning. Zero scope creep. 20/20 tests passing. TypeScript clean. Minor non-blocking notes: Centurion cost silently changed from 140 to 100 (flag for balance pass), CAPACITY_DESIGN.md still shows "SPEC" status (should be marked implemented), one awkward comment phrasing. Ready for browser playtest validation.
 - **2026-04-12** — Capacity system implemented. 20 unit tests passing, production build clean. Architectural deviation: built as stateless module instead of `CapacityManager` class (capacity is fully derived state — 0 mutable fields would have made the class cargo-culted parallel structure). Two design surprises during impl: (1) `Unit` class doesn't store `UnitDef` reference, so added `cap` field copied in `init()` matching the existing `cost` pattern; (2) `AIHiveController` had no `gameManager` reference, so threaded `unitsProvider: () => readonly Unit[]` getter through constructor. Awaiting browser playtest.
+- **2026-04-12** — Capacity Item 1 CLOSED. Browser playtest passed all 7 scenarios (deploy cap, cap bar, cap-blocked card visual, death frees, cancel refunds, AI limit, exact 20/20 fit). Two close-out fixes bundled with the roadmap update: (1) AI cap line added to `ai` debug overlay in `GameManager.ts` so future playtests can watch AI cap live, (2) mound slot click-through fix in `index.html` — pre-existing bug since `f5d3da2` where draggable `<img class="lm-preview">` suppressed clicks on the center of the chamber slot. Root cause: HTML images are draggable-by-default, the browser's native drag start suppresses the click event. Fix: `.lm-slot > * { pointer-events: none; }` passes clicks through to the parent onclick. Same latent issue exists on `.ucard .uico-img` but cards are large enough that users never noticed — not fixed proactively, flagged here if anyone hits it later.
 
 ## Tech debt / follow-ups (surfaced during other work)
 
 - **`unitDied` event declared but never fired** (surfaced 2026-04-12 during capacity explore). Not blocking capacity (derived state doesn't need it). Latent issue — any future system needing death notifications will hit this gap. Fix when first real consumer appears, or during combat audit (Item 3). Location: `EventBus` declares event, no `emit('unitDied', ...)` call exists in codebase.
+- **Phaser registry is stringly-typed and polling-based** (surfaced 2026-04-12 during capacity architecture review). Codebase-wide pattern: WorldScene writes `registry.set('cap.used', ...)` and MenuUIScene reads `registry.get('cap.used')`. Key typos silently break readers, no schema, `any` return type. Not capacity-specific — inherited from the existing WorldScene → MenuUIScene bridge. Future refactor: typed registry wrapper (`registry.cap.used.get() → number`), possibly with subscription model. Out of scope for mechanics roadmap, flag for a future "codebase architectural hygiene" pass.
+- **Module-vs-class decision not hoisted to DESIGN_PATTERNS.md** (surfaced 2026-04-12 during capacity architecture review). The Capacity.ts reasoning ("stateless helpers → module, stateful systems → class") is documented in CAPACITY_DESIGN.md but is a codebase-level principle. Should be extracted to DESIGN_PATTERNS.md so future implementers have a reference when facing the same call. Low-effort follow-up, high long-term value.
+- **No transactional test for deploy-rejection side-effect discipline** (surfaced 2026-04-12 during capacity architecture review). GameManager.playerSpawn relies on ordering (all validations before economy.spend). A regression test asserting "rejected deploy does not change economy.nectar or units array" would defend against a future contributor inserting a validation after the spend call. Add during combat audit (Item 3) or when writing the first GameManager integration test.
 
 ## How to resume in a new conversation
 

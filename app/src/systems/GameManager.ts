@@ -18,7 +18,7 @@ import { ParticleManager } from './ParticleManager';
 import { AudioManager } from './AudioManager';
 import { SaveManager } from './SaveManager';
 import { IncubationManager, MAX_CHAMBERS } from './IncubationManager';
-import { capUsed, canDeploy } from './Capacity';
+import { capUsed, canDeploy, MAX_CAPACITY } from './Capacity';
 import { EventBus } from './EventBus';
 import { UnitPool } from './UnitPool';
 import { CocoonVisuals } from '../entities/CocoonVisuals';
@@ -151,11 +151,14 @@ export class GameManager {
           const larvaNext = ai.incubation.larvaCount < 10
             ? `(${Math.ceil(5 - ai.incubation.larvaTimer)}s)`
             : 'MAX';
+          const aiCapUsed = capUsed(this.units, 'enemy', ai.incubation.chambers);
+          const capWarn = aiCapUsed >= MAX_CAPACITY ? ' [FULL]' : aiCapUsed >= MAX_CAPACITY * 0.8 ? ' [HIGH]' : '';
           overlay.textContent = [
             `AI: ${(ai as any).profile.personality}`,
             `Nectar: ${Math.floor(ai.nectar)} +${ai.income}/s`,
             `Larvae: ${ai.incubation.larvaCount} ${larvaNext}`,
             `Chambers: ${chambers}`,
+            `Cap: ${aiCapUsed} / ${MAX_CAPACITY}${capWarn}`,
             `Base HP: ${this.enemyHive.base.hp}/${this.enemyHive.base.maxHp}`,
             `Intent: [${ai.intent.action}] ${ai.intent.details}`,
             `---`,
