@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { UnitDef, WaveDef, Side, AbilityKey, RenderUnit, IWaveController, HiveProfile } from '../types';
+import type { UnitDef, WaveDef, Side, PlayerAbilityKey, RenderUnit, IWaveController, HiveProfile } from '../types';
 import { resolveColors } from '../config/Palettes';
 import { W, DEFAULT_WORLD_W, SBW as SBW_CONST } from '../config/Constants';
 import type { RunBuff } from './RunState';
@@ -7,6 +7,7 @@ import type { RunBuff } from './RunState';
 import { UNIT_DEFS, drawUnit } from '../units/registry';
 import { ENEMY_DEFS } from '../config/EnemyDefs';
 import { BaseStructure } from '../entities/BaseStructure';
+import { BaseEntity } from '../entities/BaseEntity';
 import { Unit, resetUid } from '../entities/Unit';
 import { CombatSystem } from './CombatSystem';
 import { WaveManager } from './WaveManager';
@@ -21,9 +22,11 @@ import { IncubationManager, MAX_CHAMBERS } from './IncubationManager';
 import { capUsed, canDeploy, MAX_CAPACITY } from './Capacity';
 import { EventBus } from './EventBus';
 import { UnitPool } from './UnitPool';
+import { SpatialIndex } from './SpatialIndex';
 import { CocoonVisuals } from '../entities/CocoonVisuals';
 import { LarvaVisuals } from '../entities/LarvaVisuals';
 import { registerDebugCommand, unregisterDebugCommand } from './DebugConsole';
+import { HpHud } from './HpHud';
 
 export interface HiveView {
   base: BaseStructure;
@@ -50,7 +53,12 @@ export class GameManager {
   enemyHive: HiveView;
   private enemyChamberSnapshot: boolean[];
   unitPool: UnitPool;
+  spatialIndex: SpatialIndex;
   units: Unit[];
+  // Phase 6 follow-up #2 — WorldEntity wrappers around the hive
+  // structures so ranged units' targeting includes the base.
+  playerBaseEntity: BaseEntity;
+  enemyBaseEntity: BaseEntity;
   deckKeys: string[];
   SBW: number;
   worldW: number;
@@ -78,6 +86,7 @@ export class GameManager {
 
     // Units
     this.unitPool = new UnitPool(scene);
+    this.spatialIndex = new SpatialIndex();
     this.units = [];
 
     // Systems
@@ -103,6 +112,18 @@ export class GameManager {
     };
     this.enemyChamberSnapshot = new Array(MAX_CHAMBERS).fill(false);
 
+    // Phase 6 follow-up #2 — wrap bases as WorldEntity instances and
+    // register them in the spatial index. The wall positions are:
+    //   playerBase wall: x = SBW          (enemy units approach from right, attack when u.x ≤ SBW)
+    //   enemyBase wall:  x = worldW - SBW (player units approach from left, attack when u.x + u.unitW ≥ worldW - SBW)
+    // Bases are dropped with the GameManager — no explicit deregister
+    // is needed since the spatial index is owned by this instance.
+    this.playerBaseEntity = new BaseEntity(this.playerHive.base, SBW);
+    this.enemyBaseEntity = new BaseEntity(this.enemyHive.base, worldW - SBW);
+    this.spatialIndex.add(this.playerBaseEntity);
+    this.spatialIndex.add(this.enemyBaseEntity);
+    this.combat.setBaseEntities(this.playerBaseEntity, this.enemyBaseEntity);
+
     // Apply run buffs (hive buildings from roguelike rewards)
     if (runBuffs) {
       for (const buff of runBuffs) {
@@ -116,6 +137,13 @@ export class GameManager {
     this.kills = 0;
     this.elapsed = 0;
     this.manualPanTimer = 0;
+
+    // Attach this battle's units to the HpHud overlay (DEV only — the
+    // HpHud command is registered at module load and is a no-op until a
+    // source is attached). Detached in cleanupDebugCommands.
+    if (import.meta.env.DEV) {
+      HpHud.attachSource(() => this.units);
+    }
 
     // Debug commands (dev only — tree-shaken in production)
     if (import.meta.env.DEV) {
@@ -237,9 +265,17 @@ export class GameManager {
       this.audio
     );
 
-    // Clean up dead units — return to pool
+    // Re-sort live units in the spatial index after combat moved them.
+    // Sweep-and-prune bubbles each entity toward its sorted position,
+    // so this loop is amortized O(n) across typical per-frame movement.
+    for (const u of this.units) {
+      if (!u.dead) this.spatialIndex.update(u);
+    }
+
+    // Clean up dead units — return to pool.
     this.units = this.units.filter(u => {
       if (u.dead) {
+        this.spatialIndex.remove(u);
         this.unitPool.despawn(u);
         return false;
       }
@@ -252,6 +288,13 @@ export class GameManager {
     // Update bases
     this.playerHive.base.update(dt);
     this.enemyHive.base.update(dt);
+
+    // Phase 6 follow-up #2 — re-derive `dead` on the base entities so
+    // spatial-index queries (which exclude dead via matchesFilter) and
+    // _findTarget's base check stop returning a destroyed hive on the
+    // next frame. Cheap derivation; no separate state.
+    this.playerBaseEntity.syncDead();
+    this.enemyBaseEntity.syncDead();
 
     // Check defeat
     if (this.playerHive.base.hp <= 0) {
@@ -329,9 +372,10 @@ export class GameManager {
     const unitDef = { ...def, _key: key };
     const unit = this.unitPool.spawn(unitDef, side, x);
     this.units.push(unit);
+    this.spatialIndex.add(unit);
   }
 
-  castAbility(key: AbilityKey): { success: boolean; message: string } {
+  castAbility(key: PlayerAbilityKey): { success: boolean; message: string } {
     if (!this.running) return { success: false, message: '' };
     let success = false;
     let message = '';
@@ -407,6 +451,7 @@ export class GameManager {
       unregisterDebugCommand('wave');
       unregisterDebugCommand('hp');
       unregisterDebugCommand('ai');
+      HpHud.detachSource();
     }
   }
 

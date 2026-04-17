@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
-import type { AbilityKey, IUnit, IParticleManager } from '../types';
+import type { PlayerAbilityKey, IUnit, IParticleManager } from '../types';
 import { ABILITY_DEFS } from '../config/AbilityDefs';
+import { applyEffect } from './EffectSystem';
 import { DEFAULT_WORLD_W, SBW } from '../config/Constants';
 import { LANE } from '../config/Layout';
 const GND = LANE.land.groundY;
@@ -35,7 +36,7 @@ export class AbilityManager {
   }
 
   canCast(key: string, economy: EconomyManager): boolean {
-    const def = ABILITY_DEFS[key as AbilityKey];
+    const def = ABILITY_DEFS[key as PlayerAbilityKey];
     return this.cooldowns[key] <= 0 && economy.canAfford(def.cost);
   }
 
@@ -85,7 +86,7 @@ export class AbilityManager {
     this.cooldowns.slow = def.cooldown;
     this.slowActive = def.duration!;
     units.filter(u => u.side === 'enemy' && !u.dead).forEach(u => {
-      u.slowTimer = def.duration!;
+      applyEffect(u, 'slow', { remaining: def.duration });
     });
     if (particles) {
       particles.burst(this.worldW / 2, GND - 30, 0x80f8c0, 15);
@@ -108,7 +109,7 @@ export class AbilityManager {
   }
 
   getCooldownPercent(key: string): number {
-    const def = ABILITY_DEFS[key as AbilityKey];
+    const def = ABILITY_DEFS[key as PlayerAbilityKey];
     const cd = this.cooldowns[key];
     return cd > 0 ? (1 - cd / def.cooldown) * 100 : 100;
   }

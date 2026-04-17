@@ -1,0 +1,11 @@
+# Claude Code local state (per-machine settings, not for repo)
+.claude/settings.local.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/*.local.json
+.idea/
+*.swp

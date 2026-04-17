@@ -1,15 +1,27 @@
 import Phaser from 'phaser';
-import { W, H } from '../config/Constants';
+import { W, H, SBW } from '../config/Constants';
 import { LANE } from '../config/Layout';
 const GND = LANE.land.groundY;
 import { UNIT_DEFS, TIER_DEFS, drawUnit } from '../units/registry';
 import { resolveColors } from '../config/Palettes';
 import { Unit, resetUid } from '../entities/Unit';
+import { BaseStructure } from '../entities/BaseStructure';
+import { BaseEntity } from '../entities/BaseEntity';
 import { CombatSystem } from '../systems/CombatSystem';
 import { EventBus } from '../systems/EventBus';
 import { ParticleManager } from '../systems/ParticleManager';
 import { AudioManager } from '../systems/AudioManager';
-import type { RenderUnit } from '../types';
+import { HpHud } from '../systems/HpHud';
+import { ScenarioEngine } from '../debug/scenarioEngine';
+import { registerPhase8Scenarios } from '../debug/phase8Scenarios';
+import type { EffectBearer } from '../config/combat/effects/types';
+import type { RenderUnit, Side } from '../types';
+
+// Sandbox base HP — matches production BASE_HP. Low enough that a
+// sustained front line breaks through in 10-30 seconds (fast enough
+// for smoke iteration), high enough that a single unit observing
+// burn/DOT has time to watch ticks before the base falls.
+const SANDBOX_BASE_HP = 1000;
 const UNIT_KEYS: string[] = Object.keys(UNIT_DEFS);
 
 export class SandboxScene extends Phaser.Scene {
@@ -24,6 +36,19 @@ export class SandboxScene extends Phaser.Scene {
   private particles!: ParticleManager;
   private audio!: AudioManager;
   private previews!: void;
+  // Base targets wired via the production BaseStructure + BaseEntity
+  // pair so sandbox smoke tests exercise the same code paths as
+  // WorldScene (ranged base targeting, applyEffectsPhase on
+  // BaseEntity, etc.).
+  private playerBaseStructure!: BaseStructure;
+  private enemyBaseStructure!: BaseStructure;
+  private playerBaseEntity!: BaseEntity;
+  private enemyBaseEntity!: BaseEntity;
+  // HP bars drawn above each base. WorldScene gets its bars from
+  // HUDScene (registry-driven); sandbox draws them inline to avoid
+  // launching a second scene just for two bars.
+  private playerHpBar!: Phaser.GameObjects.Graphics;
+  private enemyHpBar!: Phaser.GameObjects.Graphics;
   private leftIcon!: Phaser.GameObjects.Image;
   private leftLabel!: Phaser.GameObjects.Text;
   private leftCountLabel!: Phaser.GameObjects.Text;
@@ -49,7 +74,12 @@ export class SandboxScene extends Phaser.Scene {
     this.rightCount = 3;
     this.units = [];
     this.running = false;
-    this.combat = new CombatSystem(this, new EventBus());
+    // Pass W as worldW so the in-CombatSystem wall checks (at
+    // `this.worldW - SBW`) align with the sandbox's visible arena
+    // instead of DEFAULT_WORLD_W=2560. Without this, player units
+    // would march past the visible right edge chasing an invisible
+    // wall, and the BaseEntity wired below would never be reached.
+    this.combat = new CombatSystem(this, new EventBus(), W);
     this.particles = new ParticleManager(this);
     this.audio = new AudioManager();
 
@@ -62,8 +92,118 @@ export class SandboxScene extends Phaser.Scene {
     // Build UI
     this.buildUI();
 
+    // Real BaseEntity wiring — mirrors GameManager.ts:104-125 but
+    // without larvae / cocoons / wave logic / HP UI. HP is bumped to
+    // SANDBOX_BASE_HP so scenarios have room to observe DOT and
+    // repeated hits before the base dies.
+    this.playerBaseStructure = new BaseStructure(this, 0, 'player');
+    this.playerBaseStructure.maxHp = SANDBOX_BASE_HP;
+    this.playerBaseStructure.setHp(SANDBOX_BASE_HP);
+    this.enemyBaseStructure = new BaseStructure(this, W - SBW, 'enemy');
+    this.enemyBaseStructure.maxHp = SANDBOX_BASE_HP;
+    this.enemyBaseStructure.setHp(SANDBOX_BASE_HP);
+    this.playerBaseEntity = new BaseEntity(this.playerBaseStructure, SBW);
+    this.enemyBaseEntity = new BaseEntity(this.enemyBaseStructure, W - SBW);
+    this.combat.setBaseEntities(this.playerBaseEntity, this.enemyBaseEntity);
+
+    // HP bars above each hive, drawn inline (no HUDScene in sandbox).
+    this.playerHpBar = this.add.graphics();
+    this.enemyHpBar = this.add.graphics();
+    this.redrawHpBars();
+
     // Spawn initial preview
     this.resetArena();
+
+    // Debug HP HUD — type `hphud` in the debug console to toggle.
+    // Smoke scenarios — type `scenarios list` in the debug console.
+    if (import.meta.env.DEV) {
+      HpHud.attachSource(() => this.units);
+      ScenarioEngine.attachSandbox(() => ({
+        spawn: (key, side, x) => this.scenarioSpawn(key, side, x),
+        clear: () => this.scenarioClear(),
+        startFight: () => this.scenarioStartFight(),
+      }));
+      registerPhase8Scenarios();
+      this.events.once('shutdown', () => {
+        HpHud.detachSource();
+        ScenarioEngine.detachSandbox();
+      });
+    }
+  }
+
+  /**
+   * Scenario API — used by the `/scenarios` dev command to set up
+   * Phase-scoped smoke tests. These helpers mirror the internal
+   * resetArena spawn path but let callers position units at specific
+   * coordinates and mix unit types on the same side. No gameplay
+   * code should call these; they're debug tooling only.
+   */
+  scenarioClear(): void {
+    this.resultText.setText('');
+    this.statsText.setText('');
+    this.running = false;
+    this.elapsed = 0;
+    this.units.forEach((u: Unit) => u.kill());
+    this.units = [];
+    this.resetBases();
+  }
+
+  /**
+   * Restore bases to full HP and wipe any ActiveEffects they may
+   * have accumulated (e.g., burn from a previous Cinderfly run).
+   * Called from both resetArena and scenarioClear so every fresh
+   * scenario starts with clean base state. EffectBearer.activeEffects
+   * is set by EffectSystem.applyEffect lazily; BaseEntity does not
+   * declare the field in its class shape so the reset casts through
+   * the interface the EffectSystem uses.
+   */
+  private resetBases(): void {
+    this.playerBaseStructure.setHp(SANDBOX_BASE_HP);
+    this.enemyBaseStructure.setHp(SANDBOX_BASE_HP);
+    this.playerBaseEntity.syncDead();
+    this.enemyBaseEntity.syncDead();
+    (this.playerBaseEntity as EffectBearer).activeEffects = [];
+    (this.enemyBaseEntity as EffectBearer).activeEffects = [];
+    if (this.playerHpBar) this.redrawHpBars();
+  }
+
+  /** Redraw HP bars above each hive. Mirrors HUDScene.drawHpBar. */
+  private redrawHpBars(): void {
+    this.drawHpBar(this.playerHpBar, 2, GND - 114, SBW - 4,
+      this.playerBaseStructure.hp, this.playerBaseStructure.maxHp, 'player');
+    this.drawHpBar(this.enemyHpBar, W - SBW + 2, GND - 114, SBW - 4,
+      this.enemyBaseStructure.hp, this.enemyBaseStructure.maxHp, 'enemy');
+  }
+
+  private drawHpBar(g: Phaser.GameObjects.Graphics, x: number, y: number, w: number, hp: number, maxHp: number, side: Side): void {
+    g.clear();
+    const frac = Math.max(0, hp / maxHp);
+    const isBlue = side === 'player';
+    g.fillStyle(0x080810);
+    g.fillRect(x, y, w, 6);
+    let hpColor: number;
+    if (frac > 0.5) hpColor = isBlue ? 0x4ab0f0 : 0xf05050;
+    else if (frac > 0.25) hpColor = 0xf0c040;
+    else hpColor = 0xf03030;
+    g.fillStyle(hpColor);
+    g.fillRect(x, y, w * frac, 6);
+    g.lineStyle(0.5, 0x111111);
+    g.strokeRect(x, y, w, 6);
+  }
+
+  scenarioSpawn(key: string, side: Side, x: number): Unit {
+    const def = UNIT_DEFS[key];
+    if (!def) throw new Error(`Unknown unit key: ${key}`);
+    const unit = new Unit(this, { ...def, _key: key }, side, x);
+    this.units.push(unit);
+    return unit;
+  }
+
+  scenarioStartFight(): void {
+    this.running = true;
+    this.elapsed = 0;
+    this.resultText.setText('');
+    this.statsText.setText('');
   }
 
   private buildUI(): void {
@@ -193,6 +333,10 @@ export class SandboxScene extends Phaser.Scene {
     this.units.forEach((u: Unit) => u.kill());
     this.units = [];
 
+    // Restore bases to full HP so repeat reset/fight cycles don't
+    // accumulate damage across runs.
+    this.resetBases();
+
     // Spawn left team (player side)
     const ld = UNIT_DEFS[this.leftKey];
     const spacing: number = Math.round((ld.w + 4) * 1.2);
@@ -229,39 +373,64 @@ export class SandboxScene extends Phaser.Scene {
 
     this.elapsed += dt;
 
-    // Dummy bases (no base damage in sandbox -- fight until one side is wiped)
-    const dummyBase = { hp: 999999, setHp(): void {}, flash(): void {} } as any;
+    // Advance base flash animations (mirrors GameManager.tick's
+    // per-frame base.update). Even though the structures are hidden,
+    // update is cheap and keeps state consistent.
+    this.playerBaseStructure.update(dt);
+    this.enemyBaseStructure.update(dt);
 
-    this.combat.resolve(this.units, dt, dummyBase, dummyBase, this.particles, 0, this.audio);
+    this.combat.resolve(
+      this.units,
+      dt,
+      this.playerBaseStructure,
+      this.enemyBaseStructure,
+      this.particles,
+      0,
+      this.audio,
+    );
 
-    // Clean up dead
+    // Re-derive BaseEntity.dead so spatial-index / _findTarget
+    // queries stop returning a destroyed base on the next frame.
+    // Mirrors GameManager.ts:296-297.
+    this.playerBaseEntity.syncDead();
+    this.enemyBaseEntity.syncDead();
+
+    this.redrawHpBars();
+
+    // Clean up dead units
     this.units = this.units.filter((u: Unit) => {
       if (u.dead) { u.kill(); return false; }
       return true;
     });
 
-    // Check winner
-    const leftAlive: Unit[] = this.units.filter((u: Unit) => u.side === 'player');
-    const rightAlive: Unit[] = this.units.filter((u: Unit) => u.side === 'enemy');
+    // Win condition: a base was destroyed. Mirrors WorldScene/
+    // GameManager victory semantics so sandbox smoke tests reflect
+    // real-match win state. Unit wipeout does NOT end the fight on
+    // its own — the surviving side marches to the opposing wall and
+    // naturally destroys the enemy base.
+    const playerBaseDead = this.playerBaseStructure.hp <= 0;
+    const enemyBaseDead = this.enemyBaseStructure.hp <= 0;
 
-    if (leftAlive.length === 0 || rightAlive.length === 0) {
+    if (playerBaseDead || enemyBaseDead) {
       this.running = false;
-      const ld = UNIT_DEFS[this.leftKey];
-      const rd = UNIT_DEFS[this.rightKey];
-      if (leftAlive.length === 0 && rightAlive.length === 0) {
+      const leftAlive = this.units.filter((u: Unit) => u.side === 'player');
+      const rightAlive = this.units.filter((u: Unit) => u.side === 'enemy');
+
+      if (playerBaseDead && enemyBaseDead) {
         this.resultText.setText('DRAW!');
         this.resultText.setColor('#888888');
-      } else if (leftAlive.length > 0) {
-        this.resultText.setText(`${ld.name} WINS!`);
+        this.statsText.setText(`both bases destroyed | ${this.elapsed.toFixed(1)}s`);
+      } else if (enemyBaseDead) {
+        this.resultText.setText('PLAYER WINS!');
         this.resultText.setColor('#40c0ff');
-        const totalHp: number = leftAlive.reduce((s: number, u: Unit) => s + u.hp, 0);
-        const maxHp: number = leftAlive.reduce((s: number, u: Unit) => s + u.maxHp, 0);
+        const totalHp = leftAlive.reduce((s: number, u: Unit) => s + u.hp, 0);
+        const maxHp = leftAlive.reduce((s: number, u: Unit) => s + u.maxHp, 0);
         this.statsText.setText(`${leftAlive.length} survived | ${totalHp}/${maxHp} HP | ${this.elapsed.toFixed(1)}s`);
       } else {
-        this.resultText.setText(`${rd.name} WINS!`);
+        this.resultText.setText('ENEMY WINS!');
         this.resultText.setColor('#ff6040');
-        const totalHp: number = rightAlive.reduce((s: number, u: Unit) => s + u.hp, 0);
-        const maxHp: number = rightAlive.reduce((s: number, u: Unit) => s + u.maxHp, 0);
+        const totalHp = rightAlive.reduce((s: number, u: Unit) => s + u.hp, 0);
+        const maxHp = rightAlive.reduce((s: number, u: Unit) => s + u.maxHp, 0);
         this.statsText.setText(`${rightAlive.length} survived | ${totalHp}/${maxHp} HP | ${this.elapsed.toFixed(1)}s`);
       }
     }
@@ -286,7 +455,7 @@ export class SandboxScene extends Phaser.Scene {
         facing: 1, bob: 0,
         state: 'march' as const, atkCd: 0, atkRate: def.atkRate,
         trait: def.trait, hp: def.hp, maxHp: def.hp,
-        burrowed: false, hitCount: 0, foreswingTimer: 0, backswingTimer: 0,
+        burrowed: false, foreswingTimer: 0, backswingTimer: 0,
       };
       drawUnit(g, renderUnit, pw / 2, pad);
       const texKey: string = '_sb_preview_' + key;

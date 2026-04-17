@@ -1,8 +1,7 @@
-// Central registry — imports all units, exports UNIT_DEFS, TIER_DEFS, COMBAT_MAP, drawUnit
+// Central registry — imports all units, exports UNIT_DEFS, TIER_DEFS, drawUnit.
 import type {
   UnitDef,
   UnitModule,
-  CombatHooks,
   DrawFunction,
   SpriteAnimDef,
   TierKey,
@@ -58,14 +57,6 @@ for (const [_key, mod] of Object.entries(UNITS)) {
 export const SPRITE_ANIM_MAP: Record<string, SpriteAnimDef> = {};
 for (const [_key, mod] of Object.entries(UNITS)) {
   if (mod.spriteAnim) SPRITE_ANIM_MAP[mod.def.trait] = mod.spriteAnim;
-}
-
-
-
-// Build combat map: trait -> combat hooks
-export const COMBAT_MAP: Record<string, CombatHooks> = {};
-for (const [_key, mod] of Object.entries(UNITS)) {
-  if (mod.combat) COMBAT_MAP[mod.def.trait] = mod.combat;
 }
 
 

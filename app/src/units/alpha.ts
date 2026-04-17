@@ -1,4 +1,4 @@
-import type { UnitDef, CombatHooks, UnitModule } from "../types";
+import type { UnitDef, UnitModule } from "../types";
 import { PALETTES } from "../config/Palettes";
 import drawGrunt from "../draws/alpha/grunt";
 import drawMandible from "../draws/alpha/mandible";
@@ -14,7 +14,6 @@ const alphaDef = (def: Omit<UnitDef, "palette" | "geneline">): UnitDef => ({
   geneline: "alpha",
 });
 
-// --- Grunt ---
 const gruntDef = alphaDef({
   name: "Grunt",
   ico: "\u{1F6E1}\uFE0F",
@@ -36,9 +35,9 @@ const gruntDef = alphaDef({
   tier: 1,
   incubation: 3,
   caste: "soldier",
+  defaultAbility: "jaw_strike",
 });
 
-// --- Mandible ---
 const mandibleDef = alphaDef({
   name: "Mandible",
   ico: "\u{1F41C}",
@@ -61,9 +60,11 @@ const mandibleDef = alphaDef({
   incubation: 4,
   knockResist: 5,
   caste: "soldier",
+  defaultAbility: "jaw_strike",
 });
 
-// --- Bombardier ---
+// Bombardier explodes on death via `deathAbility` — applyDeathTriggerPhase
+// queues `death_bomb` per target within range of the dying unit.
 const bombardierDef = alphaDef({
   name: "Bombardier",
   ico: "\u{1F4A5}",
@@ -86,9 +87,10 @@ const bombardierDef = alphaDef({
   incubation: 5,
   knockForce: 15,
   caste: "soldier",
+  deathAbility: 'death_bomb',
+  defaultAbility: 'jaw_strike',
 });
 
-// --- Needler ---
 const needlerDef = alphaDef({
   name: "Needler",
   ico: "\u{1F3AF}",
@@ -110,9 +112,11 @@ const needlerDef = alphaDef({
   tier: 2,
   incubation: 5,
   caste: "soldier",
+  defaultAbility: "needle_shot",
 });
 
-// --- Legionnaire ---
+// Legionnaire uses bash_strike (blunt) to pair with its knockForce;
+// resistance: heavy plate soaks physical, armor cooks under fire.
 const legionnaireDef = alphaDef({
   name: "Legionnaire",
   ico: "\u{1FAB2}",
@@ -136,9 +140,13 @@ const legionnaireDef = alphaDef({
   knockForce: 20,
   knockResist: 40,
   caste: "soldier",
+  defaultAbility: "bash_strike",
+  resistance: { blunt: 'strong', sharp: 'strong', heat: 'weak' },
 });
 
-// --- Ravager ---
+// Ravager's `selfModifier` adds +50% atkRate when HP ≤ 50% via the
+// updatePassives self-modifier branch. Step-function; flips both ways
+// if Mendwing heal brings HP back above the threshold.
 const ravagerDef = alphaDef({
   name: "Ravager",
   ico: "\u{1F41D}",
@@ -160,9 +168,19 @@ const ravagerDef = alphaDef({
   tier: 3,
   incubation: 6,
   caste: "soldier",
+  defaultAbility: "jaw_strike",
+  selfModifier: {
+    stat: "atkRate",
+    type: "percent",
+    value: 50,
+    condition: "hp_below_half",
+  },
 });
 
-// --- Centurion ---
+// Centurion's rally aura adds +20% atk to in-range same-side allies
+// via the updatePassives aura branch. Multi-source stacking is
+// additive: two overlapping Centurions = +40%. Source-tagged
+// `aura:${id}:atk` so one dying only removes its own tag.
 const centurionDef = alphaDef({
   name: "Centurion",
   ico: "\u{2694}\uFE0F",
@@ -185,149 +203,21 @@ const centurionDef = alphaDef({
   incubation: 8,
   knockResist: 15,
   caste: "soldier",
+  defaultAbility: "jaw_strike",
+  auraModifier: {
+    stat: "atk",
+    type: "percent",
+    value: 20,
+    range: 80,
+  },
 });
 
-const AURA_RANGE = 80;
-
-// --- Combat Hooks ---
-
-const bombardierCombat: CombatHooks = {
-  onDeath(u, ctx) {
-    // Explode on death, hitting up to 5 nearby foes for 65 damage
-    const foes = ctx.allAlive.filter((e) => e.side !== u.side && !e.dead);
-    foes
-      .filter(
-        (e) => Math.abs(e.x + e.unitW / 2 - (u.x + u.unitW / 2)) < 50 * ctx.S,
-      )
-      .slice(0, 5)
-      .forEach((e) => ctx.hitUnit(e, 65, "aoe"));
-    if (ctx.particles) {
-      const bx = u.x + u.unitW / 2;
-      const by = u.y + u.unitH / 2;
-      const pm = ctx.particles as any;
-      // Big explosion — fast wide particles + slow lingering embers
-      for (let i = 0; i < 30; i++) {
-        const a = Math.random() * Math.PI * 2;
-        const s = 3 + Math.random() * 5;
-        pm.particles.push({
-          x: bx,
-          y: by,
-          vx: Math.cos(a) * s,
-          vy: Math.sin(a) * s - 2,
-          life: 0.8 + Math.random() * 0.5,
-          col: [0xffcc20, 0xff8020, 0xff4010][Math.floor(Math.random() * 3)],
-          r: 2.5 + Math.random() * 3,
-        });
-      }
-      // Slow rising embers
-      for (let i = 0; i < 12; i++) {
-        pm.particles.push({
-          x: bx + (Math.random() - 0.5) * 20,
-          y: by,
-          vx: (Math.random() - 0.5) * 1.5,
-          vy: -1 - Math.random() * 2,
-          life: 1.0 + Math.random() * 0.6,
-          col: 0xffaa30,
-          r: 1 + Math.random() * 1.5,
-        });
-      }
-      ctx.particles.float(bx, u.y - 14, "BOOM!", 0xffcc20, true);
-    }
-  },
-};
-
-const ravagerCombat: CombatHooks = {
-  onUpdate(u, _dt) {
-    // Rage: attack rate increases as HP drops
-    const base = ravagerDef.atkRate;
-    const hpFrac = u.hp / u.maxHp;
-    if (hpFrac <= 0.5) u.atkRate = base * 1.5;
-    else u.atkRate = base;
-    return false;
-  },
-};
-
-const centurionCombat: CombatHooks = {
-  onUpdate(u, _dt, ctx) {
-    // Rally aura: up to 5 nearest allies within range get +20% ATK.
-    // Buff fades when an ally leaves range. Each rallied ally remembers which
-    // centurion buffed it via `_ralliedByUid` so multi-centurion scenarios
-    // don't cross-wipe each other's buffs.
-    const allies = ctx.allAlive
-      .filter(
-        (a) =>
-          a.side === u.side &&
-          a !== u &&
-          !a.dead &&
-          Math.abs(a.x + a.unitW / 2 - (u.x + u.unitW / 2)) <
-            AURA_RANGE * ctx.S,
-      )
-      .sort((a, b) => Math.abs(a.x - u.x) - Math.abs(b.x - u.x))
-      .slice(0, 5);
-
-    const rallied = new Set(allies);
-    for (const a of allies) {
-      if (!(a as any)._rallied) {
-        (a as any)._baseAtk = (a as any)._baseAtk ?? a.atk;
-        a.atk = Math.round((a as any)._baseAtk * 1.2);
-        (a as any)._rallied = true;
-        (a as any)._ralliedByUid = u.id;
-      }
-    }
-
-    // Fade: any ally this centurion previously buffed but is no longer in the
-    // current in-range set (walked out of aura, or pushed out of the top-5
-    // nearest by another ally) has its buff restored to base.
-    for (const a of ctx.allAlive) {
-      if (
-        a.side === u.side &&
-        (a as any)._rallied &&
-        (a as any)._ralliedByUid === u.id &&
-        !rallied.has(a)
-      ) {
-        a.atk = (a as any)._baseAtk ?? a.atk;
-        (a as any)._rallied = false;
-        (a as any)._ralliedByUid = undefined;
-      }
-    }
-
-    // Store buff count so draw can show chevrons
-    (u as any).rallyCount = allies.length;
-    return false;
-  },
-  onDeath(u, ctx) {
-    // Remove rally buff from allies THIS centurion was buffing.
-    // Filter by `_ralliedByUid` so a dying centurion doesn't clear another
-    // centurion's buffs in multi-centurion compositions.
-    for (const a of ctx.allAlive) {
-      if (
-        a.side === u.side &&
-        (a as any)._rallied &&
-        (a as any)._ralliedByUid === u.id
-      ) {
-        a.atk = (a as any)._baseAtk ?? a.atk;
-        (a as any)._rallied = false;
-        (a as any)._ralliedByUid = undefined;
-      }
-    }
-  },
-};
-
-// --- Export as UnitModule records ---
 export const units: Record<string, UnitModule> = {
   grunt: { def: gruntDef, draw: drawGrunt },
   mandible: { def: mandibleDef, draw: drawMandible },
-  bombardier: {
-    def: bombardierDef,
-    combat: bombardierCombat,
-    draw: drawBombardier,
-  },
+  bombardier: { def: bombardierDef, draw: drawBombardier },
   needler: { def: needlerDef, draw: drawNeedler },
   legionnaire: { def: legionnaireDef, draw: drawLegionnaire },
-  ravager: { def: ravagerDef, combat: ravagerCombat, draw: drawRavager },
-  centurion: {
-    def: centurionDef,
-    combat: centurionCombat,
-    draw: drawCenturion,
-  },
+  ravager: { def: ravagerDef, draw: drawRavager },
+  centurion: { def: centurionDef, draw: drawCenturion },
 };

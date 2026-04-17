@@ -1,0 +1,370 @@
+{
+  "_comment": "Tier ceiling: Main caps at T6 (Exavyss). T7-9 = Dark Realm range. T10 = Coptic primordials only.",
+
+  "meta": {
+    "variant": "main",
+    "title": "MAIN HIVYSS — Greek genelines (α–ω)",
+    "subtitle": "",
+    "width": 900,
+    "height": 1300,
+    "bgGradient": [
+      { "offset": "0%", "color": "#0a1225" },
+      { "offset": "8%", "color": "#1a2030" },
+      { "offset": "20%", "color": "#2a2415" },
+      { "offset": "38%", "color": "#3a1510" },
+      { "offset": "58%", "color": "#2a1025" },
+      { "offset": "75%", "color": "#0a1535" },
+      { "offset": "92%", "color": "#2a0f00" },
+      { "offset": "100%", "color": "#1a0500" }
+    ]
+  },
+
+  "layers": [
+    {
+      "id": "drift",
+      "name": "DRIFT",
+      "subtitle": "atmosphere · T2-5 · ascent-only",
+      "tierRange": [2, 5],
+      "yStart": 50,
+      "yEnd": 210,
+      "labelColor": "#8090a0",
+      "subtitleColor": "#607090",
+      "dividerColor": "#556070"
+    },
+    {
+      "id": "skin",
+      "name": "SKIN",
+      "subtitle": "outer membrane · T0-2",
+      "tierRange": [0, 2],
+      "yStart": 220,
+      "yEnd": 440,
+      "labelColor": "#d0b080",
+      "subtitleColor": "#a08060",
+      "dividerColor": "#605040"
+    },
+    {
+      "id": "veins",
+      "name": "VEINS",
+      "subtitle": "circulatory · T1-3",
+      "tierRange": [1, 3],
+      "yStart": 450,
+      "yEnd": 660,
+      "labelColor": "#e06070",
+      "subtitleColor": "#a04050",
+      "dividerColor": "#705040"
+    },
+    {
+      "id": "organs",
+      "name": "ORGANS",
+      "subtitle": "biological machines · T2-4",
+      "tierRange": [2, 4],
+      "yStart": 670,
+      "yEnd": 890,
+      "labelColor": "#b070c0",
+      "subtitleColor": "#7050a0",
+      "dividerColor": "#504060"
+    },
+    {
+      "id": "nerve",
+      "name": "NERVE",
+      "subtitle": "awareness · T3-5",
+      "tierRange": [3, 5],
+      "yStart": 900,
+      "yEnd": 1100,
+      "labelColor": "#70a0d0",
+      "subtitleColor": "#5080b0",
+      "dividerColor": "#405060"
+    },
+    {
+      "id": "core",
+      "name": "CORE",
+      "subtitle": "the mind · T5-6 · ω (Exavyss peak)",
+      "tierRange": [5, 6],
+      "yStart": 1110,
+      "yEnd": 1300,
+      "labelColor": "#ffb050",
+      "subtitleColor": "#c08030"
+    }
+  ],
+
+  "zones": [
+    {
+      "id": "spore_waste",
+      "name": "Spore Waste",
+      "layer": "drift",
+      "owner": "shared",
+      "ownerSymbol": "—",
+      "tier": 3,
+      "envRule": "fog_spore",
+      "fill": "#4060a0",
+      "stroke": "#6080b0",
+      "position": { "x": 380, "y": 155 },
+      "radius": { "x": 200, "y": 35 }
+    },
+
+    {
+      "id": "carapace_plains",
+      "name": "Carapace Plains",
+      "layer": "skin",
+      "owner": "alpha",
+      "ownerSymbol": "α",
+      "tier": 0,
+      "envRule": "clear",
+      "fill": "#c0302d",
+      "stroke": "#c0502d",
+      "position": { "x": 210, "y": 340 },
+      "radius": { "x": 130, "y": 65 }
+    },
+    {
+      "id": "hive_marsh",
+      "name": "Hive Marsh",
+      "layer": "skin",
+      "owner": "beta",
+      "ownerSymbol": "β",
+      "tier": 1,
+      "envRule": "water_heavy",
+      "fill": "#8cb030",
+      "stroke": "#8cb030",
+      "position": { "x": 640, "y": 345 },
+      "radius": { "x": 130, "y": 70 }
+    },
+    {
+      "id": "stone_ridge",
+      "name": "Stone Ridge",
+      "layer": "skin",
+      "owner": "gamma",
+      "ownerSymbol": "γ",
+      "tier": 1,
+      "envRule": "crystalline",
+      "fill": "#909090",
+      "stroke": "#a0a0a0",
+      "position": { "x": 420, "y": 395 },
+      "radius": { "x": 90, "y": 50 }
+    },
+
+    {
+      "id": "pulse_network",
+      "name": "Pulse Network",
+      "layer": "veins",
+      "owner": "epsilon",
+      "ownerSymbol": "ε",
+      "tier": 2,
+      "envRule": "pheromone_dense",
+      "fill": "#e08090",
+      "stroke": "#e08090",
+      "position": { "x": 180, "y": 550 },
+      "radius": { "x": 120, "y": 70 }
+    },
+    {
+      "id": "pursuit_veldt",
+      "name": "Pursuit Veldt",
+      "layer": "veins",
+      "owner": "delta",
+      "ownerSymbol": "δ",
+      "tier": 2,
+      "envRule": "clear",
+      "fill": "#d04040",
+      "stroke": "#d04040",
+      "position": { "x": 620, "y": 550 },
+      "radius": { "x": 125, "y": 70 }
+    },
+    {
+      "id": "bond_hollow",
+      "name": "Bond Hollow",
+      "layer": "veins",
+      "owner": "zeta",
+      "ownerSymbol": "ζ",
+      "tier": 2,
+      "envRule": "silence",
+      "fill": "#a060c0",
+      "stroke": "#a060c0",
+      "position": { "x": 400, "y": 595 },
+      "radius": { "x": 85, "y": 45 }
+    },
+
+    {
+      "id": "feeding_chambers",
+      "name": "Feeding Chambers",
+      "layer": "organs",
+      "owner": "theta",
+      "ownerSymbol": "θ",
+      "tier": 3,
+      "envRule": "heat_passive",
+      "fill": "#604080",
+      "stroke": "#6040a0",
+      "position": { "x": 200, "y": 770 },
+      "radius": { "x": 130, "y": 75 }
+    },
+    {
+      "id": "molt_cavity",
+      "name": "Molt Cavity",
+      "layer": "organs",
+      "owner": "iota",
+      "ownerSymbol": "ι",
+      "tier": 3,
+      "envRule": "fog_dim",
+      "fill": "#9060c0",
+      "stroke": "#9060c0",
+      "position": { "x": 620, "y": 770 },
+      "radius": { "x": 130, "y": 75 }
+    },
+
+    {
+      "id": "signal_labyrinth",
+      "name": "Signal Labyrinth",
+      "layer": "nerve",
+      "owner": "kappa_mu",
+      "ownerSymbol": "κ–μ",
+      "tier": 4,
+      "envRule": "pheromone_dense",
+      "fill": "#4080c0",
+      "stroke": "#4080c0",
+      "position": { "x": 250, "y": 990 },
+      "radius": { "x": 140, "y": 75 }
+    },
+    {
+      "id": "dream_fog",
+      "name": "Dream Fog",
+      "layer": "nerve",
+      "owner": "xi_omicron",
+      "ownerSymbol": "ξ–ο",
+      "tier": 4,
+      "envRule": "fog_dim",
+      "fill": "#80a0e0",
+      "stroke": "#80a0e0",
+      "position": { "x": 600, "y": 990 },
+      "radius": { "x": 140, "y": 75 }
+    },
+
+    {
+      "id": "core_approach",
+      "name": "Core Approach",
+      "layer": "core",
+      "owner": "pi_rho",
+      "ownerSymbol": "π, ρ",
+      "tier": 6,
+      "envRule": "clear",
+      "fill": "#ffb050",
+      "stroke": "#ffb050",
+      "position": { "x": 400, "y": 1195 },
+      "radius": { "x": 200, "y": 70 }
+    }
+  ],
+
+  "nodes": [
+    { "id": "spore_cloud", "name": "Spore Cloud", "type": "ascent_point", "layer": "drift", "biome": "spore_waste", "tier": 3, "position": { "x": 280, "y": 170 } },
+    { "id": "chitin_drift", "name": "Chitin Drift", "type": "ascent_point", "layer": "drift", "biome": "spore_waste", "tier": 4, "position": { "x": 470, "y": 170 } },
+
+    { "id": "home_hive", "name": "HOME HIVE", "subtitle": "hub · fast-travel anchor", "type": "hub", "layer": "skin", "biome": "carapace_plains", "tier": 0, "position": { "x": 400, "y": 260 } },
+
+    { "id": "ochre_flats", "name": "Ochre Flats", "type": "battle", "layer": "skin", "biome": "carapace_plains", "tier": 0, "position": { "x": 240, "y": 330 } },
+    { "id": "sun_carapace", "name": "Sun Carapace", "type": "battle", "layer": "skin", "biome": "carapace_plains", "tier": 0, "position": { "x": 160, "y": 280 }, "labelOffset": { "x": 0, "y": -12 } },
+    { "id": "ridge_path", "name": "Ridge Path", "type": "battle", "layer": "skin", "biome": "carapace_plains", "tier": 1, "position": { "x": 175, "y": 385 } },
+
+    { "id": "shallow_marsh", "name": "Shallow Marsh", "type": "battle", "layer": "skin", "biome": "hive_marsh", "tier": 1, "position": { "x": 560, "y": 340 }, "labelOffset": { "x": 0, "y": -12 } },
+    { "id": "brood_pit", "name": "Brood Pit", "type": "battle", "layer": "skin", "biome": "hive_marsh", "tier": 1, "position": { "x": 650, "y": 390 } },
+    { "id": "fetid_pool", "name": "Fetid Pool", "type": "battle", "layer": "skin", "biome": "hive_marsh", "tier": 2, "position": { "x": 700, "y": 310 }, "labelOffset": { "x": 0, "y": -12 } },
+
+    { "id": "low_ridge", "name": "Low Ridge", "type": "battle", "layer": "skin", "biome": "stone_ridge", "tier": 1, "position": { "x": 410, "y": 390 } },
+    { "id": "quarry_edge", "name": "Quarry Edge", "type": "battle", "layer": "skin", "biome": "stone_ridge", "tier": 1, "position": { "x": 490, "y": 375 } },
+    { "id": "crown_stone", "name": "Crown Stone", "type": "battle", "layer": "skin", "biome": "stone_ridge", "tier": 2, "position": { "x": 360, "y": 390 }, "labelOffset": { "x": 0, "y": -12 } },
+
+    { "id": "signal_nexus", "name": "Signal Nexus", "type": "battle", "layer": "veins", "biome": "pulse_network", "tier": 2, "position": { "x": 145, "y": 510 }, "labelOffset": { "x": 0, "y": -12 } },
+    { "id": "quiet_capillary", "name": "Quiet Capillary", "type": "battle", "layer": "veins", "biome": "pulse_network", "tier": 2, "position": { "x": 210, "y": 555 } },
+    { "id": "throb_chamber", "name": "Throb Chamber", "type": "battle", "layer": "veins", "biome": "pulse_network", "tier": 3, "position": { "x": 240, "y": 605 } },
+
+    { "id": "hunt_grounds", "name": "Hunt Grounds", "type": "battle", "layer": "veins", "biome": "pursuit_veldt", "tier": 2, "position": { "x": 610, "y": 515 }, "labelOffset": { "x": 0, "y": -12 } },
+    { "id": "ambush_hollow", "name": "Ambush Hollow", "type": "battle", "layer": "veins", "biome": "pursuit_veldt", "tier": 3, "position": { "x": 660, "y": 575 } },
+    { "id": "stalkers_rest", "name": "Stalker's Rest", "type": "battle", "layer": "veins", "biome": "pursuit_veldt", "tier": 2, "position": { "x": 750, "y": 540 } },
+
+    { "id": "paired_pit", "name": "Paired Pit", "type": "battle", "layer": "veins", "biome": "bond_hollow", "tier": 2, "position": { "x": 395, "y": 555 }, "labelOffset": { "x": 0, "y": -12 } },
+    { "id": "twin_chamber", "name": "Twin Chamber", "type": "battle", "layer": "veins", "biome": "bond_hollow", "tier": 2, "position": { "x": 455, "y": 595 } },
+
+    { "id": "rot_pocket", "name": "Rot Pocket", "subtitle": "⚠ anomaly", "type": "anomaly", "layer": "veins", "biome": "bond_hollow", "tier": 4, "position": { "x": 370, "y": 650 }, "bridgesTo": "dark:dark_crossroads" },
+
+    { "id": "slow_digest", "name": "Slow Digest", "type": "battle", "layer": "organs", "biome": "feeding_chambers", "tier": 2, "position": { "x": 155, "y": 820 } },
+    { "id": "bile_lake", "name": "Bile Lake", "type": "battle", "layer": "organs", "biome": "feeding_chambers", "tier": 3, "position": { "x": 260, "y": 790 }, "labelOffset": { "x": 0, "y": -12 } },
+    { "id": "acid_pool", "name": "Acid Pool", "type": "battle", "layer": "organs", "biome": "feeding_chambers", "tier": 3, "position": { "x": 200, "y": 745 }, "labelOffset": { "x": 0, "y": -12 } },
+
+    { "id": "shell_pit", "name": "Shell Pit", "type": "battle", "layer": "organs", "biome": "molt_cavity", "tier": 3, "position": { "x": 670, "y": 815 } },
+    { "id": "growth_wall", "name": "Growth Wall", "type": "battle", "layer": "organs", "biome": "molt_cavity", "tier": 3, "position": { "x": 565, "y": 800 }, "labelOffset": { "x": 0, "y": -12 } },
+    { "id": "shed_chamber", "name": "Shed Chamber", "type": "battle", "layer": "organs", "biome": "molt_cavity", "tier": 2, "position": { "x": 625, "y": 745 }, "labelOffset": { "x": 0, "y": -12 } },
+
+    { "id": "resonant_heart", "name": "Resonant Heart", "subtitle": "Mid-Core Boss · T4 · unlocks η", "type": "boss", "layer": "organs", "biome": "feeding_chambers", "tier": 4, "position": { "x": 410, "y": 825 } },
+
+    { "id": "thought_splinter", "name": "Thought Splinter", "type": "battle", "layer": "nerve", "biome": "signal_labyrinth", "tier": 4, "position": { "x": 250, "y": 945 }, "labelOffset": { "x": 0, "y": -12 } },
+    { "id": "attention_spike", "name": "Attention Spike", "type": "battle", "layer": "nerve", "biome": "signal_labyrinth", "tier": 4, "position": { "x": 320, "y": 945 }, "labelOffset": { "x": 0, "y": -12 } },
+    { "id": "echo_field", "name": "Echo Field", "type": "battle", "layer": "nerve", "biome": "signal_labyrinth", "tier": 3, "position": { "x": 280, "y": 1010 } },
+    { "id": "hollow_pulse", "name": "Hollow Pulse", "type": "battle", "layer": "nerve", "biome": "signal_labyrinth", "tier": 4, "position": { "x": 200, "y": 1030 } },
+
+    { "id": "fade_hollow", "name": "Fade Hollow", "type": "battle", "layer": "nerve", "biome": "dream_fog", "tier": 4, "position": { "x": 550, "y": 950 }, "labelOffset": { "x": 0, "y": -12 } },
+    { "id": "wakeless", "name": "Wakeless", "type": "battle", "layer": "nerve", "biome": "dream_fog", "tier": 5, "position": { "x": 640, "y": 960 }, "labelOffset": { "x": 0, "y": -12 } },
+    { "id": "ether_silence", "name": "Ether Silence", "type": "battle", "layer": "nerve", "biome": "dream_fog", "tier": 4, "position": { "x": 595, "y": 1005 } },
+    { "id": "rebound", "name": "Rebound", "type": "battle", "layer": "nerve", "biome": "dream_fog", "tier": 5, "position": { "x": 650, "y": 1020 } },
+
+    { "id": "core_app_node_1", "name": "Core Approach", "type": "battle", "layer": "core", "biome": "core_approach", "tier": 5, "position": { "x": 395, "y": 1155 } },
+    { "id": "inner_sanctum", "name": "Inner Sanctum", "type": "battle", "layer": "core", "biome": "core_approach", "tier": 5, "position": { "x": 420, "y": 1210 }, "labelOffset": { "x": 0, "y": -15 } },
+
+    { "id": "omega_arena", "name": "ω", "subtitle": "The Watching · T6 (Exavyss peak)", "type": "endpoint", "layer": "core", "biome": "core_approach", "tier": 6, "position": { "x": 430, "y": 1265 } }
+  ],
+
+  "edges": [
+    { "from": "home_hive", "to": "ochre_flats", "type": "standard" },
+    { "from": "home_hive", "to": "shallow_marsh", "type": "standard" },
+    { "from": "home_hive", "to": "low_ridge", "type": "standard" },
+    { "from": "ochre_flats", "to": "sun_carapace", "type": "standard" },
+    { "from": "ochre_flats", "to": "ridge_path", "type": "standard" },
+    { "from": "shallow_marsh", "to": "brood_pit", "type": "standard" },
+    { "from": "brood_pit", "to": "fetid_pool", "type": "standard" },
+    { "from": "low_ridge", "to": "quarry_edge", "type": "standard" },
+    { "from": "low_ridge", "to": "crown_stone", "type": "standard" },
+
+    { "from": "sun_carapace", "to": "spore_cloud", "type": "ascent" },
+    { "from": "fetid_pool", "to": "chitin_drift", "type": "ascent" },
+    { "from": "spore_cloud", "to": "chitin_drift", "type": "standard" },
+
+    { "from": "ridge_path", "to": "signal_nexus", "type": "descent" },
+    { "from": "low_ridge", "to": "paired_pit", "type": "descent" },
+    { "from": "brood_pit", "to": "hunt_grounds", "type": "descent" },
+    { "from": "fetid_pool", "to": "stalkers_rest", "type": "descent" },
+
+    { "from": "signal_nexus", "to": "quiet_capillary", "type": "standard" },
+    { "from": "quiet_capillary", "to": "throb_chamber", "type": "standard" },
+    { "from": "paired_pit", "to": "twin_chamber", "type": "standard" },
+    { "from": "twin_chamber", "to": "hunt_grounds", "type": "standard" },
+    { "from": "hunt_grounds", "to": "ambush_hollow", "type": "standard" },
+    { "from": "ambush_hollow", "to": "stalkers_rest", "type": "standard" },
+
+    { "from": "twin_chamber", "to": "rot_pocket", "type": "anomaly_bleed" },
+
+    { "from": "throb_chamber", "to": "slow_digest", "type": "descent" },
+    { "from": "twin_chamber", "to": "resonant_heart", "type": "descent" },
+    { "from": "ambush_hollow", "to": "shed_chamber", "type": "descent" },
+
+    { "from": "slow_digest", "to": "acid_pool", "type": "standard" },
+    { "from": "acid_pool", "to": "bile_lake", "type": "standard" },
+    { "from": "shed_chamber", "to": "shell_pit", "type": "standard" },
+    { "from": "shell_pit", "to": "growth_wall", "type": "standard" },
+    { "from": "bile_lake", "to": "resonant_heart", "type": "standard" },
+    { "from": "growth_wall", "to": "resonant_heart", "type": "standard" },
+
+    { "from": "resonant_heart", "to": "thought_splinter", "type": "descent" },
+    { "from": "resonant_heart", "to": "fade_hollow", "type": "descent" },
+
+    { "from": "thought_splinter", "to": "attention_spike", "type": "standard" },
+    { "from": "attention_spike", "to": "echo_field", "type": "standard" },
+    { "from": "echo_field", "to": "hollow_pulse", "type": "standard" },
+    { "from": "fade_hollow", "to": "wakeless", "type": "standard" },
+    { "from": "wakeless", "to": "ether_silence", "type": "standard" },
+    { "from": "ether_silence", "to": "rebound", "type": "standard" },
+
+    { "from": "echo_field", "to": "core_app_node_1", "type": "descent" },
+    { "from": "ether_silence", "to": "core_app_node_1", "type": "descent" },
+    { "from": "core_app_node_1", "to": "inner_sanctum", "type": "standard" },
+    { "from": "inner_sanctum", "to": "omega_arena", "type": "standard" }
+  ],
+
+  "specials": [
+    { "type": "husk", "position": { "x": 810, "y": 75 }, "radius": 38 }
+  ]
+}

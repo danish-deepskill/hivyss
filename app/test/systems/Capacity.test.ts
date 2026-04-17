@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { capUsed, canDeploy, capRemaining, MAX_CAPACITY } from './Capacity';
-import type { UnitDef, Side } from '../types';
+import { capUsed, canDeploy, capRemaining, MAX_CAPACITY } from '../../src/systems/Capacity';
+import type { UnitDef, Side } from '../../src/types';
 
 // Minimal test stand-ins. Capacity helpers are typed against structural
 // interfaces, so plain objects satisfy them — no Phaser/Unit construction.

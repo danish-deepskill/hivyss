@@ -123,8 +123,10 @@ const draw: DrawFunction = (g, u, cx, uy) => {
     g.lineTo(sx + f * 22, sy - 2);
     g.strokePath();
 
-    // Overcharge ring (every 4th hit)
-    if (u.hitCount && u.hitCount % 4 === 3) {
+    // Overcharge anticipation ring — fires when the next cast will
+    // overcharge (castCount 3, 7, 11, ... → next cast is the 4th/8th/12th).
+    const castCount = u.resources?.castCount ?? 0;
+    if (castCount > 0 && castCount % 4 === 3) {
       g.lineStyle(2, 0xffff60, 0.6);
       g.strokeCircle(cx, uy + h * 0.45, w * 0.6);
     }

@@ -82,10 +82,45 @@
       "Bash(curl -sIL \"https://archive.org/download/into-the-breach-ai/Into%20The%20Breach%20AI.pdf\")",
       "Bash(curl -sL \"https://archive.org/metadata/into-the-breach-ai\")",
       "Bash(curl -sL -o /tmp/itb-ai.txt \"https://ia801603.us.archive.org/0/items/into-the-breach-ai/Into%20the%20Breach%20AI_djvu.txt\")",
-      "Read(//c/tmp/**)"
+      "Read(//c/tmp/**)",
+      "Bash(npm test:*)",
+      "Bash(npx vitest:*)",
+      "Read(//c/Work/Simulation/**)",
+      "Bash(awk 'NR>=340 && NR<=395 {print NR\": \"substr\\($0,1,200\\)}' \"c:/Work/Simulation/hivyss/app/src/MECHANICS_ROADMAP.md\")",
+      "Bash(awk 'NR>=355 && NR<=400 {print NR\": \"$0}' \"c:/Work/Simulation/hivyss/app/src/MECHANICS_ROADMAP.md\")",
+      "Bash(awk 'NR>=340 && NR<=395' c:/Work/Simulation/hivyss/app/src/MECHANICS_ROADMAP.md)",
+      "Bash(awk 'NR>=355 && NR<=395' c:/Work/Simulation/hivyss/app/src/MECHANICS_ROADMAP.md)",
+      "Bash(awk 'NR>=378 && NR<=395' c:/Work/Simulation/hivyss/app/src/MECHANICS_ROADMAP.md)",
+      "Bash(awk 'NR>=1 && NR<=200' c:/Work/Simulation/hivyss/app/src/COMBAT_REWRITE_PLAN.md)",
+      "Bash(awk '/^## Phase 8/,/^## Phase 9/' c:/Work/Simulation/hivyss/app/src/COMBAT_REWRITE_PLAN.md)",
+      "Bash(awk 'NR>=1 && NR<=250' c:/Work/Simulation/hivyss/app/src/COMBAT_REWRITE_PHASE8_DECISIONS.md)",
+      "Bash(awk 'NR>=250 && NR<=500' c:/Work/Simulation/hivyss/app/src/COMBAT_REWRITE_PHASE8_DECISIONS.md)",
+      "Bash(awk 'NR>=500 && NR<=750' c:/Work/Simulation/hivyss/app/src/COMBAT_REWRITE_PHASE8_DECISIONS.md)",
+      "Bash(awk 'NR>=750 && NR<=1053' c:/Work/Simulation/hivyss/app/src/COMBAT_REWRITE_PHASE8_DECISIONS.md)",
+      "Bash(awk 'NR>=985 && NR<=1053' c:/Work/Simulation/hivyss/app/src/COMBAT_REWRITE_PHASE8_DECISIONS.md)",
+      "Bash(rm \"C:/Users/USER/.claude/projects/c--Work-Simulation-hivyss/memory/feedback_review_depth.md\")",
+      "Bash(node svg/tools/generate.mjs)",
+      "WebFetch(domain:austinkleon.com)",
+      "WebFetch(domain:www.sloww.co)",
+      "WebFetch(domain:www.themarginalian.org)",
+      "WebFetch(domain:howtoes.blog)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(echo \"TSC_EXIT=$?\")",
+      "Bash(echo \"TSC=$?\")",
+      "Bash(gh repo *)",
+      "Bash(curl -sL https://raw.githubusercontent.com/shinpr/mcp-image/main/README.md)",
+      "WebFetch(domain:www.reddit.com)",
+      "Bash(gh api *)",
+      "Bash(curl -sL https://raw.githubusercontent.com/freema/pixelforge-mcp/main/README.md)",
+      "Bash(mkdir -p test/systems test/entities test/debug test/config/combat test/config/combat/abilities test/config/combat/effects)",
+      "Read(//c/c/Work/Simulation/hivyss/app/**)",
+      "Bash(sed -i 's|app/src/MECHANICS_ROADMAP\\\\.md|app/docs/MECHANICS_ROADMAP.md|g' lore/HIVYSS.md)",
+      "Bash(sed -i 's|app/src/DESIGN_PATTERNS\\\\.md|app/docs/DESIGN_PATTERNS.md|g' lore/HIVYSS.md)",
+      "Bash(sed -i 's|app/src/units/CLAUDE\\\\.md|app/src/units/CLAUDE.md|g' lore/HIVYSS.md)"
     ],
     "additionalDirectories": [
-      "C:\\Work\\Simulation\\hivyss\\app\\src\\draws"
+      "C:\\Work\\Simulation\\hivyss\\app\\src\\draws",
+      "\\tmp"
     ]
   }
 }

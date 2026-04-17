@@ -1,0 +1,140 @@
+<svg viewBox="0 0 900 900" xmlns="http://www.w3.org/2000/svg" font-family="sans-serif">
+  <defs>
+    <linearGradient id="bg_primordials" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#000008"/><stop offset="40%" stop-color="#04020a"/><stop offset="70%" stop-color="#020208"/><stop offset="100%" stop-color="#000000"/></linearGradient>
+    <radialGradient id="hive"><stop offset="0%" stop-color="#ffeb90"/><stop offset="70%" stop-color="#b07020"/><stop offset="100%" stop-color="#401500"/></radialGradient>
+    <radialGradient id="core"><stop offset="0%" stop-color="#fff090"/><stop offset="55%" stop-color="#ff7010"/><stop offset="100%" stop-color="#400500"/></radialGradient>
+    <radialGradient id="darkcore"><stop offset="0%" stop-color="#e060e0"/><stop offset="40%" stop-color="#601060"/><stop offset="100%" stop-color="#100010"/></radialGradient>
+    <radialGradient id="husk"><stop offset="0%" stop-color="#c8c8b8"/><stop offset="60%" stop-color="#70705c"/><stop offset="100%" stop-color="#2a2820"/></radialGradient>
+    <radialGradient id="primordial_shei"><stop offset="0%" stop-color="#ffffff"/><stop offset="55%" stop-color="#a0c0ff"/><stop offset="100%" stop-color="#101040"/></radialGradient>
+    <radialGradient id="primordial_dei"><stop offset="0%" stop-color="#ffe0a0"/><stop offset="45%" stop-color="#c060c0"/><stop offset="100%" stop-color="#200020"/></radialGradient>
+    <radialGradient id="primordial_fei"><stop offset="0%" stop-color="#ffa080"/><stop offset="50%" stop-color="#c02020"/><stop offset="100%" stop-color="#200000"/></radialGradient>
+    <radialGradient id="primordial_djandja"><stop offset="0%" stop-color="#a0ffc0"/><stop offset="50%" stop-color="#208060"/><stop offset="100%" stop-color="#001020"/></radialGradient>
+    <radialGradient id="primordial_tchima"><stop offset="0%" stop-color="#ffb0ff"/><stop offset="50%" stop-color="#8030c0"/><stop offset="100%" stop-color="#100020"/></radialGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="3"/></filter>
+  </defs>
+  <rect width="900" height="900" fill="url(#bg_primordials)"/>
+  <text x="450" y="28" fill="#e0e0ff" font-size="16" font-weight="bold" text-anchor="middle" letter-spacing="4">THE PRIMORDIALS — pre-shatter wholeness</text>
+  <text x="450" y="45" fill="#8090c0" font-size="9" text-anchor="middle">Ϸ Shei · ϯ Dei · ϥ Fei · ϫ Djandja · ϭ Tchima · all T10 (Quettavyss) · post-ω · post-ת</text>
+
+  <!-- Zones -->
+
+  <!-- Edges -->
+
+  <!-- Nodes -->
+  <circle cx="450" cy="200" r="38" fill="url(#primordial_shei)" stroke="#a0c0ff" stroke-width="3" filter="url(#glow)"/>
+  <text x="450" y="208" fill="#fff" font-size="14" text-anchor="middle">Ϸ · T10</text>
+  <text x="450" y="220" fill="#fff" font-size="8" text-anchor="middle" opacity="0.9">Shei · The First · Being</text>
+  <circle cx="212" cy="373" r="38" fill="url(#primordial_dei)" stroke="#e090e0" stroke-width="3" filter="url(#glow)"/>
+  <text x="212" y="381" fill="#fff" font-size="14" text-anchor="middle">ϯ · T10</text>
+  <text x="212" y="393" fill="#fff" font-size="8" text-anchor="middle" opacity="0.9">Dei · The Shape · Form</text>
+  <circle cx="303" cy="652" r="38" fill="url(#primordial_fei)" stroke="#e08070" stroke-width="3" filter="url(#glow)"/>
+  <text x="303" y="660" fill="#fff" font-size="14" text-anchor="middle">ϥ · T10</text>
+  <text x="303" y="672" fill="#fff" font-size="8" text-anchor="middle" opacity="0.9">Fei · The Hunger · Desire</text>
+  <circle cx="597" cy="652" r="38" fill="url(#primordial_djandja)" stroke="#80e0a0" stroke-width="3" filter="url(#glow)"/>
+  <text x="597" y="660" fill="#fff" font-size="14" text-anchor="middle">ϫ · T10</text>
+  <text x="597" y="672" fill="#fff" font-size="8" text-anchor="middle" opacity="0.9">Djandja · The Echo · Continuity</text>
+  <circle cx="688" cy="373" r="38" fill="url(#primordial_tchima)" stroke="#d090ff" stroke-width="3" filter="url(#glow)"/>
+  <text x="688" y="381" fill="#fff" font-size="14" text-anchor="middle">ϭ · T10</text>
+  <text x="688" y="393" fill="#fff" font-size="8" text-anchor="middle" opacity="0.9">Tchima · The Turning · Change</text>
+  <!-- Specials -->
+  <circle cx="662.1" cy="454.6" r="0.7" fill="#fff" opacity="0.28"/>
+  <circle cx="781.5" cy="348.8" r="1.3" fill="#fff" opacity="0.74"/>
+  <circle cx="73.7" cy="823.5" r="0.7" fill="#fff" opacity="0.88"/>
+  <circle cx="366.8" cy="163.4" r="1.4" fill="#fff" opacity="0.39"/>
+  <circle cx="511.5" cy="142.6" r="1.4" fill="#fff" opacity="0.61"/>
+  <circle cx="111.8" cy="344.3" r="1.8" fill="#fff" opacity="0.62"/>
+  <circle cx="44.2" cy="673.9" r="1.3" fill="#fff" opacity="0.74"/>
+  <circle cx="697.7" cy="860.0" r="1.3" fill="#fff" opacity="0.72"/>
+  <circle cx="462.1" cy="170.2" r="1.8" fill="#fff" opacity="0.66"/>
+  <circle cx="640.4" cy="661.1" r="0.8" fill="#fff" opacity="0.88"/>
+  <circle cx="47.9" cy="315.3" r="1.0" fill="#fff" opacity="0.55"/>
+  <circle cx="633.7" cy="742.2" r="1.0" fill="#fff" opacity="0.76"/>
+  <circle cx="40.8" cy="204.8" r="1.2" fill="#fff" opacity="0.61"/>
+  <circle cx="85.6" cy="123.9" r="0.4" fill="#fff" opacity="0.79"/>
+  <circle cx="848.9" cy="314.1" r="0.5" fill="#fff" opacity="0.53"/>
+  <circle cx="504.2" cy="86.9" r="0.8" fill="#fff" opacity="0.32"/>
+  <circle cx="273.0" cy="301.9" r="1.6" fill="#fff" opacity="0.84"/>
+  <circle cx="678.7" cy="447.2" r="1.7" fill="#fff" opacity="0.67"/>
+  <circle cx="750.0" cy="30.3" r="1.8" fill="#fff" opacity="0.71"/>
+  <circle cx="458.8" cy="63.8" r="0.9" fill="#fff" opacity="0.89"/>
+  <circle cx="354.4" cy="263.0" r="1.1" fill="#fff" opacity="0.27"/>
+  <circle cx="878.3" cy="623.9" r="1.3" fill="#fff" opacity="0.68"/>
+  <circle cx="321.3" cy="585.4" r="0.7" fill="#fff" opacity="0.51"/>
+  <circle cx="898.5" cy="709.4" r="1.6" fill="#fff" opacity="0.63"/>
+  <circle cx="174.5" cy="831.0" r="1.3" fill="#fff" opacity="0.52"/>
+  <circle cx="41.2" cy="827.5" r="1.0" fill="#fff" opacity="0.53"/>
+  <circle cx="365.7" cy="11.7" r="1.6" fill="#fff" opacity="0.31"/>
+  <circle cx="356.9" cy="588.1" r="1.5" fill="#fff" opacity="0.83"/>
+  <circle cx="515.0" cy="624.6" r="1.7" fill="#fff" opacity="0.65"/>
+  <circle cx="348.9" cy="291.3" r="0.8" fill="#fff" opacity="0.60"/>
+  <circle cx="50.9" cy="133.5" r="1.1" fill="#fff" opacity="0.72"/>
+  <circle cx="491.0" cy="870.8" r="0.8" fill="#fff" opacity="0.27"/>
+  <circle cx="718.6" cy="312.9" r="0.6" fill="#fff" opacity="0.45"/>
+  <circle cx="340.8" cy="721.0" r="1.6" fill="#fff" opacity="0.26"/>
+  <circle cx="886.0" cy="484.8" r="1.6" fill="#fff" opacity="0.77"/>
+  <circle cx="425.0" cy="453.3" r="0.6" fill="#fff" opacity="0.47"/>
+  <circle cx="140.6" cy="729.7" r="1.5" fill="#fff" opacity="0.37"/>
+  <circle cx="84.2" cy="82.2" r="1.3" fill="#fff" opacity="0.67"/>
+  <circle cx="469.2" cy="183.3" r="0.7" fill="#fff" opacity="0.29"/>
+  <circle cx="87.2" cy="855.8" r="1.8" fill="#fff" opacity="0.34"/>
+  <circle cx="449.5" cy="530.0" r="1.0" fill="#fff" opacity="0.50"/>
+  <circle cx="771.2" cy="710.5" r="0.7" fill="#fff" opacity="0.50"/>
+  <circle cx="750.4" cy="330.8" r="0.8" fill="#fff" opacity="0.67"/>
+  <circle cx="598.2" cy="690.8" r="1.4" fill="#fff" opacity="0.59"/>
+  <circle cx="281.4" cy="369.0" r="1.8" fill="#fff" opacity="0.66"/>
+  <circle cx="624.4" cy="126.3" r="0.8" fill="#fff" opacity="0.71"/>
+  <circle cx="279.3" cy="687.3" r="0.4" fill="#fff" opacity="0.85"/>
+  <circle cx="442.7" cy="256.8" r="1.4" fill="#fff" opacity="0.75"/>
+  <circle cx="699.3" cy="877.6" r="0.6" fill="#fff" opacity="0.54"/>
+  <circle cx="676.1" cy="651.1" r="1.4" fill="#fff" opacity="0.53"/>
+  <circle cx="796.4" cy="713.5" r="1.1" fill="#fff" opacity="0.89"/>
+  <circle cx="100.7" cy="192.7" r="1.5" fill="#fff" opacity="0.66"/>
+  <circle cx="400.6" cy="733.6" r="1.1" fill="#fff" opacity="0.59"/>
+  <circle cx="322.8" cy="207.0" r="1.7" fill="#fff" opacity="0.52"/>
+  <circle cx="758.2" cy="785.1" r="0.6" fill="#fff" opacity="0.41"/>
+  <circle cx="891.3" cy="164.2" r="1.4" fill="#fff" opacity="0.31"/>
+  <circle cx="563.3" cy="649.0" r="0.5" fill="#fff" opacity="0.36"/>
+  <circle cx="370.4" cy="180.5" r="0.7" fill="#fff" opacity="0.51"/>
+  <circle cx="383.2" cy="506.1" r="1.0" fill="#fff" opacity="0.71"/>
+  <circle cx="692.9" cy="462.8" r="1.1" fill="#fff" opacity="0.32"/>
+  <circle cx="182.8" cy="746.0" r="0.4" fill="#fff" opacity="0.71"/>
+  <circle cx="671.0" cy="706.0" r="0.5" fill="#fff" opacity="0.35"/>
+  <circle cx="818.2" cy="8.4" r="1.5" fill="#fff" opacity="0.31"/>
+  <circle cx="699.6" cy="414.7" r="1.1" fill="#fff" opacity="0.63"/>
+  <circle cx="389.9" cy="387.2" r="0.9" fill="#fff" opacity="0.31"/>
+  <circle cx="197.5" cy="597.8" r="1.2" fill="#fff" opacity="0.90"/>
+  <circle cx="205.9" cy="298.6" r="1.5" fill="#fff" opacity="0.55"/>
+  <circle cx="201.9" cy="314.6" r="0.9" fill="#fff" opacity="0.85"/>
+  <circle cx="559.9" cy="123.2" r="1.0" fill="#fff" opacity="0.84"/>
+  <circle cx="744.6" cy="766.4" r="1.0" fill="#fff" opacity="0.68"/>
+  <circle cx="43.2" cy="318.6" r="1.3" fill="#fff" opacity="0.89"/>
+  <circle cx="157.5" cy="196.4" r="1.1" fill="#fff" opacity="0.58"/>
+  <circle cx="566.0" cy="574.7" r="1.7" fill="#fff" opacity="0.44"/>
+  <circle cx="84.2" cy="80.9" r="0.9" fill="#fff" opacity="0.51"/>
+  <circle cx="312.6" cy="216.6" r="1.0" fill="#fff" opacity="0.41"/>
+  <circle cx="190.5" cy="356.5" r="1.5" fill="#fff" opacity="0.33"/>
+  <circle cx="881.4" cy="507.2" r="0.4" fill="#fff" opacity="0.32"/>
+  <circle cx="785.8" cy="84.3" r="0.8" fill="#fff" opacity="0.88"/>
+  <circle cx="599.6" cy="1.5" r="1.1" fill="#fff" opacity="0.46"/>
+  <circle cx="324.1" cy="181.4" r="1.6" fill="#fff" opacity="0.42"/>
+  <circle cx="118.3" cy="434.3" r="1.1" fill="#fff" opacity="0.56"/>
+  <circle cx="755.7" cy="674.7" r="1.2" fill="#fff" opacity="0.69"/>
+  <circle cx="840.6" cy="338.1" r="1.6" fill="#fff" opacity="0.25"/>
+  <circle cx="567.1" cy="281.7" r="0.8" fill="#fff" opacity="0.51"/>
+  <circle cx="229.0" cy="216.9" r="0.7" fill="#fff" opacity="0.64"/>
+  <circle cx="310.4" cy="821.1" r="1.6" fill="#fff" opacity="0.56"/>
+  <circle cx="804.1" cy="125.4" r="1.0" fill="#fff" opacity="0.67"/>
+  <circle cx="637.7" cy="281.9" r="0.6" fill="#fff" opacity="0.86"/>
+  <circle cx="736.5" cy="217.9" r="0.8" fill="#fff" opacity="0.63"/>
+  <circle cx="615.7" cy="547.8" r="0.8" fill="#fff" opacity="0.44"/>
+  <text x="450" y="458" fill="#666688" font-size="11" font-style="italic" text-anchor="middle">before the shattering — the unnameable five</text>
+  <text x="450" y="478" fill="#444466" font-size="9" font-style="italic" text-anchor="middle">all Greek and Phoenician are their fragments</text>
+  <text x="450" y="270" fill="#a0c0ff" font-size="9" font-style="italic" text-anchor="middle">“I am, therefore everything else is.”</text>
+  <text x="212" y="443" fill="#e090e0" font-size="9" font-style="italic" text-anchor="middle">“I was the first to choose to be something.”</text>
+  <text x="303" y="722" fill="#e08070" font-size="9" font-style="italic" text-anchor="middle">“I was the first to want.”</text>
+  <text x="597" y="722" fill="#80e0a0" font-size="9" font-style="italic" text-anchor="middle">“I refused to end with myself.”</text>
+  <text x="688" y="443" fill="#d090ff" font-size="9" font-style="italic" text-anchor="middle">“I became something other than I was.”</text>
+  <text x="450" y="825" fill="#555577" font-size="8" font-style="italic" text-anchor="middle">no edges connect them — each is a singular encounter</text>
+  <text x="450" y="845" fill="#444466" font-size="8" font-style="italic" text-anchor="middle">no Greek or Phoenician will ever reach Quettavyss naturally</text>
+  <text x="450" y="865" fill="#666688" font-size="8" font-style="italic" text-anchor="middle">to face one is to face the original of yourself</text>
+</svg>

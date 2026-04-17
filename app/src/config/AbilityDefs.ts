@@ -1,7 +1,7 @@
-import type { AbilityDef, AbilityKey } from '../types';
+import type { PlayerAbilityDef, PlayerAbilityKey } from '../types';
 
 // Ability definitions
-export const ABILITY_DEFS: Record<AbilityKey, AbilityDef> = {
+export const ABILITY_DEFS: Record<PlayerAbilityKey, PlayerAbilityDef> = {
   nuke: {
     name: 'Acid Nuke', icon: '\u2622',
     cost: 50, cooldown: 25,

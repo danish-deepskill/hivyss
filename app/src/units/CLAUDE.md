@@ -6,9 +6,9 @@ Each unit is a self-contained module in `src/units/`:
 
 ```
 src/units/
-  registry.ts        — Imports all units, exports UNIT_DEFS, TIER_DEFS, COMBAT_MAP, drawUnit
+  registry.ts        — Imports all units, exports UNIT_DEFS, TIER_DEFS, drawUnit
   renderUtils.ts     — Shared drawing helpers (hexToInt, lerpColor, drawCommonParts)
-  <unitname>.ts      — One file per unit (stats + draw function + optional combat hooks)
+  <unitname>.ts      — One file per unit (stats + draw function)
 ```
 
 ## Adding a New Unit
@@ -20,12 +20,12 @@ src/units/
 5. Add to wave compositions in `src/config/WaveDefs.ts` if desired (key = `e<unitname>`)
 6. Add `TRAIT_DESC` entry in `src/scenes/DeckScene.ts` `showTooltip()` for tooltip text
 
-That's it — UNIT_DEFS, DRAW_MAP, COMBAT_MAP auto-build from UNITS.
+UNIT_DEFS / DRAW_MAP auto-build from UNITS.
 
 ## Unit File Template
 
 ```ts
-import type { UnitDef, CombatHooks, DrawFunction } from '../types';
+import type { UnitDef, DrawFunction } from '../types';
 import { hexToInt, drawCommonParts } from './renderUtils';
 
 export const def: UnitDef = {
@@ -41,14 +41,10 @@ export const def: UnitDef = {
   w: 16, h: 14,            // Base sprite dimensions (scaled by S automatically)
   primary: 0x50a8f0,       // Primary body color (hex integer)
   secondary: 0x1a4880,     // Dark/accent color for outlines, limbs
-  trait: 'unique_trait',   // Must be unique — maps to draw function AND combat hooks
+  trait: 'unique_trait',   // Must be unique — maps to draw function
   desc: 'Short Desc',      // Shown on card (keep under ~15 chars)
-  tier: 'D',               // F, E, D, C, B, A, S, SS, SSS
-};
-
-// Optional: combat hooks (only export if the unit has special abilities)
-export const combat: CombatHooks = {
-  // See "Combat Hook System" below for available hooks
+  tier: 3,                 // 1-11, see Tier Guidelines below
+  defaultAbility: 'jaw_strike',  // Every unit has one — routes through the pipeline
 };
 
 export const draw: DrawFunction = (g, u, cx, uy) => {
@@ -56,91 +52,33 @@ export const draw: DrawFunction = (g, u, cx, uy) => {
 };
 ```
 
-## Combat Hook System
+## Unit Behavior — Data-Driven, Not Hooks
 
-Each unit can optionally export a `combat` object with hooks. CombatSystem calls these
-hooks at the right time — no need to modify CombatSystem when adding new units.
+**There are no `CombatHooks` anymore.** Unit behavior is defined entirely in data:
 
-### Available Hooks
+- **Basic attack** — `defaultAbility: 'ability_name'` on the def. The ability lives in `config/combat/abilities/` and carries dmgType, targeting, range, targetCount, tiers, appliesEffects, targetFalloff, chainRange, overchargeEvery, aoeRider — everything the pipeline needs.
+- **Passive behaviors** — `auraModifier`, `selfModifier`, `passiveHeal` fields on the def. The IP-5 passive tick loop reads these every frame and dispatches source-tracked modifiers / heal casts.
+- **Death triggers** — `deathAbility: 'ability_name'` on the def. `applyDeathTriggerPhase` queues the named ability when the unit dies.
+- **Status effects** — `appliesEffects: ['burn', 'stun', ...]` on the ability. EffectDef declares `duration`, `tiers`, lifecycle hooks (`onApply`, `onTick`, `onExpire`, `onStack`).
+- **AOE spread** — `aoeRider: { effect, radius, targetCount, excludePrimary }` on the ability. `applyAoeRiderPhase` applies the effect to nearby targets.
+- **Damage multipliers** — `targetFalloff: number[]` (per-target scaling), `overchargeEvery: number` (every-Nth-cast doubling via ResourceSystem).
+- **Multi-target chains** — `chainRange: number` on the ability (chain-from-primary selection, Stormfly).
 
-| Hook | Signature | When Called | Return |
-|------|-----------|------------|--------|
-| `onSpawn` | `(u, ctx)` | Once when unit first enters combat | void |
-| `onUpdate` | `(u, dt, ctx)` | Every frame (passive effects) | `true` to skip normal AI |
-| `onAttack` | `(u, target, foes, dmg, ctx)` | Replaces default attack logic | void |
-| `afterHit` | `(u, target, dmg, ctx)` | After dealing damage to target | void |
-| `onDeath` | `(u, ctx)` | When this unit dies | void |
-| `modifyDamage` | `(u, dmg, ctx)` | Incoming damage to self | modified dmg |
-| `modifyAllyDamage` | `(auraUnit, target, dmg, ctx)` | Damage to a nearby ally | modified dmg |
-| `getAtk` | `(u)` | Override ATK calculation | ATK value |
+Nothing is defined in procedural code on the unit anymore. Design new units by composing data.
 
-### The `ctx` Object (CombatContext)
+## The `ctx` Object (CombatContext)
 
-All hooks receive a typed context object:
-```ts
-{
-  particles: ParticleManager | null;
-  audio: AudioManager | null;
-  scene: Phaser.Scene;
-  allAlive: Unit[];
-  S: number;                              // Scale factor (W / 900)
-  events: { emit(event, data): void };    // EventBus for cross-system events
-  hitUnit(target, dmg, dmgType): void;    // Apply damage (triggers modifiers + death)
-  playHitSound(type): void;               // Play hit SFX ('melee' | 'ranged' | 'aoe' | 'heal')
-}
-```
+Draw functions don't receive `ctx`. Pipeline subscribers (`applyHealPhase`, `applyEffectsPhase`, `applyAoeRiderPhase`, `applyDeathTriggerPhase`) receive `DamageEvent` + read `_currentCtx` from CombatSystem for FX dispatch.
 
-### Hook Examples
+For FX routing, use the registered dispatchers:
 
-**Simple on-hit effect (burn):**
-```ts
-export const combat: CombatHooks = {
-  afterHit(u, target, dmg, ctx) {
-    target.burnTimer = 2;
-    target.burnDmgAcc = 0;
-  },
-};
-```
+- `setHealFxDispatcher` — heal `+N` float + heal sound
+- `setDotDispatcher` — DOT damage routed via pipeline with `baseDamageOverride`
+- `setDeathTriggerDispatcher` — death explosion FX + selector + queueAbility loop
+- `setStunFxDispatcher` — "STUNNED!" float
+- `setAoeRiderAliveAccessor` — alive-list provider for `applyAoeRiderPhase`
 
-**Custom attack (chain lightning):**
-```ts
-export const combat: CombatHooks = {
-  onAttack(u, target, foes, dmg, ctx) {
-    ctx.hitUnit(target, dmg, 'ranged');
-    // ... chain to more targets
-    ctx.playHitSound('aoe');
-  },
-};
-```
-
-**Passive aura:**
-```ts
-export const combat: CombatHooks = {
-  modifyAllyDamage(auraUnit, target, dmg, ctx) {
-    if (Math.abs(auraUnit.x - target.x) < 80 * ctx.S) {
-      return Math.ceil(dmg * 0.8); // 20% reduction
-    }
-    return dmg;
-  },
-};
-```
-
-**ATK modifier (berserk):**
-```ts
-export const combat: CombatHooks = {
-  getAtk(u) {
-    const hpFrac = u.hp / u.maxHp;
-    if (hpFrac <= 0.25) return u.atk * 2;
-    if (hpFrac <= 0.5) return u.atk * 1.5;
-    return u.atk;
-  },
-};
-```
-
-### Units WITHOUT Special Abilities
-
-Units with no special combat behavior (grub, mandible, zephyr, locust, scarab) do NOT
-need a `combat` export. CombatSystem uses default melee/ranged attack based on range.
+These are module-level singletons set by the CombatSystem constructor. Tests stub them.
 
 ## Draw Function Conventions
 
@@ -169,6 +107,7 @@ need a `combat` export. CombatSystem uses default melee/ranged attack based on r
 - `u.bob` — continuously incrementing float, use with `Math.sin(u.bob * speed)` for oscillation
 - `u.state` — `'march'` or `'attack'`, use for idle vs attack animations
 - `u.hp / u.maxHp` — health fraction, use for rage/damage visuals
+- `u.resources?.castCount` — accessible for visual anticipation (e.g. Stormfly overcharge ring)
 
 ### Visual Signature Rules
 - Every unit MUST have a visually distinct silhouette
@@ -179,29 +118,20 @@ need a `combat` export. CombatSystem uses default melee/ranged attack based on r
 
 ## Trait System
 
-Each unit has a unique `trait` string that:
-1. Maps to its draw function via the registry DRAW_MAP
-2. Maps to its combat hooks via the registry COMBAT_MAP
-3. Shows in tooltip descriptions in `src/scenes/DeckScene.ts`
+Each unit has a unique `trait` string that maps to its draw function via the registry DRAW_MAP and shows in tooltip descriptions in `src/scenes/DeckScene.ts`.
 
-When adding a new trait with special abilities:
-- Add `combat` export in the unit file (gameplay hooks)
-- Add `draw` function in the unit file (visual)
-- Add `TRAIT_DESC` in DeckScene.ts `showTooltip()` (tooltip text)
-
-For units with no special ability, only `draw` is needed.
+For units with no visual flourish beyond the basic body, `drawBasicBody` is the default fallback.
 
 ## Tier Guidelines
 
-| Tier | Cost Range | Power Level | Complexity |
-|------|-----------|-------------|------------|
-| F    | 10-20     | Fodder      | No ability |
-| E    | 30-45     | Basic       | Simple ability |
-| D    | 50-85     | Specialized | One strong ability |
-| C    | 85-125    | Elite       | Strong ability + extra mechanic |
-| B    | 125-160   | Rare        | Multi-hit or compound abilities |
-| A    | 160+      | Epic        | Powerful unique mechanic |
-| S+   | 200+      | Legendary   | Game-changing ability |
+Numeric tiers 1-11 (see TIER_DEFS in registry.ts for full names). Rough cost bands:
+
+| Tier | Cost Range | Power Level |
+|------|-----------|-------------|
+| 1-2  | 15-40     | Fodder / baseline |
+| 3-4  | 50-85     | Specialists |
+| 5-6  | 85-130    | Elites |
+| 7+   | 150+      | Legendary / endgame |
 
 ## Registry (registry.ts)
 
@@ -215,6 +145,4 @@ const UNITS: Record<string, UnitModule> = {
 };
 ```
 
-The registry auto-builds UNIT_DEFS, DRAW_MAP, and COMBAT_MAP from the UNITS object.
-No other registration needed — combat hooks are picked up automatically from the
-unit's `combat` export.
+The registry auto-builds UNIT_DEFS and DRAW_MAP from the UNITS object.

@@ -44,7 +44,7 @@ sideCap(side) =
 
 ### 1. Add field to `UnitDef`
 
-[types.ts:38](app/src/types.ts#L38) — add `cap?: number;` next to `cost`. Optional so the base / future tokens can omit it.
+[types.ts:38](../src/types.ts#L38) — add `cap?: number;` next to `cost`. Optional so the base / future tokens can omit it.
 
 ### 2. New file: `app/src/systems/Capacity.ts`
 
@@ -84,7 +84,7 @@ export function capRemaining(used: number, max: number = MAX_CAPACITY): number {
 
 ### 4. Player deploy validation
 
-[GameManager.ts:277-298](app/src/systems/GameManager.ts#L277-L298) — `playerSpawn`. Insert cap check **between** the `isFull()` chamber check and the `economy.spend(def.cost)` line:
+[GameManager.ts:277-298](../src/systems/GameManager.ts#L277-L298) — `playerSpawn`. Insert cap check **between** the `isFull()` chamber check and the `economy.spend(def.cost)` line:
 
 ```typescript
 const used = capUsed(this.units, 'player', this.incubation.chambers);
@@ -97,7 +97,7 @@ Order matters: we need to check cap before spending nectar so a rejected deploy 
 
 ### 5. AI deploy filter
 
-[AIHiveController.ts:210-228](app/src/systems/AIHiveController.ts#L210-L228) — `getAffordableUnits`. After the existing cost filter, add a remaining-cap filter so the AI can't queue picks that would over-cap. AI uses GameManager.units (filtered by `side === 'enemy'`) + its own `this.incubation.chambers`.
+[AIHiveController.ts:210-228](../src/systems/AIHiveController.ts#L210-L228) — `getAffordableUnits`. After the existing cost filter, add a remaining-cap filter so the AI can't queue picks that would over-cap. AI uses GameManager.units (filtered by `side === 'enemy'`) + its own `this.incubation.chambers`.
 
 ```typescript
 const aiUsed = capUsed(this.gameManager.units, 'enemy', this.incubation.chambers);
@@ -115,7 +115,7 @@ for (const key of this.profile.roster) {
 
 ### 6. UI — cap bar
 
-[MenuUIScene.ts:197-225](app/src/scenes/MenuUIScene.ts#L197-L225) — mirror the nectar bar DOM structure, distinct color. Pick a cool tone to contrast nectar's gold:
+[MenuUIScene.ts:197-225](../src/scenes/MenuUIScene.ts#L197-L225) — mirror the nectar bar DOM structure, distinct color. Pick a cool tone to contrast nectar's gold:
 
 ```typescript
 // Suggested gradient: cyan/teal — distinct from nectar gold
@@ -128,7 +128,7 @@ capTrack.appendChild(this.capFill);
 this.capLabel = ...;
 ```
 
-**Update path:** Add cap value to the registry write at [WorldScene.ts:163-166](app/src/scenes/WorldScene.ts#L163-L166):
+**Update path:** Add cap value to the registry write at [WorldScene.ts:163-166](../src/scenes/WorldScene.ts#L163-L166):
 ```typescript
 this.registry.set('capUsed', capUsed(this.gm.units, 'player', this.gm.incubation.chambers));
 this.registry.set('capMax', MAX_CAPACITY);
@@ -140,7 +140,7 @@ Per-frame cost: `capUsed` is O(N) over ~30 units. Negligible. If profiling ever 
 
 ### 7. UI — per-card warning
 
-[MenuUIScene.ts:178-184](app/src/scenes/MenuUIScene.ts#L178-L184) — extend the existing card-disabled toggle:
+[MenuUIScene.ts:178-184](../src/scenes/MenuUIScene.ts#L178-L184) — extend the existing card-disabled toggle:
 
 ```typescript
 const used = this.registry.get('capUsed') ?? 0;
@@ -158,7 +158,7 @@ this.deckKeys.forEach(key => {
 
 ### 8. Per-card cap label
 
-[UnitCard.ts:30-36](app/src/ui/UnitCard.ts#L30-L36) — add a cap value next to the cost so players can see what each unit weighs:
+[UnitCard.ts:30-36](../src/ui/UnitCard.ts#L30-L36) — add a cap value next to the cost so players can see what each unit weighs:
 
 ```typescript
 <div class="ucost">${d.cost}n</div>

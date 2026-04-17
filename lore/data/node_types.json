@@ -1,0 +1,70 @@
+{
+  "_comment": "Node type styling shared between main and dark maps. Each node references its type; the zone provides fill/stroke colors. These are fallbacks for special node types (hub, boss, endpoint, anomaly) that don't inherit from zones.",
+
+  "battle": {
+    "radius": 8,
+    "strokeWidth": 2,
+    "labelSize": 8,
+    "labelColor": "#ccc"
+  },
+  "boss": {
+    "radius": 14,
+    "strokeWidth": 3,
+    "useGlow": true,
+    "fill": "#603020",
+    "stroke": "#e08040",
+    "labelColor": "#f0a060",
+    "labelSize": 10
+  },
+  "anomaly": {
+    "radius": 10,
+    "strokeWidth": 2.5,
+    "strokeDashed": true,
+    "fill": "#301030",
+    "stroke": "#a030a0",
+    "labelColor": "#c060c0",
+    "labelSize": 8
+  },
+  "hub": {
+    "radius": 22,
+    "strokeWidth": 3,
+    "useGlow": true,
+    "useGradient": "hive",
+    "stroke": "#ffd060",
+    "labelColor": "#ffd080",
+    "labelSize": 11
+  },
+  "endpoint": {
+    "radius": 28,
+    "strokeWidth": 4,
+    "useGlow": true,
+    "useGradient": "core",
+    "stroke": "#ffeb50",
+    "labelColor": "#ffd080",
+    "labelSize": 13
+  },
+  "ascent_point": {
+    "radius": 9,
+    "strokeWidth": 2,
+    "fill": "#6080a0",
+    "stroke": "#a0c0e0",
+    "labelColor": "#b0c0d0",
+    "labelSize": 9
+  },
+  "entry": {
+    "radius": 11,
+    "strokeWidth": 2.5,
+    "strokeDashed": true,
+    "fill": "#301030",
+    "stroke": "#c060c0",
+    "labelColor": "#c060c0",
+    "labelSize": 8
+  },
+  "primordial": {
+    "radius": 38,
+    "strokeWidth": 3,
+    "useGlow": true,
+    "labelColor": "#fff",
+    "labelSize": 14
+  }
+}

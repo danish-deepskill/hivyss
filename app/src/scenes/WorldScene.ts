@@ -6,7 +6,7 @@ const GND = LANE.land.groundY;
 import { ABILITY_DEFS } from '../config/AbilityDefs';
 import { GameManager } from '../systems/GameManager';
 import { capUsed, MAX_CAPACITY } from '../systems/Capacity';
-import type { AbilityKey, WaveDef, HiveProfile } from '../types';
+import type { PlayerAbilityKey, WaveDef, HiveProfile } from '../types';
 import type { RunBuff } from '../systems/RunState';
 
 interface WorldSceneData {
@@ -56,7 +56,7 @@ export class WorldScene extends Phaser.Scene {
       if (result.message) this.gm.events.emit('logMessage', { message: result.message });
     };
     const onAbility = (evt: { key: string }) => {
-      const result = this.gm.castAbility(evt.key as AbilityKey);
+      const result = this.gm.castAbility(evt.key as PlayerAbilityKey);
       if (result.message) this.gm.events.emit('logMessage', { message: result.message });
     };
     const onCancel = (evt: { index: number }) => {

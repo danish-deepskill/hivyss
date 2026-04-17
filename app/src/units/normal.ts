@@ -1,11 +1,7 @@
-// Normal geneline — baseline (universal) units, no special palette.
-// Designed for AI Lab testing: clean tier curve (T1-T4), role coverage at every
-// tier, deliberate speed/cost spreads. 11 units, 3-3-3-2 across tiers.
-//
-// Naming follows Vyssid Naming Convention (GAME_DESIGN.md §Vyssid Naming):
-// universal/plain insect-feel names, no military ranks, no fantasy terms.
+// Normal geneline — universal baseline units, no special palette.
+// Tier curve T1–T4, role coverage at every tier.
 
-import type { UnitDef, CombatHooks, UnitModule } from "../types";
+import type { UnitDef, UnitModule } from "../types";
 import drawHardshell from "../draws/hardshell";
 import drawGrub from "../draws/grub";
 import drawPricker from "../draws/pricker";
@@ -18,10 +14,7 @@ import drawWardling from "../draws/wardling";
 import drawBashguard from "../draws/bashguard";
 import drawStormfly from "../draws/stormfly";
 
-// =========================================================
-// TIER 1 — Baseline (15-30n) — available to D1 hives
-// Roles: tank, dps, ranged (no support yet)
-// =========================================================
+// --- T1 baseline (15-30n) ---
 
 const hardshellDef: UnitDef = {
   name: "Hardshell",
@@ -46,6 +39,8 @@ const hardshellDef: UnitDef = {
   incubation: 5,
   knockResist: 30,
   caste: "soldier",
+  resistance: { blunt: 'strong' },
+  defaultAbility: "jaw_strike",
 };
 
 const grubDef: UnitDef = {
@@ -70,6 +65,7 @@ const grubDef: UnitDef = {
   tier: 1,
   incubation: 3,
   caste: "soldier",
+  defaultAbility: "jaw_strike",
 };
 
 const prickerDef: UnitDef = {
@@ -94,12 +90,10 @@ const prickerDef: UnitDef = {
   tier: 1,
   incubation: 5,
   caste: "soldier",
+  defaultAbility: "pricker_jab",
 };
 
-// =========================================================
-// TIER 2 — Extended baseline (40-55n) — D2 hives gain these
-// Adds: support role, glass-cannon dps, mid tank
-// =========================================================
+// --- T2 extended baseline (40-55n) ---
 
 const domebackDef: UnitDef = {
   name: "Domeback",
@@ -124,6 +118,7 @@ const domebackDef: UnitDef = {
   incubation: 9,
   knockResist: 20,
   caste: "soldier",
+  defaultAbility: "jaw_strike",
 };
 
 const skitterlingDef: UnitDef = {
@@ -148,8 +143,14 @@ const skitterlingDef: UnitDef = {
   tier: 2,
   incubation: 4,
   caste: "soldier",
+  defaultAbility: "jaw_strike",
 };
 
+// Mendwing's passiveHeal ticks via updatePassives; when the cooldown
+// is ready AND a wounded ally is in range (F13=B locked 90px), queues
+// heal_pulse. Heal targets the LOWEST-HP ally in range (triage
+// priority), not the nearest. Cooldown does NOT reset on empty-target
+// ticks — next-frame target acquisition fires immediately.
 const mendwingDef: UnitDef = {
   name: "Mendwing",
   ico: "\u{1F33F}",
@@ -173,13 +174,17 @@ const mendwingDef: UnitDef = {
   incubation: 8,
   knockResist: 5,
   caste: "soldier",
+  defaultAbility: "needle_shot",
+  passiveHeal: {
+    abilityName: "heal_pulse",
+    cooldown: 2,
+  },
 };
 
-// =========================================================
-// TIER 3 — Specialists (70-90n) — D3 hives gain these
-// Adds: AOE dps, sniper ranged, aura support
-// =========================================================
+// --- T3 specialists (70-90n) ---
 
+// fire_bite's aoeRider spreads burn to up to 3 enemies within 85px of
+// the primary (primary gets burn via the heat default effect).
 const cinderflyDef: UnitDef = {
   name: "Cinderfly",
   ico: "\u{1F525}",
@@ -203,6 +208,8 @@ const cinderflyDef: UnitDef = {
   incubation: 8,
   knockForce: 10,
   caste: "soldier",
+  resistance: { heat: 'strong', cold: 'weak' },
+  defaultAbility: "fire_bite",
 };
 
 const longeyeDef: UnitDef = {
@@ -227,8 +234,13 @@ const longeyeDef: UnitDef = {
   tier: 3,
   incubation: 14,
   caste: "soldier",
+  defaultAbility: "piercing_shot",
 };
 
+// Wardling's dmg_taken -20% aura uses the same dispatch branch as
+// Centurion's rally. Multi-Wardling stacks additively: 2 overlapping
+// Wardlings give a shared ally -40% dmg_taken. One dying removes only
+// its own source tag; surviving Wardlings keep their aura on allies.
 const wardlingDef: UnitDef = {
   name: "Wardling",
   ico: "\u{1F6E1}\uFE0F",
@@ -252,12 +264,20 @@ const wardlingDef: UnitDef = {
   incubation: 11,
   knockResist: 20,
   caste: "soldier",
+  defaultAbility: "jaw_strike",
+  auraModifier: {
+    stat: "dmg_taken",
+    type: "percent",
+    value: -20,
+    range: 114,
+  },
 };
 
-// =========================================================
-// TIER 4 — Elites (110-130n) — D4 hives gain these
-// =========================================================
+// --- T4 elites (110-130n) ---
 
+// Bashguard's knockForce=100 drives the knockback effect (applied by
+// default on blunt damage) — poise accumulation + stagger via
+// knockback.onApply. Highest knockForce in the roster.
 const bashguardDef: UnitDef = {
   name: "Bashguard",
   ico: "\u{1F98F}",
@@ -282,8 +302,12 @@ const bashguardDef: UnitDef = {
   caste: "soldier",
   knockForce: 100,
   knockResist: 30,
+  defaultAbility: "bash_strike",
 };
 
+// chain_lightning: 3-target chain with falloff [1.0, 0.7, 0.4], every
+// 4th cast doubles damage (overchargeEvery: 4), 25% stun chance via
+// the electric default effect.
 const stormflyDef: UnitDef = {
   name: "Stormfly",
   ico: "\u{26A1}",
@@ -308,166 +332,26 @@ const stormflyDef: UnitDef = {
   knockForce: 20,
   knockResist: 10,
   caste: "elite",
+  defaultAbility: "chain_lightning",
 };
-
-// =========================================================
-// Combat Hooks
-// =========================================================
-
-const mendwingCombat: CombatHooks = {
-  onUpdate(u, dt, ctx) {
-    // Heal nearest wounded ally every 2 seconds
-    u.healTimer = (u.healTimer || 0) + dt;
-    if (u.healTimer >= 2) {
-      u.healTimer = 0;
-      const allies = ctx.allAlive.filter(
-        (a) => a.side === u.side && a !== u && a.hp < a.maxHp,
-      );
-      if (allies.length > 0) {
-        const nearest = allies.reduce((a, b) =>
-          Math.abs(a.x - u.x) < Math.abs(b.x - u.x) ? a : b,
-        );
-        const healAmt = nearest.heal(20);
-        if (healAmt > 0) {
-          if (ctx.particles)
-            ctx.particles.float(
-              nearest.x + nearest.unitW / 2,
-              nearest.y - 8,
-              `+${healAmt}`,
-              0x60f880,
-            );
-          ctx.playHitSound("heal");
-        }
-      }
-    }
-    return false;
-  },
-};
-
-const cinderflyCombat: CombatHooks = {
-  afterHit(u, target, _dmg, ctx) {
-    // Spread burn to up to 3 nearby enemies
-    const foes = ctx.allAlive
-      .filter(
-        (e) =>
-          e.side !== u.side &&
-          !e.dead &&
-          !e.burrowed &&
-          Math.abs(e.x + e.unitW / 2 - (target.x + target.unitW / 2)) < 85,
-      )
-      .sort((a, b) => Math.abs(a.x - target.x) - Math.abs(b.x - target.x))
-      .slice(0, 3);
-    foes.forEach((e) => {
-      e.burnTimer = 8;
-      e.burnDmgAcc = 0;
-    });
-  },
-};
-
-const longeyeCombat: CombatHooks = {
-  onAttack(u, _target, foes, dmg, ctx) {
-    // Piercing shot — hits up to 2 enemies, second at 50% damage
-    const targets = foes
-      .filter((e) => {
-        if (e.burrowed) return false;
-        const d = u.facing > 0 ? e.x - (u.x + u.unitW) : u.x - (e.x + e.unitW);
-        return Math.max(0, d) <= u.range;
-      })
-      .sort((a, b) => {
-        const da = u.facing > 0 ? a.x - u.x : u.x - a.x;
-        const db = u.facing > 0 ? b.x - u.x : u.x - b.x;
-        return da - db;
-      })
-      .slice(0, 2);
-    targets.forEach((e, i) =>
-      ctx.hitUnit(e, i === 0 ? dmg : Math.ceil(dmg * 0.5), "ranged"),
-    );
-    ctx.playHitSound("ranged");
-  },
-};
-
-const wardlingCombat: CombatHooks = {
-  modifyAllyDamage(auraUnit, target, dmg, _ctx) {
-    // Allies within ~114px take 20% less damage
-    if (
-      Math.abs(
-        auraUnit.x + auraUnit.unitW / 2 - (target.x + target.unitW / 2),
-      ) < 114
-    ) {
-      return Math.ceil(dmg * 0.8);
-    }
-    return dmg;
-  },
-};
-
-const stormflyCombat: CombatHooks = {
-  onAttack(u, target, foes, dmg, ctx) {
-    // Chain lightning: hit primary + up to 2 nearby foes, every 4th hit overcharges
-    u.hitCount = (u.hitCount || 0) + 1;
-    const isOvercharge = u.hitCount % 4 === 0;
-    const chainDmg = isOvercharge ? dmg * 2 : dmg;
-    const chainTargets = [target];
-
-    const chainRange = 114;
-    const others = foes
-      .filter(
-        (e) =>
-          e !== target &&
-          !e.burrowed &&
-          !e.dead &&
-          Math.abs(e.x - target.x) <= chainRange,
-      )
-      .sort((a, b) => Math.abs(a.x - target.x) - Math.abs(b.x - target.x));
-    if (others[0]) chainTargets.push(others[0]);
-    if (others[1]) chainTargets.push(others[1]);
-
-    const dmgScale = [1.0, 0.7, 0.4];
-    chainTargets.forEach((t, i) => {
-      const d = Math.max(1, Math.round(chainDmg * dmgScale[i]));
-      ctx.hitUnit(t, d, "ranged");
-      if (!t.dead && Math.random() < 0.25) {
-        t.stunTimer = 0.6;
-        if (ctx.particles)
-          ctx.particles.float(t.x + t.unitW / 2, t.y - 18, "STUNNED!", 0x80ffff);
-      }
-      if (i > 0 && ctx.particles) {
-        const prev = chainTargets[i - 1];
-        ctx.particles.burst(
-          (prev.x + t.x) / 2 + (prev.unitW + t.unitW) / 4,
-          (prev.y + t.y) / 2,
-          0x80ffff,
-          3,
-        );
-      }
-    });
-    if (isOvercharge && ctx.particles) {
-      ctx.particles.float(u.x + u.unitW / 2, u.y - 18, "OVERCHARGE!", 0xffff40);
-    }
-    ctx.playHitSound("aoe");
-  },
-};
-
-// =========================================================
-// Export — ordered by tier for AI Lab roster planning
-// =========================================================
 
 export const units: Record<string, UnitModule> = {
-  // T1 — Baseline (15-30n)
+  // T1
   hardshell: { def: hardshellDef, draw: drawHardshell },
   grub: { def: grubDef, draw: drawGrub },
   pricker: { def: prickerDef, draw: drawPricker },
 
-  // T2 — Extended baseline (40-55n)
+  // T2
   domeback: { def: domebackDef, draw: drawDomeback },
   skitterling: { def: skitterlingDef, draw: drawSkitterling },
-  mendwing: { def: mendwingDef, combat: mendwingCombat, draw: drawMendwing },
+  mendwing: { def: mendwingDef, draw: drawMendwing },
 
-  // T3 — Specialists (70-90n)
-  cinderfly: { def: cinderflyDef, combat: cinderflyCombat, draw: drawCinderfly },
-  longeye: { def: longeyeDef, combat: longeyeCombat, draw: drawLongeye },
-  wardling: { def: wardlingDef, combat: wardlingCombat, draw: drawWardling },
+  // T3
+  cinderfly: { def: cinderflyDef, draw: drawCinderfly },
+  longeye: { def: longeyeDef, draw: drawLongeye },
+  wardling: { def: wardlingDef, draw: drawWardling },
 
-  // T4 — Elites (110-130n)
+  // T4
   bashguard: { def: bashguardDef, draw: drawBashguard },
-  stormfly: { def: stormflyDef, combat: stormflyCombat, draw: drawStormfly },
+  stormfly: { def: stormflyDef, draw: drawStormfly },
 };

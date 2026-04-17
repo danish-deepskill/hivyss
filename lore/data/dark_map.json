@@ -1,0 +1,384 @@
+{
+  "_comment": "Tier ceiling: Dark caps at T9 (Ronnavyss). T10 = Coptic primordials only — never appears in dark map.",
+
+  "meta": {
+    "variant": "dark",
+    "title": "DARK HIVYSS — Phoenician counterparts (ℵ–ת)",
+    "subtitle": "22 evolved dark versions of main Greek (ψ, ω have no dark counterpart)",
+    "width": 900,
+    "height": 1300,
+    "bgGradient": [
+      { "offset": "0%", "color": "#06060f" },
+      { "offset": "12%", "color": "#10081a" },
+      { "offset": "26%", "color": "#1a0820" },
+      { "offset": "42%", "color": "#200515" },
+      { "offset": "58%", "color": "#180818" },
+      { "offset": "74%", "color": "#0a0a25" },
+      { "offset": "90%", "color": "#1a0420" },
+      { "offset": "100%", "color": "#080008" }
+    ]
+  },
+
+  "layers": [
+    {
+      "id": "dark_drift",
+      "name": "DARK DRIFT",
+      "subtitle": "void atmosphere · T5-8 · Corr 1-2",
+      "tierRange": [5, 8],
+      "corruptionRange": [1, 2],
+      "yStart": 50,
+      "yEnd": 210,
+      "labelColor": "#7060a0",
+      "subtitleColor": "#504070",
+      "dividerColor": "#553070"
+    },
+    {
+      "id": "dark_skin",
+      "name": "DARK SKIN",
+      "subtitle": "bone membrane · T3-5 · Corr 1-2",
+      "tierRange": [3, 5],
+      "corruptionRange": [1, 2],
+      "yStart": 220,
+      "yEnd": 440,
+      "labelColor": "#a04060",
+      "subtitleColor": "#702040",
+      "dividerColor": "#502040"
+    },
+    {
+      "id": "dark_veins",
+      "name": "DARK VEINS",
+      "subtitle": "dead circulation · T4-6 · Corr 2-3",
+      "tierRange": [4, 6],
+      "corruptionRange": [2, 3],
+      "yStart": 450,
+      "yEnd": 660,
+      "labelColor": "#a02050",
+      "subtitleColor": "#701030",
+      "dividerColor": "#501040"
+    },
+    {
+      "id": "dark_organs",
+      "name": "DARK ORGANS",
+      "subtitle": "rot machines · T5-7 · Corr 2-3",
+      "tierRange": [5, 7],
+      "corruptionRange": [2, 3],
+      "yStart": 670,
+      "yEnd": 890,
+      "labelColor": "#8040a0",
+      "subtitleColor": "#502060",
+      "dividerColor": "#301040"
+    },
+    {
+      "id": "dark_nerve",
+      "name": "DARK NERVE",
+      "subtitle": "denial · T6-8 · Corr 3-4",
+      "tierRange": [6, 8],
+      "corruptionRange": [3, 4],
+      "yStart": 900,
+      "yEnd": 1100,
+      "labelColor": "#5080a0",
+      "subtitleColor": "#304060",
+      "dividerColor": "#301050"
+    },
+    {
+      "id": "dark_core",
+      "name": "DARK CORE",
+      "subtitle": "the refusal · T8-9 · Corr 5 · ת (Taw, Ronnavyss peak)",
+      "tierRange": [8, 9],
+      "corruptionRange": [5, 5],
+      "yStart": 1110,
+      "yEnd": 1300,
+      "labelColor": "#e060c0",
+      "subtitleColor": "#a03080"
+    }
+  ],
+
+  "zones": [
+    {
+      "id": "spore_void",
+      "name": "Spore Void",
+      "layer": "dark_drift",
+      "owner": "shared_dark",
+      "ownerSymbol": "—",
+      "tier": 6,
+      "corruption": 2,
+      "envRule": "fog_spore",
+      "fill": "#300a50",
+      "stroke": "#6030a0",
+      "position": { "x": 380, "y": 155 },
+      "radius": { "x": 200, "y": 35 }
+    },
+
+    {
+      "id": "bone_plains",
+      "name": "Bone Plains",
+      "layer": "dark_skin",
+      "owner": "aleph",
+      "ownerSymbol": "ℵ",
+      "tier": 3,
+      "corruption": 1,
+      "envRule": "clear",
+      "fill": "#600a1a",
+      "stroke": "#801030",
+      "position": { "x": 210, "y": 340 },
+      "radius": { "x": 130, "y": 65 }
+    },
+    {
+      "id": "rot_marsh",
+      "name": "Rot Marsh",
+      "layer": "dark_skin",
+      "owner": "beth",
+      "ownerSymbol": "ב",
+      "tier": 4,
+      "corruption": 2,
+      "envRule": "water_heavy",
+      "fill": "#304020",
+      "stroke": "#506030",
+      "position": { "x": 640, "y": 345 },
+      "radius": { "x": 130, "y": 70 }
+    },
+    {
+      "id": "obsidian_ridge",
+      "name": "Obsidian Ridge",
+      "layer": "dark_skin",
+      "owner": "gimel",
+      "ownerSymbol": "ג",
+      "tier": 4,
+      "corruption": 1,
+      "envRule": "crystalline",
+      "fill": "#20202a",
+      "stroke": "#404050",
+      "position": { "x": 420, "y": 395 },
+      "radius": { "x": 90, "y": 50 }
+    },
+
+    {
+      "id": "anti_pulse",
+      "name": "Anti-Pulse",
+      "layer": "dark_veins",
+      "owner": "he_daleth",
+      "ownerSymbol": "ה ד",
+      "tier": 5,
+      "corruption": 2,
+      "envRule": "silence",
+      "fill": "#601030",
+      "stroke": "#801040",
+      "position": { "x": 180, "y": 550 },
+      "radius": { "x": 120, "y": 70 }
+    },
+    {
+      "id": "hollow_veldt",
+      "name": "Hollow Veldt",
+      "layer": "dark_veins",
+      "owner": "waw",
+      "ownerSymbol": "ו",
+      "tier": 5,
+      "corruption": 2,
+      "envRule": "fog_dim",
+      "fill": "#500515",
+      "stroke": "#700525",
+      "position": { "x": 620, "y": 550 },
+      "radius": { "x": 125, "y": 70 }
+    },
+    {
+      "id": "bound_rot",
+      "name": "Bound Rot",
+      "layer": "dark_veins",
+      "owner": "zayin",
+      "ownerSymbol": "ז",
+      "tier": 5,
+      "corruption": 3,
+      "envRule": "corruption",
+      "fill": "#401030",
+      "stroke": "#602050",
+      "position": { "x": 400, "y": 595 },
+      "radius": { "x": 85, "y": 45 }
+    },
+
+    {
+      "id": "cannibal_chambers",
+      "name": "Cannibal Chambers",
+      "layer": "dark_organs",
+      "owner": "heth_teth",
+      "ownerSymbol": "ח ט",
+      "tier": 6,
+      "corruption": 3,
+      "envRule": "corruption",
+      "fill": "#30104a",
+      "stroke": "#502080",
+      "position": { "x": 200, "y": 770 },
+      "radius": { "x": 130, "y": 75 }
+    },
+    {
+      "id": "hollow_cavity",
+      "name": "Hollow Cavity",
+      "layer": "dark_organs",
+      "owner": "yodh",
+      "ownerSymbol": "י",
+      "tier": 6,
+      "corruption": 3,
+      "envRule": "fog_dim",
+      "fill": "#401060",
+      "stroke": "#602080",
+      "position": { "x": 620, "y": 770 },
+      "radius": { "x": 130, "y": 75 }
+    },
+
+    {
+      "id": "anti_labyrinth",
+      "name": "Anti-Labyrinth",
+      "layer": "dark_nerve",
+      "owner": "kaph_mem",
+      "ownerSymbol": "כ–מ",
+      "tier": 7,
+      "corruption": 4,
+      "envRule": "silence",
+      "fill": "#102040",
+      "stroke": "#203060",
+      "position": { "x": 250, "y": 990 },
+      "radius": { "x": 140, "y": 75 }
+    },
+    {
+      "id": "void_dream",
+      "name": "Void Dream",
+      "layer": "dark_nerve",
+      "owner": "nun_ayin",
+      "ownerSymbol": "נ–ע",
+      "tier": 8,
+      "corruption": 4,
+      "envRule": "fog_dim",
+      "fill": "#202050",
+      "stroke": "#303070",
+      "position": { "x": 600, "y": 990 },
+      "radius": { "x": 140, "y": 75 }
+    },
+
+    {
+      "id": "dark_core_approach",
+      "name": "Dark Core Approach",
+      "layer": "dark_core",
+      "owner": "pe",
+      "ownerSymbol": "פ",
+      "tier": 9,
+      "corruption": 5,
+      "envRule": "corruption",
+      "fill": "#500550",
+      "stroke": "#800580",
+      "position": { "x": 400, "y": 1195 },
+      "radius": { "x": 200, "y": 70 }
+    }
+  ],
+
+  "nodes": [
+    { "id": "dark_entry", "name": "anomaly entry from Main", "type": "entry", "layer": "dark_drift", "biome": "spore_void", "tier": 5, "position": { "x": 450, "y": 80 }, "labelOffset": { "x": 0, "y": -16 } },
+
+    { "id": "spore_void_node", "name": "Spore Void", "type": "ascent_point", "layer": "dark_drift", "biome": "spore_void", "tier": 6, "corruption": 2, "position": { "x": 280, "y": 170 } },
+    { "id": "chitin_wrath", "name": "Chitin Wrath", "type": "ascent_point", "layer": "dark_drift", "biome": "spore_void", "tier": 7, "corruption": 2, "position": { "x": 470, "y": 170 } },
+
+    { "id": "blood_flat", "name": "Blood Flat", "type": "battle", "layer": "dark_skin", "biome": "bone_plains", "tier": 3, "corruption": 1, "position": { "x": 240, "y": 330 } },
+    { "id": "ash_carapace", "name": "Ash Carapace", "type": "battle", "layer": "dark_skin", "biome": "bone_plains", "tier": 4, "corruption": 1, "position": { "x": 160, "y": 280 }, "labelOffset": { "x": 0, "y": -12 } },
+    { "id": "vein_scar", "name": "Vein Scar", "type": "battle", "layer": "dark_skin", "biome": "bone_plains", "tier": 4, "corruption": 2, "position": { "x": 175, "y": 385 } },
+
+    { "id": "festering_pool", "name": "Festering Pool", "type": "battle", "layer": "dark_skin", "biome": "rot_marsh", "tier": 4, "corruption": 2, "position": { "x": 560, "y": 340 }, "labelOffset": { "x": 0, "y": -12 } },
+    { "id": "necrotic_brood", "name": "Necrotic Brood", "type": "battle", "layer": "dark_skin", "biome": "rot_marsh", "tier": 4, "corruption": 2, "position": { "x": 650, "y": 390 } },
+    { "id": "grave_reek", "name": "Grave Reek", "type": "battle", "layer": "dark_skin", "biome": "rot_marsh", "tier": 5, "corruption": 2, "position": { "x": 700, "y": 310 }, "labelOffset": { "x": 0, "y": -12 } },
+
+    { "id": "black_quarry", "name": "Black Quarry", "type": "battle", "layer": "dark_skin", "biome": "obsidian_ridge", "tier": 4, "corruption": 1, "position": { "x": 410, "y": 390 } },
+    { "id": "cracked_crown", "name": "Cracked Crown", "type": "battle", "layer": "dark_skin", "biome": "obsidian_ridge", "tier": 5, "corruption": 2, "position": { "x": 490, "y": 375 } },
+    { "id": "null_stone", "name": "Null Stone", "type": "battle", "layer": "dark_skin", "biome": "obsidian_ridge", "tier": 5, "corruption": 1, "position": { "x": 360, "y": 390 }, "labelOffset": { "x": 0, "y": -12 } },
+
+    { "id": "silent_nexus", "name": "Silent Nexus", "type": "battle", "layer": "dark_veins", "biome": "anti_pulse", "tier": 5, "corruption": 2, "position": { "x": 145, "y": 510 }, "labelOffset": { "x": 0, "y": -12 } },
+    { "id": "jammed_signal", "name": "Jammed Signal", "type": "battle", "layer": "dark_veins", "biome": "anti_pulse", "tier": 5, "corruption": 3, "position": { "x": 210, "y": 555 } },
+    { "id": "dead_capillary", "name": "Dead Capillary", "type": "battle", "layer": "dark_veins", "biome": "anti_pulse", "tier": 6, "corruption": 3, "position": { "x": 240, "y": 605 } },
+
+    { "id": "wraith_hunt", "name": "Wraith Hunt", "type": "battle", "layer": "dark_veins", "biome": "hollow_veldt", "tier": 5, "corruption": 2, "position": { "x": 610, "y": 515 }, "labelOffset": { "x": 0, "y": -12 } },
+    { "id": "shadow_ambush", "name": "Shadow Ambush", "type": "battle", "layer": "dark_veins", "biome": "hollow_veldt", "tier": 6, "corruption": 3, "position": { "x": 660, "y": 575 } },
+    { "id": "hollow_rest", "name": "Hollow Rest", "type": "battle", "layer": "dark_veins", "biome": "hollow_veldt", "tier": 5, "corruption": 2, "position": { "x": 750, "y": 540 } },
+
+    { "id": "forced_pair", "name": "Forced Pair", "type": "battle", "layer": "dark_veins", "biome": "bound_rot", "tier": 5, "corruption": 3, "position": { "x": 395, "y": 555 }, "labelOffset": { "x": 0, "y": -12 } },
+    { "id": "broken_bond", "name": "Broken Bond", "type": "battle", "layer": "dark_veins", "biome": "bound_rot", "tier": 6, "corruption": 3, "position": { "x": 455, "y": 595 } },
+
+    { "id": "dark_crossroads", "name": "Dark Crossroads", "type": "anomaly", "layer": "dark_veins", "biome": "bound_rot", "tier": 6, "corruption": 3, "position": { "x": 370, "y": 650 }, "bridgesTo": "main:rot_pocket" },
+
+    { "id": "self_consume", "name": "Self-Consume", "type": "battle", "layer": "dark_organs", "biome": "cannibal_chambers", "tier": 6, "corruption": 3, "position": { "x": 155, "y": 820 } },
+    { "id": "endless_hunger", "name": "Endless Hunger", "type": "battle", "layer": "dark_organs", "biome": "cannibal_chambers", "tier": 6, "corruption": 3, "position": { "x": 260, "y": 790 }, "labelOffset": { "x": 0, "y": -12 } },
+    { "id": "auto_digestion", "name": "Auto-Digestion", "type": "battle", "layer": "dark_organs", "biome": "cannibal_chambers", "tier": 5, "corruption": 3, "position": { "x": 200, "y": 745 }, "labelOffset": { "x": 0, "y": -12 } },
+
+    { "id": "shed_rejected", "name": "Shed Rejected", "type": "battle", "layer": "dark_organs", "biome": "hollow_cavity", "tier": 6, "corruption": 3, "position": { "x": 670, "y": 815 } },
+    { "id": "wrong_growth", "name": "Wrong Growth", "type": "battle", "layer": "dark_organs", "biome": "hollow_cavity", "tier": 6, "corruption": 3, "position": { "x": 565, "y": 800 }, "labelOffset": { "x": 0, "y": -12 } },
+    { "id": "unmolt", "name": "Unmolt", "type": "battle", "layer": "dark_organs", "biome": "hollow_cavity", "tier": 5, "corruption": 3, "position": { "x": 625, "y": 745 }, "labelOffset": { "x": 0, "y": -12 } },
+
+    { "id": "silence_heart", "name": "Silence Heart", "subtitle": "Dark Mid-Core · T7 · C4", "type": "boss", "layer": "dark_organs", "biome": "cannibal_chambers", "tier": 7, "corruption": 4, "position": { "x": 410, "y": 825 } },
+
+    { "id": "unraveling_thought", "name": "Unraveling Thought", "type": "battle", "layer": "dark_nerve", "biome": "anti_labyrinth", "tier": 7, "corruption": 4, "position": { "x": 250, "y": 945 }, "labelOffset": { "x": 0, "y": -12 } },
+    { "id": "stolen_attention", "name": "Stolen Attention", "type": "battle", "layer": "dark_nerve", "biome": "anti_labyrinth", "tier": 8, "corruption": 4, "position": { "x": 320, "y": 945 }, "labelOffset": { "x": 0, "y": -12 } },
+    { "id": "empty_echo", "name": "Empty Echo", "type": "battle", "layer": "dark_nerve", "biome": "anti_labyrinth", "tier": 7, "corruption": 4, "position": { "x": 280, "y": 1010 } },
+    { "id": "null_pulse", "name": "Null Pulse", "type": "battle", "layer": "dark_nerve", "biome": "anti_labyrinth", "tier": 8, "corruption": 4, "position": { "x": 200, "y": 1030 } },
+
+    { "id": "dreamless", "name": "Dreamless", "type": "battle", "layer": "dark_nerve", "biome": "void_dream", "tier": 8, "corruption": 4, "position": { "x": 550, "y": 950 }, "labelOffset": { "x": 0, "y": -12 } },
+    { "id": "forgotten", "name": "Forgotten", "type": "battle", "layer": "dark_nerve", "biome": "void_dream", "tier": 8, "corruption": 4, "position": { "x": 640, "y": 960 }, "labelOffset": { "x": 0, "y": -12 } },
+    { "id": "void_silence", "name": "Void Silence", "type": "battle", "layer": "dark_nerve", "biome": "void_dream", "tier": 8, "corruption": 4, "position": { "x": 595, "y": 1005 } },
+    { "id": "anti_wake", "name": "Anti-Wake", "type": "battle", "layer": "dark_nerve", "biome": "void_dream", "tier": 8, "corruption": 4, "position": { "x": 650, "y": 1020 } },
+
+    { "id": "pe_chamber", "name": "Pe Chamber", "type": "battle", "layer": "dark_core", "biome": "dark_core_approach", "tier": 8, "corruption": 5, "position": { "x": 395, "y": 1155 } },
+    { "id": "denial_vault", "name": "Denial Vault", "type": "battle", "layer": "dark_core", "biome": "dark_core_approach", "tier": 9, "corruption": 5, "position": { "x": 420, "y": 1230 }, "labelOffset": { "x": 0, "y": -15 } },
+
+    { "id": "taw_arena", "name": "ת", "subtitle": "Taw · True Ending · T9 · C5 (Ronnavyss peak)", "type": "endpoint", "layer": "dark_core", "biome": "dark_core_approach", "tier": 9, "corruption": 5, "position": { "x": 430, "y": 1270 } }
+  ],
+
+  "edges": [
+    { "from": "dark_entry", "to": "spore_void_node", "type": "standard" },
+    { "from": "dark_entry", "to": "chitin_wrath", "type": "standard" },
+    { "from": "spore_void_node", "to": "blood_flat", "type": "descent" },
+    { "from": "chitin_wrath", "to": "festering_pool", "type": "descent" },
+
+    { "from": "blood_flat", "to": "ash_carapace", "type": "standard" },
+    { "from": "blood_flat", "to": "vein_scar", "type": "standard" },
+    { "from": "festering_pool", "to": "necrotic_brood", "type": "standard" },
+    { "from": "necrotic_brood", "to": "grave_reek", "type": "standard" },
+    { "from": "black_quarry", "to": "cracked_crown", "type": "standard" },
+    { "from": "black_quarry", "to": "null_stone", "type": "standard" },
+
+    { "from": "vein_scar", "to": "silent_nexus", "type": "descent" },
+    { "from": "black_quarry", "to": "forced_pair", "type": "descent" },
+    { "from": "necrotic_brood", "to": "wraith_hunt", "type": "descent" },
+    { "from": "grave_reek", "to": "hollow_rest", "type": "descent" },
+
+    { "from": "silent_nexus", "to": "jammed_signal", "type": "standard" },
+    { "from": "jammed_signal", "to": "dead_capillary", "type": "standard" },
+    { "from": "forced_pair", "to": "broken_bond", "type": "standard" },
+    { "from": "broken_bond", "to": "wraith_hunt", "type": "standard" },
+    { "from": "wraith_hunt", "to": "shadow_ambush", "type": "standard" },
+    { "from": "shadow_ambush", "to": "hollow_rest", "type": "standard" },
+
+    { "from": "broken_bond", "to": "dark_crossroads", "type": "anomaly_bleed" },
+
+    { "from": "dead_capillary", "to": "auto_digestion", "type": "descent" },
+    { "from": "broken_bond", "to": "silence_heart", "type": "descent" },
+    { "from": "shadow_ambush", "to": "unmolt", "type": "descent" },
+
+    { "from": "auto_digestion", "to": "self_consume", "type": "standard" },
+    { "from": "auto_digestion", "to": "endless_hunger", "type": "standard" },
+    { "from": "unmolt", "to": "shed_rejected", "type": "standard" },
+    { "from": "unmolt", "to": "wrong_growth", "type": "standard" },
+    { "from": "endless_hunger", "to": "silence_heart", "type": "standard" },
+    { "from": "wrong_growth", "to": "silence_heart", "type": "standard" },
+
+    { "from": "silence_heart", "to": "unraveling_thought", "type": "descent" },
+    { "from": "silence_heart", "to": "dreamless", "type": "descent" },
+
+    { "from": "unraveling_thought", "to": "stolen_attention", "type": "standard" },
+    { "from": "stolen_attention", "to": "empty_echo", "type": "standard" },
+    { "from": "empty_echo", "to": "null_pulse", "type": "standard" },
+    { "from": "dreamless", "to": "forgotten", "type": "standard" },
+    { "from": "forgotten", "to": "void_silence", "type": "standard" },
+    { "from": "void_silence", "to": "anti_wake", "type": "standard" },
+
+    { "from": "empty_echo", "to": "pe_chamber", "type": "descent" },
+    { "from": "void_silence", "to": "pe_chamber", "type": "descent" },
+    { "from": "pe_chamber", "to": "denial_vault", "type": "standard" },
+    { "from": "denial_vault", "to": "taw_arena", "type": "standard" }
+  ],
+
+  "specials": []
+}

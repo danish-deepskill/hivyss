@@ -38,18 +38,20 @@ Unit instances (`Unit` class) hold only per-instance state (hp, position, cooldo
 
 ---
 
-## 3. Component-like Hooks (Combat Hooks)
+## 3. Component-like Hooks (Combat Hooks) — RETIRED Phase 9 Batch 3 (2026-04-17)
 
-**Status:** Implemented
-**Files:** `types.ts` (CombatHooks), `systems/CombatSystem.ts`, individual unit files
+**Status:** Retired. All unit behavior is now data-driven via the ability/effect/modifier systems.
 
-Instead of inheritance (`MeleeUnit extends Unit`), unit-specific behavior is defined as detachable hook objects (`CombatHooks`). Each unit optionally exports a `combat` object with hooks like `onAttack`, `afterHit`, `onDeath`, `modifyDamage`. CombatSystem calls these via trait lookup — no switch/case, no subclasses.
+**What replaced it:**
+- **Basic attack** — `UnitDef.defaultAbility: string` routes through the multi-target attack cycle (CombatSystem) → pipeline → calculate/modify/apply/post_apply.
+- **Passive behaviors** — `UnitDef.auraModifier`, `UnitDef.selfModifier`, `UnitDef.passiveHeal` dispatched by the IP-5 passive tick loop.
+- **Death triggers** — `UnitDef.deathAbility: string` queued by `applyDeathTriggerPhase`.
+- **Effects** — `AbilityDef.appliesEffects: string[]` applied by `applyEffectsPhase`, gated by `tiers.*.effectChance` at queue time.
+- **AOE spread** — `AbilityDef.aoeRider: { effect, radius, targetCount, excludePrimary }` applied by `applyAoeRiderPhase`.
+- **Damage shaping** — `AbilityDef.targetFalloff: number[]`, `AbilityDef.overchargeEvery: number`, `AbilityDef.chainRange: number`.
+- **FX dispatchers** — `setHealFxDispatcher`, `setDotDispatcher`, `setDeathTriggerDispatcher`, `setStunFxDispatcher`, `setAoeRiderAliveAccessor` — module-level callbacks set by CombatSystem constructor.
 
-**Available hooks:** `onSpawn`, `onUpdate`, `onAttack`, `afterHit`, `onDeath`, `modifyDamage`, `modifyAllyDamage`, `getAtk`
-
-**Do not:**
-- Create Unit subclasses for special behavior — use combat hooks instead
-- Add switch/case on unit type in CombatSystem — add a hook to the unit file
+**Do not** add a `combat?: CombatHooks` field to UnitModule — the interface is gone. Compose unit behavior from ability data.
 
 ---
 

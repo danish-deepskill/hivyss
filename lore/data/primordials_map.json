@@ -1,0 +1,98 @@
+{
+  "_comment": "The Primordials — 5 transcendent T10 (Quettavyss) entities. Pre-shatter wholeness. Post-Dark-Core unlock content. Their names use Coptic script letters because Greek/Phoenician alphabets cannot express what they are. No layers, no zones, no edges between them — they exist outside the cosmology that shattered them.",
+
+  "meta": {
+    "variant": "primordials",
+    "title": "THE PRIMORDIALS — pre-shatter wholeness",
+    "subtitle": "Ϸ Shei · ϯ Dei · ϥ Fei · ϫ Djandja · ϭ Tchima · all T10 (Quettavyss) · post-ω · post-ת",
+    "width": 900,
+    "height": 900,
+    "bgGradient": [
+      { "offset": "0%", "color": "#000008" },
+      { "offset": "40%", "color": "#04020a" },
+      { "offset": "70%", "color": "#020208" },
+      { "offset": "100%", "color": "#000000" }
+    ]
+  },
+
+  "layers": [],
+
+  "zones": [],
+
+  "nodes": [
+    {
+      "id": "shei",
+      "name": "Ϸ",
+      "subtitle": "Shei · The First · Being",
+      "type": "primordial",
+      "tier": 10,
+      "position": { "x": 450, "y": 200 },
+      "labelOffset": { "x": 0, "y": 8 },
+      "useGradient": "primordial_shei",
+      "stroke": "#a0c0ff"
+    },
+    {
+      "id": "dei",
+      "name": "ϯ",
+      "subtitle": "Dei · The Shape · Form",
+      "type": "primordial",
+      "tier": 10,
+      "position": { "x": 212, "y": 373 },
+      "labelOffset": { "x": 0, "y": 8 },
+      "useGradient": "primordial_dei",
+      "stroke": "#e090e0"
+    },
+    {
+      "id": "fei",
+      "name": "ϥ",
+      "subtitle": "Fei · The Hunger · Desire",
+      "type": "primordial",
+      "tier": 10,
+      "position": { "x": 303, "y": 652 },
+      "labelOffset": { "x": 0, "y": 8 },
+      "useGradient": "primordial_fei",
+      "stroke": "#e08070"
+    },
+    {
+      "id": "djandja",
+      "name": "ϫ",
+      "subtitle": "Djandja · The Echo · Continuity",
+      "type": "primordial",
+      "tier": 10,
+      "position": { "x": 597, "y": 652 },
+      "labelOffset": { "x": 0, "y": 8 },
+      "useGradient": "primordial_djandja",
+      "stroke": "#80e0a0"
+    },
+    {
+      "id": "tchima",
+      "name": "ϭ",
+      "subtitle": "Tchima · The Turning · Change",
+      "type": "primordial",
+      "tier": 10,
+      "position": { "x": 688, "y": 373 },
+      "labelOffset": { "x": 0, "y": 8 },
+      "useGradient": "primordial_tchima",
+      "stroke": "#d090ff"
+    }
+  ],
+
+  "edges": [],
+
+  "specials": [
+    { "type": "starfield", "count": 90, "seed": 17 },
+
+    { "type": "scripture", "position": { "x": 450, "y": 458 }, "text": "before the shattering — the unnameable five", "color": "#666688", "fontSize": 11 },
+    { "type": "scripture", "position": { "x": 450, "y": 478 }, "text": "all Greek and Phoenician are their fragments", "color": "#444466", "fontSize": 9 },
+
+    { "type": "scripture", "position": { "x": 450, "y": 270 }, "text": "\u201cI am, therefore everything else is.\u201d", "color": "#a0c0ff", "fontSize": 9 },
+    { "type": "scripture", "position": { "x": 212, "y": 443 }, "text": "\u201cI was the first to choose to be something.\u201d", "color": "#e090e0", "fontSize": 9 },
+    { "type": "scripture", "position": { "x": 303, "y": 722 }, "text": "\u201cI was the first to want.\u201d", "color": "#e08070", "fontSize": 9 },
+    { "type": "scripture", "position": { "x": 597, "y": 722 }, "text": "\u201cI refused to end with myself.\u201d", "color": "#80e0a0", "fontSize": 9 },
+    { "type": "scripture", "position": { "x": 688, "y": 443 }, "text": "\u201cI became something other than I was.\u201d", "color": "#d090ff", "fontSize": 9 },
+
+    { "type": "scripture", "position": { "x": 450, "y": 825 }, "text": "no edges connect them — each is a singular encounter", "color": "#555577", "fontSize": 8 },
+    { "type": "scripture", "position": { "x": 450, "y": 845 }, "text": "no Greek or Phoenician will ever reach Quettavyss naturally", "color": "#444466", "fontSize": 8 },
+    { "type": "scripture", "position": { "x": 450, "y": 865 }, "text": "to face one is to face the original of yourself", "color": "#666688", "fontSize": 8, "fontStyle": "italic" }
+  ]
+}

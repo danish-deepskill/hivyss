@@ -246,7 +246,7 @@ export class MainMenuScene extends Phaser.Scene {
           facing: dir, bob: 0, state: 'march',
           atkCd: 0, atkRate: def.atkRate,
           trait: def.trait, hp: def.hp, maxHp: def.hp,
-          burrowed: false, hitCount: 0, foreswingTimer: 0, backswingTimer: 0,
+          burrowed: false, foreswingTimer: 0, backswingTimer: 0,
         },
       });
     }

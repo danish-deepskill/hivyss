@@ -1,9 +1,15 @@
 import Phaser from 'phaser';
-import type { UnitDef, Side, UnitState, StatusEffect, RenderUnit, Route, AttackRange, GenePalette } from '../types';
+import type { UnitDef, Side, UnitState, RenderUnit, Route, AttackRange, GenePalette, ComponentTag, UnitPersistent, SelfModifierConfig, AuraModifierConfig, PassiveHealConfig } from '../types';
+import { hasActiveEffect } from '../systems/EffectSystem';
+import type { DamageType } from '../config/combat/damageTypes';
+import type { ResistanceTier } from '../config/combat/resistances';
+import type { Modifier } from '../systems/ModifierSystem';
+import type { ActiveEffect } from '../config/combat/effects/types';
 import { resolveColors } from '../config/Palettes';
 import { SPD_MULT } from '../config/Constants';
 import { getGroundY } from '../config/RouteMatrix';
 import { drawUnit } from '../units/registry';
+import { UNIT_COMPONENTS } from '../systems/EntityComponents';
 
 let _uid = 0;
 function uid(): number { return ++_uid; }
@@ -46,9 +52,15 @@ export class Unit extends Phaser.GameObjects.Container {
   dmgFlash: number;
   dead: boolean;
 
+  // Per-unit ability/behavior fields copied from def in init().
+  defaultAbility?: string;
+  deathAbility?: string;
+  selfModifier?: SelfModifierConfig;
+  auraModifier?: AuraModifierConfig;
+  passiveHeal?: PassiveHealConfig;
+
   // Direct properties (hot-path / rendering)
   burrowed: boolean;
-  hitCount: number;
   passedEnemies: number;
   ambush: boolean;
   _swinging: boolean;
@@ -60,11 +72,33 @@ export class Unit extends Phaser.GameObjects.Container {
   knockForce: number;
   knockResist: number;
 
-  // Effect system
-  effects: Map<string, StatusEffect>;
+  // Mendwing passive-heal cooldown (plain field, not an effect).
+  healTimer: number;
 
-  // Dynamic properties set by combat system
+  components: Set<ComponentTag>;
+
+  // Per-damage-type resistance tiers. baseResistance is the immutable
+  // spawn-time copy (for revert paths); resistance is the live
+  // mutable view modifiers can shift.
+  baseResistance: Partial<Record<DamageType, ResistanceTier>>;
+  resistance: Partial<Record<DamageType, ResistanceTier>>;
+
+  // Battle-scope primitives — cleared by init() on pool recycle.
+  activeEffects: ActiveEffect[];
+  modifiers: Modifier[];
+  resources: Record<string, number>;
+  /** Persistent state that SURVIVES pool recycle. Do not reset in init(). */
+  persistent: UnitPersistent;
+
   _spawned?: boolean;
+  /**
+   * Death-trigger re-entry latch. _applyDeathEffectsPhase CHECKS only;
+   * applyDeathTriggerPhase CHECKS then SETS before the `!deathAbility`
+   * early-return. Resets in init() on pool recycle.
+   */
+  _deathTriggerFired?: boolean;
+  /** Aura death-cleanup re-entry latch. Resets in init(). */
+  _auraCleanedUp?: boolean;
 
   // Graphics
   gfx: Phaser.GameObjects.Graphics;
@@ -106,7 +140,6 @@ export class Unit extends Phaser.GameObjects.Container {
     this.dmgFlash = 0;
     this.dead = false;
     this.burrowed = false;
-    this.hitCount = 0;
     this.passedEnemies = 0;
     this.ambush = false;
     this._swinging = false;
@@ -117,7 +150,18 @@ export class Unit extends Phaser.GameObjects.Container {
     this.poiseAccum = 0;
     this.knockForce = 0;
     this.knockResist = 0;
-    this.effects = new Map();
+    this.healTimer = 0;
+    this.components = new Set();
+    this.baseResistance = {};
+    this.resistance = {};
+
+    // Phase 5 primitives — empty on first construction. init() resets
+    // battle-scope (activeEffects, modifiers, resources); persistent
+    // is initialized ONCE here and never cleared by init().
+    this.activeEffects = [];
+    this.modifiers = [];
+    this.resources = {};
+    this.persistent = {};
 
     // Graphics children — created once, reused across pool cycles
     this.gfx = scene.add.graphics();
@@ -161,6 +205,11 @@ export class Unit extends Phaser.GameObjects.Container {
     this.route = def.route ?? 'land';
     this.currentRoute = this.route;
     this.attackRange = def.attackRange ?? 'melee';
+    this.defaultAbility = def.defaultAbility;
+    this.deathAbility = def.deathAbility;
+    this.selfModifier = def.selfModifier;
+    this.auraModifier = def.auraModifier;
+    this.passiveHeal = def.passiveHeal;
 
     this.state = 'march';
     this.facing = isPlayer ? 1 : -1;
@@ -170,7 +219,6 @@ export class Unit extends Phaser.GameObjects.Container {
     this.dead = false;
 
     this.burrowed = false;
-    this.hitCount = 0;
     this.passedEnemies = 0;
     this.ambush = false;
     this._swinging = false;
@@ -184,9 +232,35 @@ export class Unit extends Phaser.GameObjects.Container {
     this.poiseAccum = 0;
     this.knockForce = def.knockForce ?? 0;
     this.knockResist = def.knockResist ?? 0;
+    this.healTimer = 0;
 
-    this.effects.clear();
+    // Battle-scope reset. `persistent` is NOT cleared.
+    this.activeEffects.length = 0;
+    this.modifiers.length = 0;
+    for (const k in this.resources) delete this.resources[k];
+
+    this.components.clear();
+    for (const c of UNIT_COMPONENTS) this.components.add(c);
+
+    // Resistance: refill from def; omitted damage types stay absent
+    // (default 'normal' at lookup). Both copies start identical.
+    for (const k in this.baseResistance) delete (this.baseResistance as Record<string, unknown>)[k];
+    for (const k in this.resistance) delete (this.resistance as Record<string, unknown>)[k];
+    if (def.resistance) {
+      for (const k of Object.keys(def.resistance) as DamageType[]) {
+        const tier = def.resistance[k];
+        if (tier !== undefined) {
+          this.baseResistance[k] = tier;
+          this.resistance[k] = tier;
+        }
+      }
+    }
+
+    // Reset scratch latches so pool-recycled units don't inherit
+    // previous-life state.
     this._spawned = undefined;
+    this._deathTriggerFired = false;
+    this._auraCleanedUp = false;
 
     this.setPosition(Math.round(x), Math.round(getGroundY(this.currentRoute) - def.h));
     this.setActive(true);
@@ -205,71 +279,6 @@ export class Unit extends Phaser.GameObjects.Container {
     this.hpBar.clear();
   }
 
-  // --- Effect system helpers ---
-
-  setEffect(type: string, duration: number, accumulator?: number): void {
-    const existing = this.effects.get(type);
-    if (existing) {
-      existing.duration = duration;
-      if (accumulator !== undefined) existing.accumulator = accumulator;
-    } else {
-      this.effects.set(type, { duration, accumulator: accumulator ?? 0 });
-    }
-  }
-
-  getEffect(type: string): StatusEffect | undefined {
-    return this.effects.get(type);
-  }
-
-  hasEffect(type: string): boolean {
-    const e = this.effects.get(type);
-    return e !== undefined && e.duration > 0;
-  }
-
-  // --- Backward-compat accessors (used by combat hooks and CombatSystem) ---
-  // These will be removed in Step 13 cleanup
-
-  get slowTimer(): number { return this.effects.get('slow')?.duration ?? 0; }
-  set slowTimer(v: number) { this.setEffect('slow', v); }
-
-  get poisonTimer(): number { return this.effects.get('poison')?.duration ?? 0; }
-  set poisonTimer(v: number) { this.setEffect('poison', v); }
-
-  get poisonDmgAcc(): number { return this.effects.get('poison')?.accumulator ?? 0; }
-  set poisonDmgAcc(v: number) {
-    const e = this.effects.get('poison');
-    if (e) e.accumulator = v;
-    else this.effects.set('poison', { duration: 0, accumulator: v });
-  }
-
-  get burnTimer(): number { return this.effects.get('burn')?.duration ?? 0; }
-  set burnTimer(v: number) { this.setEffect('burn', v); }
-
-  get burnDmgAcc(): number { return this.effects.get('burn')?.accumulator ?? 0; }
-  set burnDmgAcc(v: number) {
-    const e = this.effects.get('burn');
-    if (e) e.accumulator = v;
-    else this.effects.set('burn', { duration: 0, accumulator: v });
-  }
-
-  get stunTimer(): number { return this.effects.get('stun')?.duration ?? 0; }
-  set stunTimer(v: number) { this.setEffect('stun', v); }
-
-  get shieldAbsorbTimer(): number { return this.effects.get('shieldAbsorb')?.duration ?? 0; }
-  set shieldAbsorbTimer(v: number) { this.setEffect('shieldAbsorb', v); }
-
-  get burrowTimer(): number { return this.effects.get('burrow')?.duration ?? 0; }
-  set burrowTimer(v: number) { this.setEffect('burrow', v); }
-
-  get summonTimer(): number { return this.effects.get('summon')?.duration ?? 0; }
-  set summonTimer(v: number) { this.setEffect('summon', v); }
-
-  get regenTimer(): number { return this.effects.get('regen')?.duration ?? 0; }
-  set regenTimer(v: number) { this.setEffect('regen', v); }
-
-  get healTimer(): number { return this.effects.get('heal')?.duration ?? 0; }
-  set healTimer(v: number) { this.setEffect('heal', v); }
-
   // --- Collision bounds ---
 
   get worldLeft(): number { return this.x; }
@@ -287,12 +296,8 @@ export class Unit extends Phaser.GameObjects.Container {
     if (this.backswingTimer > 0) this.backswingTimer = Math.max(0, this.backswingTimer - dt);
     if (this.poiseAccum > 0) this.poiseAccum = Math.max(0, this.poiseAccum - 10 * dt); // recover 10/s out of 100
 
-    // Tick effects map (decrement durations)
-    for (const [_key, effect] of this.effects) {
-      if (effect.duration > 0) {
-        effect.duration = Math.max(0, effect.duration - dt);
-      }
-    }
+    // ActiveEffect durations tick via CombatSystem.resolve's
+    // updateEffects call (once per combat frame, not per Unit).
 
     // Bob animation
     this.bob += dt * (this.state === 'march' ? 10 : 3);
@@ -302,7 +307,7 @@ export class Unit extends Phaser.GameObjects.Container {
   }
 
   getSpeed(): number {
-    return this.slowTimer > 0 ? this.spd * 0.45 : this.spd;
+    return hasActiveEffect(this, 'slow') ? this.spd * 0.45 : this.spd;
   }
 
   march(dt: number): void {
@@ -317,11 +322,6 @@ export class Unit extends Phaser.GameObjects.Container {
 
   canAttack(): boolean {
     return this.atkCd <= 0;
-  }
-
-  doAttack(): number {
-    this.atkCd = 1 / this.atkRate;
-    return Math.max(1, this.atk + ((Math.random() * 6) | 0) - 3);
   }
 
   takeDamage(dmg: number): void {
@@ -352,8 +352,9 @@ export class Unit extends Phaser.GameObjects.Container {
     const uy = bob;
 
     // Slow tint
+    const slowed = hasActiveEffect(this, 'slow');
     let primary = this.primary;
-    if (this.slowTimer > 0) {
+    if (slowed) {
       const a = primary;
       const b = 0x80c8ff;
       const t = 0.4;
@@ -368,7 +369,7 @@ export class Unit extends Phaser.GameObjects.Container {
       g.fillEllipse(this.unitW / 2, getGroundY('land') - this.y + 1, this.unitW / 2 + 2, 3);
     }
 
-    if (this.slowTimer > 0) g.setAlpha(0.85);
+    if (slowed) g.setAlpha(0.85);
 
     // Draw the ant body using the renderer
     const renderUnit: RenderUnit = {
@@ -390,7 +391,7 @@ export class Unit extends Phaser.GameObjects.Container {
     }
 
     // Slow indicator
-    if (this.slowTimer > 0) {
+    if (slowed) {
       g.fillStyle(0x80c8ff, 0.3);
       g.fillCircle(this.unitW / 2, uy + this.unitH / 2, this.unitW * 0.55);
     }

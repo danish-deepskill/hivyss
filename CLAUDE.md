@@ -1,9 +1,9 @@
 # Hivyss — Claude Code Context
 
 ## Required Reading
-- `app/src/DESIGN_PATTERNS.md` — All implemented and planned design patterns. Read before modifying architecture.
-- `app/src/GAME_DESIGN.md` — Future game mechanics (castes, routes, evolution, mutation, roguelike structure). Read before designing new features.
-- `app/src/UI_ARCHITECTURE.md` — Scene management, 4-layer rendering, canvas UI layout. Read before modifying scenes or UI.
+- `app/docs/DESIGN_PATTERNS.md` — All implemented and planned design patterns. Read before modifying architecture.
+- `app/docs/GAME_DESIGN.md` — Future game mechanics (castes, routes, evolution, mutation, roguelike structure). Read before designing new features.
+- `app/docs/UI_ARCHITECTURE.md` — Scene management, 4-layer rendering, canvas UI layout. Read before modifying scenes or UI.
 - `app/src/units/CLAUDE.md` — Unit file structure, combat hooks, draw function conventions.
 
 ## Tech Stack
