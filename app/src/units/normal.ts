@@ -35,9 +35,8 @@ const hardshellDef: UnitDef = {
   desc: "Slow Wall",
   route: "land",
   attackRange: "melee",
-  tier: 1,
+  tier: 0,
   incubation: 5,
-  knockResist: 30,
   caste: "soldier",
   resistance: { blunt: 'strong' },
   defaultAbility: "jaw_strike",
@@ -62,7 +61,7 @@ const grubDef: UnitDef = {
   desc: "Fodder",
   route: "land",
   attackRange: "melee",
-  tier: 1,
+  tier: 0,
   incubation: 3,
   caste: "soldier",
   defaultAbility: "jaw_strike",
@@ -87,7 +86,7 @@ const prickerDef: UnitDef = {
   desc: "Fragile Poker",
   route: "land",
   attackRange: "ranged",
-  tier: 1,
+  tier: 0,
   incubation: 5,
   caste: "soldier",
   defaultAbility: "pricker_jab",
@@ -114,9 +113,8 @@ const domebackDef: UnitDef = {
   desc: "Shell Wall",
   route: "land",
   attackRange: "melee",
-  tier: 2,
+  tier: 1,
   incubation: 9,
-  knockResist: 20,
   caste: "soldier",
   defaultAbility: "jaw_strike",
 };
@@ -140,7 +138,7 @@ const skitterlingDef: UnitDef = {
   desc: "Glass Cannon",
   route: "land",
   attackRange: "melee",
-  tier: 2,
+  tier: 1,
   incubation: 4,
   caste: "soldier",
   defaultAbility: "jaw_strike",
@@ -170,9 +168,8 @@ const mendwingDef: UnitDef = {
   desc: "Heals Allies",
   route: "land",
   attackRange: "ranged",
-  tier: 2,
+  tier: 1,
   incubation: 8,
-  knockResist: 5,
   caste: "soldier",
   defaultAbility: "needle_shot",
   passiveHeal: {
@@ -204,9 +201,8 @@ const cinderflyDef: UnitDef = {
   desc: "Burn AOE",
   route: "land",
   attackRange: "melee",
-  tier: 3,
+  tier: 2,
   incubation: 8,
-  knockForce: 10,
   caste: "soldier",
   resistance: { heat: 'strong', cold: 'weak' },
   defaultAbility: "fire_bite",
@@ -231,7 +227,7 @@ const longeyeDef: UnitDef = {
   desc: "Sniper",
   route: "land",
   attackRange: "ranged",
-  tier: 3,
+  tier: 2,
   incubation: 14,
   caste: "soldier",
   defaultAbility: "piercing_shot",
@@ -260,9 +256,8 @@ const wardlingDef: UnitDef = {
   desc: "-20% Ally DMG",
   route: "land",
   attackRange: "melee",
-  tier: 3,
+  tier: 2,
   incubation: 11,
-  knockResist: 20,
   caste: "soldier",
   defaultAbility: "jaw_strike",
   auraModifier: {
@@ -275,9 +270,10 @@ const wardlingDef: UnitDef = {
 
 // --- T4 elites (110-130n) ---
 
-// Bashguard's knockForce=100 drives the knockback effect (applied by
-// default on blunt damage) — poise accumulation + stagger via
-// knockback.onApply. Highest knockForce in the roster.
+// Bashguard drives the knockback effect via bash_strike's tier data
+// (homogenized knockForce 100, highest in the roster). Blunt damage
+// applies the knockback default effect; poise accumulation + stagger
+// run through knockback.onApply.
 const bashguardDef: UnitDef = {
   name: "Bashguard",
   ico: "\u{1F98F}",
@@ -297,11 +293,9 @@ const bashguardDef: UnitDef = {
   desc: "Knockback Bruiser",
   route: "land",
   attackRange: "melee",
-  tier: 4,
+  tier: 3,
   incubation: 14,
   caste: "soldier",
-  knockForce: 100,
-  knockResist: 30,
   defaultAbility: "bash_strike",
 };
 
@@ -327,10 +321,8 @@ const stormflyDef: UnitDef = {
   desc: "Chain Lightning",
   route: "land",
   attackRange: "ranged",
-  tier: 4,
+  tier: 3,
   incubation: 18,
-  knockForce: 20,
-  knockResist: 10,
   caste: "elite",
   defaultAbility: "chain_lightning",
 };

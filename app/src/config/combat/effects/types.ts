@@ -87,4 +87,8 @@ export interface ActiveEffect {
   stacks: number;
   source?: unknown;
   accumulator?: number;
+  /** Resolved tier at application time — pins tiered hooks (burn chunk) to the tier the target actually resisted at. */
+  appliedTier: ResistanceTier;
+  /** Poise force carried by knockback-applying abilities. Read by knockback.onApply. */
+  knockForce?: number;
 }

@@ -127,7 +127,14 @@
       "Bash(where python:*)",
       "Bash(where python3:*)",
       "mcp__pixelforge__forge_animation",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "WebFetch(domain:fonts.googleapis.com)",
+      "Bash(curl -s -H \"User-Agent: Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/120.0.0.0 Safari/537.36\" \"https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap\")",
+      "Bash(curl -s -o app/public/fonts/press-start-2p.woff2 \"https://fonts.gstatic.com/s/pressstart2p/v16/e3t4euO8T-267oIAQAu6jDQyK3nVivM.woff2\")",
+      "Bash(awk 'NR>=353 && NR<=395' c:/Files/Phaser/hivyss/app/docs/MECHANICS_ROADMAP.md)",
+      "Bash(awk 'NR>=353 && NR<=395 { gsub\\(/[^[:print:]]/, \"\"\\); if \\(length\\($0\\) > 500\\) { print NR \": [LONG] \" substr\\($0, 1, 300\\) \" ...\"; } else { print NR \": \" $0; } }' c:/Files/Phaser/hivyss/app/docs/MECHANICS_ROADMAP.md)",
+      "Bash(awk 'NR==358' c:/Files/Phaser/hivyss/app/docs/MECHANICS_ROADMAP.md)",
+      "Bash(awk 'NR==388' c:/Files/Phaser/hivyss/app/docs/MECHANICS_ROADMAP.md)"
     ],
     "additionalDirectories": [
       "C:\\Work\\Simulation\\hivyss\\app\\src\\draws",

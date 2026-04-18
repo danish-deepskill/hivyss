@@ -30,3 +30,15 @@ export function linearDamageTiersWithEffect(
   }
   return base;
 }
+
+/** Linear tiers with a knockForce that scales parallel to dmgMult — "resistance means less knockback" keeps stagger cadence aligned with damage scaling. At baseKnockForce=100: weakest 150, weaker 130, weak 115, normal 100, strong 85, stronger 70, strongest 50. */
+export function linearDamageTiersWithKnockForce(
+  baseKnockForce: number,
+  scale: number = 1,
+): Record<ResistanceTier, AbilityTierStats> {
+  const base = linearDamageTiers(scale);
+  for (const k of Object.keys(base) as ResistanceTier[]) {
+    base[k].knockForce = Math.round(baseKnockForce * base[k].dmgMult);
+  }
+  return base;
+}

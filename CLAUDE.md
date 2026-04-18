@@ -4,7 +4,7 @@
 - `app/docs/DESIGN_PATTERNS.md` — All implemented and planned design patterns. Read before modifying architecture.
 - `app/docs/GAME_DESIGN.md` — Future game mechanics (castes, routes, evolution, mutation, roguelike structure). Read before designing new features.
 - `app/docs/UI_ARCHITECTURE.md` — Scene management, 4-layer rendering, canvas UI layout. Read before modifying scenes or UI.
-- `app/src/units/CLAUDE.md` — Unit file structure, combat hooks, draw function conventions.
+- `app/src/units/CLAUDE.md` — Unit file structure, data-driven unit behavior fields, draw function conventions.
 
 ## Tech Stack
 - Phaser 3.90, Canvas renderer (not WebGL)
@@ -14,7 +14,7 @@
 
 ## Key Architecture Decisions
 - Units are data-driven (`UnitDef`) with procedural draw functions, not sprites
-- No class inheritance for unit behavior — use `CombatHooks` (component-like pattern)
+- Unit behavior is data-driven via `UnitDef` fields (`defaultAbility`, `deathAbility`, `auraModifier`, `selfModifier`, `passiveHeal`) — no class inheritance, no hook interfaces. See `app/src/units/CLAUDE.md` for the full field list.
 - Cross-system events go through typed `EventBus`, not Phaser `scene.events`
 - Units are pooled via `UnitPool` — never `new Unit()` or `destroy()` in gameplay code
 - Game logic lives in `systems/` managers, not in Scene classes

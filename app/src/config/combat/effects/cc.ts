@@ -71,8 +71,11 @@ export const ccEffects: Record<string, EffectDef> = {
 
   // Knockback — poise accumulation + stagger. Default effect for blunt
   // damage via DEFAULT_EFFECTS; can be declared explicitly in
-  // appliesEffects. Attacker reaches `knockForce` via ctx.source
-  // (forwarded by applyEffectsPhase from event.attacker).
+  // appliesEffects. Force is carried on the ActiveEffect instance from
+  // the ability's tier table (ability.tiers[effectiveTier].knockForce),
+  // plumbed by applyEffectsPhase. Target resistance to knockback = target
+  // resistance to the ability's damage type — the tier lookup at the
+  // apply site already accounts for it.
   //
   // WHY stackable: applyEffect's non-stackable dedupe would skip
   // onApply on a target already carrying the one-frame transient
@@ -86,9 +89,7 @@ export const ccEffects: Record<string, EffectDef> = {
     onHostDeath: 'cancel',
     onApply(target: EffectBearer, ctx: EffectContext) {
       const u = target as IUnit;
-      const attacker = ctx.source as IUnit | null | undefined;
-      const knockForce = attacker?.knockForce ?? 0;
-      const force = knockForce - u.knockResist;
+      const force = ctx.instance.knockForce ?? 0;
       if (force <= 0) return;
       u.poiseAccum += force;
       if (u.poiseAccum >= 100) {

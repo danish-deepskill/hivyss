@@ -10,11 +10,11 @@ Future Claude Code sessions: read this before modifying architecture. Do not rei
 **Status:** Implemented
 **Files:** `units/registry.ts`, `types.ts` (UnitDef), `config/EnemyDefs.ts`, `config/WaveDefs.ts`, `config/AbilityDefs.ts`
 
-All content (units, enemies, waves, abilities) is defined as pure data objects conforming to typed interfaces. The registry builds lookup maps (`UNIT_DEFS`, `DRAW_MAP`, `COMBAT_MAP`) from these definitions. Adding new content means adding data — no system code changes needed.
+All content (units, enemies, waves, abilities) is defined as pure data objects conforming to typed interfaces. The registry builds lookup maps (`UNIT_DEFS`, `DRAW_MAP`) from these definitions. Adding new content means adding data — no system code changes needed.
 
 **Key types:**
 - `UnitDef` — stats, visuals, cost, tier, incubation
-- `UnitModule` — bundles def + draw + optional combat hooks
+- `UnitModule` — bundles def + draw (unit behavior is data-driven via `UnitDef` fields — see §3 retirement notice)
 - `WaveDef` — enemy composition per wave
 - `AbilityDef` — ability stats and costs
 
@@ -23,9 +23,9 @@ Units are consolidated per geneline (`units/alpha.ts`, `units/normal.ts`). Each 
 
 1. Add the def to the appropriate geneline file (use `alphaDef()` helper for geneline units)
 2. Create a draw function in `draws/<geneline>/<unit>.ts`
-3. Add combat hooks (optional) in the same geneline file
+3. Wire unit behavior via `UnitDef` fields — `defaultAbility`, `deathAbility`, `auraModifier`, `selfModifier`, `passiveHeal`. No code hooks.
 4. Add to the `units` export record
-5. That's it — registry auto-builds UNIT_DEFS, DRAW_MAP, COMBAT_MAP from all geneline files
+5. That's it — registry auto-builds UNIT_DEFS and DRAW_MAP from all geneline files
 
 ---
 
@@ -168,7 +168,7 @@ Each game system is a standalone class with its own state and update loop. GameM
 | Manager | Responsibility |
 |---|---|
 | `GameManager` | Orchestrator — owns all systems, runs game loop |
-| `CombatSystem` | Unit targeting, damage, death, combat hooks |
+| `CombatSystem` | Unit targeting, damage resolution pipeline, death triggers, effect application |
 | `WaveManager` | Wave scheduling, enemy queue, stage progression |
 | `EconomyManager` | Nectar income, spending, balance |
 | `AbilityManager` | Player abilities, cooldowns, effects |
@@ -270,7 +270,7 @@ Add new route = add row/column. Change interaction = change one cell.
 
 **Enforcement at TWO levels** (Unreal GAS pattern):
 1. **Targeting** (`_findTarget`): route filter prevents selecting invalid targets for auto-attacks
-2. **Damage application** (`hitUnit`): `ctx.sourceUnit` tracks who is dealing damage. `hitUnit()` validates routes before applying — catches combat hooks and AOE that bypass targeting. No source (null) = ability-level damage, bypasses check.
+2. **Damage application** (`hitUnit`): `ctx.sourceUnit` tracks who is dealing damage. `hitUnit()` validates routes before applying — catches AOE riders and effect spreads that bypass targeting. No source (null) = ability-level damage, bypasses check.
 
 ```ts
 // CombatSystem.resolve() — tracks source
@@ -283,7 +283,7 @@ if (ctx.sourceUnit && !canAttack(source.route, source.attackRange, target.route)
 **`canAttack()` is a pure function** — takes primitives (route, attackRange, targetRoute), not objects. Testable, no circular dependencies.
 
 **Do not:**
-- Add route checks inside individual combat hooks — `hitUnit()` handles enforcement
+- Add route checks inside individual ability/effect subscribers — `hitUnit()` handles enforcement centrally
 - Create separate combat systems per route — one CombatSystem, one matrix
 - Hardcode route interactions in if/else — use the data matrix
 
@@ -340,15 +340,15 @@ Reusable DOM components used across multiple scenes. Each component owns its HTM
 **Status:** Implemented
 **Files:** `types.ts` (TierKey), `units/registry.ts` (TIER_DEFS)
 
-Tiers are numeric (1-11) internally, with display labels looked up from `TIER_DEFS`. This enables sorting, comparison, and tier-gated mechanics without string mapping.
+Tiers are numeric (0-10) internally, with display labels looked up from `TIER_DEFS`. This enables sorting, comparison, and tier-gated mechanics without string mapping.
 
 ```ts
-type TierKey = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
+type TierKey = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
-TIER_DEFS[3] // → { label: 'M', name: 'Megavyss', color: '#50a0e0' }
+TIER_DEFS[2] // → { label: 'MV', name: 'Megavyss', color: '#50a0e0' }
 ```
 
-Unit defs use `tier: 3`, UI reads `TIER_DEFS[def.tier].label` for display.
+Unit defs use `tier: 2`, UI reads `TIER_DEFS[def.tier].label` for display.
 
 ---
 
@@ -392,7 +392,6 @@ Migrates unit rendering from procedural Graphics API to sprite-based animation. 
 // UnitModule already has optional spriteAnim field
 interface UnitModule {
   def: UnitDef;
-  combat?: CombatHooks;
   draw: DrawFunction;            // procedural (always present as fallback)
   spriteAnim?: SpriteAnimDef;    // sprite (when atlas available)
 }
@@ -433,15 +432,15 @@ app/public/assets/sprites/
 - `redraw()` branches: sprite mode calls `updateSpriteAnim()`, procedural mode calls current logic
 - Facing via `sprite.setFlipX(facing === -1)` — all sprites authored facing right
 
-**Unit-specific animations:** Custom `AnimState` strings + overlay sprites for effects (rally chevrons, burrow dust). Combat hooks set boolean properties; overlays check `visibleWhen` conditions.
+**Unit-specific animations:** Custom `AnimState` strings + overlay sprites for effects (rally chevrons, burrow dust). Effect lifecycle hooks (onApply/onExpire) or passive ticks set boolean properties; overlays check `visibleWhen` conditions.
 
-**Migration path:** Per-unit, incremental. Add `spriteAnim` export → sprite renders. Remove export → procedural fallback. No system changes needed. When full geneline has sprites, consolidate unit files (def + spriteAnim + combat = ~30-50 lines per unit, possible per-geneline grouping).
+**Migration path:** Per-unit, incremental. Add `spriteAnim` export → sprite renders. Remove export → procedural fallback. No system changes needed. When full geneline has sprites, consolidate unit files (def + spriteAnim = ~30-50 lines per unit, possible per-geneline grouping).
 
 ---
 
 ### Comp System
 **When:** Mutation mechanic development
-Modular components attached to units (e.g., `CompFireBreath`, `CompArmorPlating`). A mutated unit = normal unit + comps. Extends the CombatHooks pattern into a general-purpose component system.
+Modular components attached to units (e.g., `CompFireBreath`, `CompArmorPlating`). A mutated unit = normal unit + comps. Extends the data-driven def pattern into a general-purpose component system scoped to mutations.
 
 ### Tick Bucketing
 **When:** 50+ entities on screen or heavy per-unit systems
@@ -480,9 +479,6 @@ interface UnitDef {
   defaultAbility: string;              // e.g. 'jaw_strike' — the unit's auto-attack ability
   passiveAbilities?: string[];         // checked every frame (rage, aura, etc.)
   deathAbility?: string;               // triggers on death (explosions, spawns)
-
-  // Hooks — complex behavior that can't be expressed as data
-  combat?: CombatHooks;                // existing system, kept for complex logic
 }
 ```
 
@@ -1243,12 +1239,12 @@ Extend ParticleManager with shape types (rings, squares/debris, lines/sparks, tr
 
 ## Architecture Rules
 
-1. **No inheritance for unit behavior** — use CombatHooks (component-like pattern)
+1. **No inheritance for unit behavior** — compose via `UnitDef` data fields (`defaultAbility`, `deathAbility`, `auraModifier`, `selfModifier`, `passiveHeal`). Combat hooks are retired (§3).
 2. **No Phaser scene.events for game logic** — use EventBus
 3. **No `new Unit()` in gameplay code** — use UnitPool
 4. **No game logic in Scene classes** — Scenes are thin UI wrappers around Managers
 5. **Content is data, not code** — UnitDef, WaveDef, AbilityDef are pure data objects
-6. **One file per unit** — each unit exports `def`, `draw`, optional `combat`
+6. **One file per unit** — each unit exports `def` and `draw` (behavior lives in `UnitDef` data fields, not hook exports)
 7. **Future: geneline folders** — when second geneline starts, restructure `units/` into `units/<geneline>/`
 8. **Snapshot before iterating mutable lists** — applies to AOE targets AND active effects. Copy the array first (`[...targets]`, `[...unit.activeEffects]`), then iterate. An onExpire/onDeath during iteration can add/remove entries mid-loop, causing skipped or double-processed items
-9. **Hooks never contain balance numbers, abilities never contain logic** — hooks define WHEN/HOW, ability data defines WHAT (damage, effects, tiers)
+9. **Effect lifecycle hooks never contain balance numbers, ability/effect data never contains imperative logic** — hooks define WHEN/HOW, ability/effect data defines WHAT (damage, effects, tiers)

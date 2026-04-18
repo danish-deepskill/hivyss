@@ -23,17 +23,17 @@ const UNITS: Record<string, UnitModule> = {
 
 // Tier display definitions
 export const TIER_DEFS: Record<TierKey, TierDef> = {
-  1:  { label: 'V', name: 'Vyss',       color: '#888888' },
-  2:  { label: 'K', name: 'Kilovyss',   color: '#60a060' },
-  3:  { label: 'M', name: 'Megavyss',   color: '#50a0e0' },
-  4:  { label: 'G', name: 'Gigavyss',   color: '#c080f0' },
-  5:  { label: 'T', name: 'Teravyss',   color: '#f0c040' },
-  6:  { label: 'P', name: 'Petavyss',   color: '#f06040' },
-  7:  { label: 'E', name: 'Exavyss',    color: '#ff4060' },
-  8:  { label: 'Z', name: 'Zettavyss',  color: '#ff2080' },
-  9:  { label: 'Y', name: 'Yottavyss',  color: '#ff10f0' },
-  10: { label: 'R', name: 'Ronnavyss',  color: '#ff00ff' },
-  11: { label: 'Q', name: 'Quettavyss', color: '#ffffff' },
+  0:  { label: 'V',  name: 'Vyss',       color: '#888888' },
+  1:  { label: 'KV', name: 'Kilovyss',   color: '#60a060' },
+  2:  { label: 'MV', name: 'Megavyss',   color: '#50a0e0' },
+  3:  { label: 'GV', name: 'Gigavyss',   color: '#c080f0' },
+  4:  { label: 'TV', name: 'Teravyss',   color: '#f0c040' },
+  5:  { label: 'PV', name: 'Petavyss',   color: '#f06040' },
+  6:  { label: 'EV', name: 'Exavyss',    color: '#ff4060' },
+  7:  { label: 'ZV', name: 'Zettavyss',  color: '#ff2080' },
+  8:  { label: 'YV', name: 'Yottavyss',  color: '#ff10f0' },
+  9:  { label: 'RV', name: 'Ronnavyss',  color: '#ff00ff' },
+  10: { label: 'QV', name: 'Quettavyss', color: '#ffffff' },
 };
 
 // Geneline display definitions

@@ -48,7 +48,7 @@ export interface WorldEntity {
 
 // --- Tier System ---
 
-export type TierKey = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
+export type TierKey = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 export type CasteKey = 'soldier' | 'elite' | 'royal';
 export type GeneLine = 'alpha';
 export type Route = 'air' | 'land' | 'tunnel';
@@ -157,8 +157,6 @@ export interface UnitDef {
   unlock?: string;
   foreswing?: number;      // [sec] wind-up time before damage lands (default: 30% of 1/atkRate)
   backswing?: number;      // [sec] cosmetic recovery after damage (default: 0.15)
-  knockForce?: number;     // [poise] fills target's poise meter per hit, 100 = instant stagger vs 0 resist (default: 0)
-  knockResist?: number;    // [poise] subtracted from incoming knockForce (default: 0)
   route?: Route;           // native route (default: 'land')
   attackRange?: AttackRange; // melee or ranged (default: 'melee')
   role: UnitRole;           // combat role: tank, dps, support, ranged
@@ -365,8 +363,6 @@ export interface IUnit extends WorldEntity {
   foreswingTimer: number;
   backswingTimer: number;
   poiseAccum: number;
-  knockForce: number;
-  knockResist: number;
 
   // Methods
   update(dt: number): void;
@@ -450,6 +446,8 @@ export interface AbilityTierStats {
   critChance?: number;
   /** Crit multiplier. Defaults to 2.0 when critChance is set and this is omitted. */
   critMult?: number;
+  /** Poise accumulation per hit for knockback.onApply. Omit = no knockback. */
+  knockForce?: number;
 }
 
 export interface AbilityDef {

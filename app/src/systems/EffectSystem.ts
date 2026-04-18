@@ -8,6 +8,7 @@ import type {
   EffectContext,
   ActiveEffect,
 } from '../config/combat/effects/types';
+import type { ResistanceTier } from '../config/combat/resistances';
 import { lookupEffect } from '../config/combat/effects';
 
 function contextOf(eff: ActiveEffect): EffectContext {
@@ -39,7 +40,7 @@ function contextOf(eff: ActiveEffect): EffectContext {
 export function applyEffect(
   target: EffectBearer,
   defOrName: EffectDef | string,
-  opts: { source?: unknown; remaining?: number } = {},
+  opts: { source?: unknown; remaining?: number; appliedTier?: ResistanceTier; knockForce?: number } = {},
 ): ActiveEffect | null {
   if (target.dead) return null;
 
@@ -69,6 +70,8 @@ export function applyEffect(
     remaining: opts.remaining ?? def.duration,
     stacks: 1,
     source: opts.source,
+    appliedTier: opts.appliedTier ?? 'normal',
+    knockForce: opts.knockForce,
   };
 
   if (!def.stackable) {

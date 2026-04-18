@@ -129,7 +129,7 @@ Each unit has a native route. Using the wrong route applies a debuff:
 | **Land** | Ranged only | Yes | No |
 | **Tunnel** | No | No | Yes |
 
-Cross-route specialists can break these rules via combat hooks.
+Cross-route specialists can break these rules via route-switching abilities or passive ticks.
 
 ### Deploy Controls
 - Click unit card = deploy to native route (default)
@@ -137,7 +137,7 @@ Cross-route specialists can break these rules via combat hooks.
 - Air units always go air, shift does nothing
 
 ### Runtime Route Switching
-Units can change route mid-battle via combat hooks:
+Units can change route mid-battle by assigning `u.currentRoute` from a passive tick or effect hook:
 ```ts
 // Example: air unit crash-lands when low HP
 u.currentRoute = 'land';

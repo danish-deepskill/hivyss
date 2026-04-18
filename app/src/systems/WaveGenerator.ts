@@ -31,7 +31,7 @@ function buildEnemyPool(geneline: string): EnemyPool {
 // Get all enemy keys up to a max tier
 function getEnemiesUpToTier(pool: EnemyPool, maxTier: number): string[] {
   const keys: string[] = [];
-  for (let t = 1; t <= maxTier; t++) {
+  for (let t = 0; t <= maxTier; t++) {
     if (pool.byTier[t]) keys.push(...pool.byTier[t]);
   }
   return keys;
@@ -49,11 +49,11 @@ interface DifficultyParams {
 
 function getDifficultyParams(difficulty: number): DifficultyParams {
   switch (difficulty) {
-    case 1: return { waveCount: 3, maxTier: 1, intervalMin: 2.5, intervalMax: 3.0, enemiesMin: 3, enemiesMax: 4 };
-    case 2: return { waveCount: 4, maxTier: 2, intervalMin: 2.0, intervalMax: 2.5, enemiesMin: 4, enemiesMax: 5 };
-    case 3: return { waveCount: 5, maxTier: 3, intervalMin: 1.5, intervalMax: 2.0, enemiesMin: 5, enemiesMax: 7 };
-    case 4: return { waveCount: 6, maxTier: 4, intervalMin: 1.0, intervalMax: 1.5, enemiesMin: 6, enemiesMax: 8 };
-    default: return { waveCount: 3, maxTier: 1, intervalMin: 2.5, intervalMax: 3.0, enemiesMin: 3, enemiesMax: 4 };
+    case 1: return { waveCount: 3, maxTier: 0, intervalMin: 2.5, intervalMax: 3.0, enemiesMin: 3, enemiesMax: 4 };
+    case 2: return { waveCount: 4, maxTier: 1, intervalMin: 2.0, intervalMax: 2.5, enemiesMin: 4, enemiesMax: 5 };
+    case 3: return { waveCount: 5, maxTier: 2, intervalMin: 1.5, intervalMax: 2.0, enemiesMin: 5, enemiesMax: 7 };
+    case 4: return { waveCount: 6, maxTier: 3, intervalMin: 1.0, intervalMax: 1.5, enemiesMin: 6, enemiesMax: 8 };
+    default: return { waveCount: 3, maxTier: 0, intervalMin: 2.5, intervalMax: 3.0, enemiesMin: 3, enemiesMax: 4 };
   }
 }
 

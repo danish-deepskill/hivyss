@@ -379,14 +379,16 @@ describe('knockback EffectDef (Phase 10 Batch 3 — live onApply)', () => {
     const target = {
       dead: false,
       activeEffects: [] as Array<{ def: { name: string }; remaining: number }>,
-      knockResist: 0, poiseAccum: 0, knockback: 0, facing: 1,
+      poiseAccum: 0, knockback: 0, facing: 1,
     } as unknown as IUnit;
-    const attacker = { knockForce: 30 } as unknown as IUnit;
+    const attacker = {} as unknown as IUnit;
 
-    applyEffect(target as unknown as Parameters<typeof applyEffect>[0], 'knockback', { source: attacker });
-    applyEffect(target as unknown as Parameters<typeof applyEffect>[0], 'knockback', { source: attacker });
+    applyEffect(target as unknown as Parameters<typeof applyEffect>[0], 'knockback', { source: attacker, knockForce: 30 });
+    applyEffect(target as unknown as Parameters<typeof applyEffect>[0], 'knockback', { source: attacker, knockForce: 30 });
 
-    // Both onApply calls fired → poise = 30 + 30 = 60.
+    // Both onApply calls fired → poise = 30 + 30 = 60. Post-refactor,
+    // knockForce flows via applyEffect opts (from ability tier data),
+    // not via attacker.knockForce.
     expect(target.poiseAccum).toBe(60);
     // Two ActiveEffect entries before sweep.
     expect(target.activeEffects!.length).toBe(2);
@@ -395,17 +397,17 @@ describe('knockback EffectDef (Phase 10 Batch 3 — live onApply)', () => {
   it('updateEffects sweeps the zero-duration knockback entry on the next frame', () => {
     // The ActiveEffect entry is debug-observable for one frame; all
     // state mutation happens in onApply. A subsequent tick splices it.
-    const attacker = { knockForce: 50 } as unknown as IUnit;
+    const attacker = {} as unknown as IUnit;
     const target = {
       dead: false,
       activeEffects: [] as Array<{ def: { name: string }; remaining: number }>,
-      knockResist: 0, poiseAccum: 0, knockback: 0, facing: 1,
+      poiseAccum: 0, knockback: 0, facing: 1,
     } as unknown as IUnit;
 
     applyEffect(
       target as unknown as Parameters<typeof applyEffect>[0],
       'knockback',
-      { source: attacker },
+      { source: attacker, knockForce: 50 },
     );
     expect(target.activeEffects!.length).toBe(1);
 
@@ -418,8 +420,13 @@ describe('knockback EffectDef (Phase 10 Batch 3 — live onApply)', () => {
 });
 
 describe('knockback.onApply — poise accumulation + stagger', () => {
+  // Post-refactor (knockback UnitDef → AbilityDef): knockForce flows
+  // via applyEffect opts from the ability's tier table. knockResist
+  // on the target is gone — target resistance to knockback lives in
+  // the ability.tiers[effectiveTier] lookup upstream. These tests
+  // exercise knockback.onApply directly; the ability-tier plumbing
+  // is covered by the end-to-end bash_strike tests further down.
   function makeKnockTarget(opts: {
-    knockResist?: number;
     poiseAccum?: number;
     facing?: 1 | -1;
     knockback?: number;
@@ -427,46 +434,41 @@ describe('knockback.onApply — poise accumulation + stagger', () => {
     return {
       dead: false,
       activeEffects: [],
-      knockResist: opts.knockResist ?? 0,
       poiseAccum: opts.poiseAccum ?? 0,
       knockback: opts.knockback ?? 0,
       facing: opts.facing ?? 1,
     } as unknown as IUnit;
   }
 
-  function makeAttacker(knockForce: number): IUnit {
-    return { knockForce } as unknown as IUnit;
-  }
+  const attacker = {} as unknown as IUnit;
 
-  it('accumulates poise by (knockForce - knockResist) per apply', () => {
-    const target = makeKnockTarget({ knockResist: 20 });
-    const attacker = makeAttacker(50);
+  it('accumulates poise by knockForce per apply', () => {
+    const target = makeKnockTarget();
     applyEffect(
       target as unknown as Parameters<typeof applyEffect>[0],
       'knockback',
-      { source: attacker },
+      { source: attacker, knockForce: 50 },
     );
-    expect(target.poiseAccum).toBe(30); // 50 - 20
+    expect(target.poiseAccum).toBe(50);
   });
 
-  it('force <= 0 is a no-op (high knockResist tanks)', () => {
-    const target = makeKnockTarget({ knockResist: 100 });
-    const attacker = makeAttacker(50);
+  it('zero knockForce is a no-op (ability tier declared no knockback)', () => {
+    const target = makeKnockTarget();
     applyEffect(
       target as unknown as Parameters<typeof applyEffect>[0],
       'knockback',
-      { source: attacker },
+      { source: attacker, knockForce: 0 },
     );
     expect(target.poiseAccum).toBe(0);
     expect(target.knockback).toBe(0);
   });
 
-  it('missing attacker / zero knockForce is a no-op', () => {
+  it('missing knockForce opt is a no-op (defensive — upstream should always pass)', () => {
     const target = makeKnockTarget();
     applyEffect(
       target as unknown as Parameters<typeof applyEffect>[0],
       'knockback',
-      // No source forwarded.
+      { source: attacker },
     );
     expect(target.poiseAccum).toBe(0);
   });
@@ -475,11 +477,10 @@ describe('knockback.onApply — poise accumulation + stagger', () => {
     // 60 + 60 = 120 → threshold crossed. Overflow = 20 → knockDist =
     // 142 + 20 × 0.71 = 156.2 px.
     const target = makeKnockTarget({ poiseAccum: 60, facing: 1 });
-    const attacker = makeAttacker(60);
     applyEffect(
       target as unknown as Parameters<typeof applyEffect>[0],
       'knockback',
-      { source: attacker },
+      { source: attacker, knockForce: 60 },
     );
     expect(target.poiseAccum).toBe(0); // reset on stagger
     // facing = 1 → knockback direction = -1.
@@ -488,11 +489,10 @@ describe('knockback.onApply — poise accumulation + stagger', () => {
 
   it('respects facing direction (enemy faces -1 → knocks in +x)', () => {
     const target = makeKnockTarget({ poiseAccum: 50, facing: -1 });
-    const attacker = makeAttacker(60);
     applyEffect(
       target as unknown as Parameters<typeof applyEffect>[0],
       'knockback',
-      { source: attacker },
+      { source: attacker, knockForce: 60 },
     );
     // Overflow = 10 → knockDist = 142 + 10 × 0.71 = 149.1. facing=-1
     // → knockback = +149.1.
@@ -502,25 +502,23 @@ describe('knockback.onApply — poise accumulation + stagger', () => {
   it('does NOT re-apply knockback while |existing knockback| >= 10 (in-motion guard)', () => {
     // Legacy invariant — don't restart knockback mid-slide.
     const target = makeKnockTarget({ poiseAccum: 90, knockback: -50 });
-    const attacker = makeAttacker(50);
     applyEffect(
       target as unknown as Parameters<typeof applyEffect>[0],
       'knockback',
-      { source: attacker },
+      { source: attacker, knockForce: 50 },
     );
-    // Poise resets (threshold was crossed: 90 + 30 = 120 after force
-    // calc) but knockback stays at its prior in-motion value.
+    // Poise resets (threshold crossed: 90 + 50 = 140) but knockback
+    // stays at its prior in-motion value.
     expect(target.poiseAccum).toBe(0);
     expect(target.knockback).toBe(-50);
   });
 
   it('below threshold: no stagger, knockback unchanged', () => {
     const target = makeKnockTarget({ poiseAccum: 30 });
-    const attacker = makeAttacker(50);
     applyEffect(
       target as unknown as Parameters<typeof applyEffect>[0],
       'knockback',
-      { source: attacker },
+      { source: attacker, knockForce: 50 },
     );
     expect(target.poiseAccum).toBe(80); // 30 + 50
     expect(target.knockback).toBe(0);
@@ -531,11 +529,10 @@ describe('knockback.onApply — poise accumulation + stagger', () => {
     setStaggerFxDispatcher((t) => fired.push(t));
 
     const target = makeKnockTarget({ poiseAccum: 60 });
-    const attacker = makeAttacker(60);
     applyEffect(
       target as unknown as Parameters<typeof applyEffect>[0],
       'knockback',
-      { source: attacker },
+      { source: attacker, knockForce: 60 },
     );
     expect(fired).toHaveLength(1);
     expect(fired[0]).toBe(target);
@@ -548,11 +545,10 @@ describe('knockback.onApply — poise accumulation + stagger', () => {
     setStaggerFxDispatcher((t) => fired.push(t));
 
     const target = makeKnockTarget({ poiseAccum: 10 });
-    const attacker = makeAttacker(30);
     applyEffect(
       target as unknown as Parameters<typeof applyEffect>[0],
       'knockback',
-      { source: attacker },
+      { source: attacker, knockForce: 30 },
     );
     expect(fired).toHaveLength(0);
 
@@ -1012,14 +1008,16 @@ describe('phase8 Stage 3 item 9 — Legionnaire migration', () => {
     expect(def.defaultAbility).toBe('bash_strike');
   });
 
-  it('legionnaire carries knockForce > 0 (the F11 decision-tree signal)', () => {
-    // Pins the decision-tree predicate: if a future change removes
-    // knockForce from Legionnaire, the F11 half-migration rationale
-    // dissolves and the choice should be re-litigated (likely back
-    // to jaw_strike as a pure-stat migration).
+  it('legionnaire.defaultAbility carries knockForce > 0 on its tier table (post-knockback-refactor decision-tree signal)', () => {
+    // Pins the decision-tree predicate. Pre-refactor the signal lived
+    // on def.knockForce; the knockback refactor relocated it to
+    // AbilityDef.tiers.*.knockForce. If a future change removes
+    // knockForce from bash_strike's tier data, the F11 half-migration
+    // rationale dissolves and the choice should be re-litigated.
     const def = UNIT_DEFS.legionnaire;
-    expect(def.knockForce).toBeDefined();
-    expect(def.knockForce ?? 0).toBeGreaterThan(0);
+    const ability = lookupAbility(def.defaultAbility!);
+    expect(ability.tiers?.normal?.knockForce).toBeDefined();
+    expect(ability.tiers?.normal?.knockForce ?? 0).toBeGreaterThan(0);
   });
 
   it('migrated bash_strike finalDamage = max(1, round(legionnaire.atk × 1.0)) against resistance-neutral target', () => {
@@ -1064,21 +1062,20 @@ describe('phase8 Stage 3 item 10 — Bashguard migration', () => {
     expect(def.defaultAbility).toBe('bash_strike');
   });
 
-  it('bashguard carries knockForce > 0 (the F11 decision-tree signal)', () => {
-    // Pins the decision-tree predicate. Bashguard's knockForce is
-    // the highest in the roster (100) — the F11 half-migration
-    // pattern was designed around exactly this unit, with Legionnaire
-    // as the lower-knockForce companion case. If a future balance
-    // pass zeros out Bashguard's knockForce, the F11 rationale
-    // dissolves and the whole decisions-doc F11 section needs a
-    // re-read.
+  it('bashguard.defaultAbility carries knockForce = 100 on its tier table (post-knockback-refactor)', () => {
+    // Pins the decision-tree predicate. The knockback refactor
+    // homogenized bash_strike's knockForce to 100 (Bashguard's
+    // canonical high-knockForce value, with Legionnaire's 20
+    // dissolved into the homogenized value). If a future balance pass
+    // zeros this out, the F11 rationale dissolves and the whole
+    // decisions-doc F11 section needs a re-read.
     const def = UNIT_DEFS.bashguard;
-    expect(def.knockForce).toBeDefined();
-    expect(def.knockForce ?? 0).toBeGreaterThan(0);
-    // Specifically: 100 — the canonical high-knockForce value that
-    // overwhelms mid knockResist (Domeback's 20 in particular, the
-    // Item 10 live smoke bookend).
-    expect(def.knockForce).toBe(100);
+    const ability = lookupAbility(def.defaultAbility!);
+    expect(ability.tiers?.normal?.knockForce).toBeDefined();
+    expect(ability.tiers?.normal?.knockForce ?? 0).toBeGreaterThan(0);
+    // Homogenized flat 100 across all 7 tiers (preserves pre-refactor
+    // flat-attacker-stat parity; per-tier scaling is a future pass).
+    expect(ability.tiers?.normal?.knockForce).toBe(100);
   });
 
   it('migrated bash_strike finalDamage = max(1, round(bashguard.atk × 1.0)) against resistance-neutral target', () => {
@@ -3269,13 +3266,13 @@ describe('Phase 10 Batch 3 — queueAbility three-state effect resolution', () =
   });
 });
 
-describe('Phase 10 Batch 3 — applyEffectsPhase forwards event.attacker as source', () => {
-  it('knockback.onApply reads attacker.knockForce via ctx.source', () => {
+describe('Phase 10 Batch 3 — applyEffectsPhase plumbs knockForce from ability tier data', () => {
+  it('knockback.onApply reads knockForce from ctx.instance (populated via ability.tiers[effectiveTier].knockForce)', () => {
     // End-to-end: queue bash_strike, drain the pipeline, verify the
-    // target's poiseAccum reflects attacker.knockForce. This is the
-    // integration test proving Option A' (reuse ActiveEffect.source
-    // for attacker reference) works end-to-end from ability data to
-    // knockback state mutation.
+    // target's poiseAccum reflects bash_strike.tiers[normal].knockForce.
+    // Post-refactor knockForce lives on ability tier data, not on the
+    // attacker unit. Resistance-neutral target → effectiveTier=normal
+    // → knockForce=100 (bash_strike's homogenized value).
     const pipeline = new CombatPipeline();
     registerPhase8ModifyHandlers(pipeline);
     pipeline.on('post_apply', applyEffectsPhase);
@@ -3284,12 +3281,10 @@ describe('Phase 10 Batch 3 — applyEffectsPhase forwards event.attacker as sour
       id: ++_id, x: 0, y: 0, dead: false,
       components: new Set<ComponentTag>(['HasHP', 'IsTargetable', 'HasModifiers']),
       atk: 18,
-      knockForce: 100,
     } as unknown as IUnit;
     const target = {
       id: ++_id, x: 30, y: 0, dead: false,
       components: new Set<ComponentTag>(['HasHP', 'IsTargetable']),
-      knockResist: 30,
       poiseAccum: 0,
       knockback: 0,
       facing: -1,
@@ -3299,20 +3294,22 @@ describe('Phase 10 Batch 3 — applyEffectsPhase forwards event.attacker as sour
     pipeline.queueAbility(attacker, target, 'bash_strike');
     pipeline.resolveFrame();
 
-    // Force = 100 - 30 = 70. Below threshold (100) → no stagger.
-    expect(target.poiseAccum).toBe(70);
-    expect(target.knockback).toBe(0);
+    // knockForce=100, poise at threshold on first hit → staggers. Overflow
+    // 0 → knockDist = 142. facing=-1 → knockback = +142.
+    expect(target.poiseAccum).toBe(0);
+    expect(target.knockback).toBeCloseTo(142, 5);
   });
 
-  it('two bash_strike hits cross the poise threshold and trigger stagger', () => {
-    // Bashguard-style scenario: knockForce=100, knockResist=30 →
-    // 70 per hit → crosses 100 on hit 2.
+  it('single bash_strike hit already crosses the poise threshold under flat-100 tier data', () => {
+    // Post-refactor (Option A flat 100 across all 7 tiers): a single
+    // bash_strike hit delivers full 100 poise → instant stagger on
+    // the first hit against any resistance-neutral target. knockResist
+    // is gone; target blunt resistance affects effectiveTier but all
+    // tiers carry knockForce=100, so poise accumulation is unchanged.
     //
-    // Two frames modeled by calling updateEffects between resolves —
-    // the production cadence calls updateEffects at end of each
-    // resolve() to sweep the duration-0 knockback ActiveEffects.
-    // Without the sweep, stackable=true just means the list grows,
-    // but onApply fires on every application either way.
+    // Second hit no-ops on knockback due to the in-motion guard
+    // (|knockback| >= 10 after the first-hit stagger) while still
+    // accumulating poise via the post-threshold reset.
     const pipeline = new CombatPipeline();
     registerPhase8ModifyHandlers(pipeline);
     pipeline.on('post_apply', applyEffectsPhase);
@@ -3321,12 +3318,10 @@ describe('Phase 10 Batch 3 — applyEffectsPhase forwards event.attacker as sour
       id: ++_id, x: 0, y: 0, dead: false,
       components: new Set<ComponentTag>(['HasHP', 'IsTargetable', 'HasModifiers']),
       atk: 50,
-      knockForce: 100,
     } as unknown as IUnit;
     const target = {
       id: ++_id, x: 30, y: 0, dead: false,
       components: new Set<ComponentTag>(['HasHP', 'IsTargetable']),
-      knockResist: 30,
       poiseAccum: 0,
       knockback: 0,
       facing: -1,
@@ -3335,10 +3330,10 @@ describe('Phase 10 Batch 3 — applyEffectsPhase forwards event.attacker as sour
 
     pipeline.queueAbility(attacker, target, 'bash_strike');
     pipeline.resolveFrame();
-    expect(target.poiseAccum).toBe(70);
-    expect(target.knockback).toBe(0);
+    expect(target.poiseAccum).toBe(0);
+    expect(target.knockback).toBeCloseTo(142, 5);
 
-    // End-of-frame sweep.
+    // End-of-frame sweep clears the duration-0 knockback entry.
     updateEffects(
       [target as unknown as Parameters<typeof updateEffects>[0][number]],
       0.016,
@@ -3346,10 +3341,10 @@ describe('Phase 10 Batch 3 — applyEffectsPhase forwards event.attacker as sour
 
     pipeline.queueAbility(attacker, target, 'bash_strike');
     pipeline.resolveFrame();
-    // 70 + 70 = 140 → threshold crossed. Overflow 40 → knockDist =
-    // 142 + 40 × 0.71 = 170.4. facing=-1 → knockback = +170.4.
+    // Second hit: threshold crossed again (100 poise >= 100), but
+    // in-motion guard holds knockback at its prior value.
     expect(target.poiseAccum).toBe(0);
-    expect(target.knockback).toBeCloseTo(170.4, 5);
+    expect(target.knockback).toBeCloseTo(142, 5);
   });
 
   it('non-blunt melee (Grunt jaw_strike) does NOT accumulate poise (gameplay change)', () => {

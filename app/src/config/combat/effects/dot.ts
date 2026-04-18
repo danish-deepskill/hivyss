@@ -28,7 +28,7 @@ export const dotEffects: Record<string, EffectDef> = {
     // `interval`, dispatch `chunk` damage and carry the remainder
     // forward so sub-interval frames don't lose fractional time.
     onTick(target, dt, ctx) {
-      const stats = ctx.instance.def.tiers?.normal;
+      const stats = ctx.instance.def.tiers?.[ctx.instance.appliedTier];
       const chunk = stats?.chunk ?? 0;
       const interval = stats?.interval ?? 0;
       if (chunk <= 0 || interval <= 0) return;

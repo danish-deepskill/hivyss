@@ -108,17 +108,17 @@ export function registerPhase8Scenarios(): void {
     helpText:
       'Bashguard F11 half-migration smoke. Spawns Bashguard against ' +
       'three tanks covering the F11 observation matrix (deterministic ' +
-      'post Phase 10 variance redesign):\n' +
-      '  - Hardshell (blunt: strong, knockResist 30): ' +
-      'damage 43 (round(50 × 0.85)), staggers every 2 hits (force 70).\n' +
-      '  - Legionnaire (blunt: strong, knockResist 40): ' +
-      'damage 43, staggers every 2 hits (force 60).\n' +
-      '  - Domeback (no resistance, knockResist 20): ' +
-      'damage 50 (normal tier × 1.0), staggers every 2 hits (force 80). ' +
-      'Legionnaire FAILED to stagger Domeback at Item 9 smoke (force 0); ' +
-      'Bashguard overwhelms with force 80.\n' +
-      'Watch for: no console errors from the placeholder knockback ' +
-      'Effect lookup, flat 43 on Hardshell/Legionnaire (no variance now).',
+      'post Phase 10 variance redesign; knockback refactor dropped ' +
+      'knockResist — knockForce now scales with tier parallel to dmgMult ' +
+      'via bash_strike tier data):\n' +
+      '  - Hardshell (blunt: strong): ' +
+      'damage 43 (round(50 × 0.85)), staggers every other hit (force 85).\n' +
+      '  - Legionnaire (blunt: strong): ' +
+      'damage 43, staggers every other hit (force 85).\n' +
+      '  - Domeback (no resistance): ' +
+      'damage 50 (normal tier × 1.0), staggers every hit (force 100).\n' +
+      'Watch for: no console errors from the knockback Effect lookup, ' +
+      'flat 43 on Hardshell/Legionnaire (no variance now).',
     setup(ctx) {
       ctx.spawn('bashguard', 'player', 300);
       ctx.spawn('hardshell', 'enemy', 900);

@@ -3,9 +3,14 @@
 // `appliesEffects: []` or override with an explicit list.
 
 import type { AbilityDef } from '../../../types';
-import { linearDamageTiers } from './_tierTables';
+import { linearDamageTiersWithKnockForce } from './_tierTables';
 
 export const bluntAbilities: Record<string, AbilityDef> = {
+  // Homogenized knockForce = 100 — highest source-unit value from the
+  // knockback-refactor audit (Bashguard 100, Legionnaire 20 dissolved
+  // into the homogenized value). Flat across all 7 tiers preserves
+  // pre-refactor knockback parity; per-tier scaling is a future
+  // balance pass.
   bash_strike: {
     name: 'Bash Strike',
     category: 'damage',
@@ -14,6 +19,6 @@ export const bluntAbilities: Record<string, AbilityDef> = {
     range: 32,
     targetCount: 1,
     trigger: 'onAttack',
-    tiers: linearDamageTiers(),
+    tiers: linearDamageTiersWithKnockForce(100),
   },
 };

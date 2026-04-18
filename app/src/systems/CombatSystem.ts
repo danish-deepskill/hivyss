@@ -10,6 +10,8 @@ import { AudioManager } from './AudioManager';
 import { EventBus } from './EventBus';
 import { CombatPipeline } from './CombatPipeline';
 import { updateEffects, applyEffect, hasActiveEffect } from './EffectSystem';
+import { shiftTier, type ResistanceTier } from '../config/combat/resistances';
+import type { CalcAttacker, CalcTarget } from './CombatPipeline';
 import { setDotDispatcher } from '../config/combat/effects/dispatch';
 import { setStunFxDispatcher, setStaggerFxDispatcher } from '../config/combat/effects/cc';
 import { applyModifiers, addModifier, removeModifiersBySource } from './ModifierSystem';
@@ -162,8 +164,9 @@ export function applyEffectsPhase(event: DamageEvent): void {
   if (!effects || effects.length === 0) return;
   const target = event.target as unknown as Parameters<typeof applyEffect>[0];
   const source = event.attacker;
+  const knockForce = event.ability.tiers?.[event.effectiveTier]?.knockForce;
   for (const name of effects) {
-    applyEffect(target, name, { source });
+    applyEffect(target, name, { source, appliedTier: event.effectiveTier, knockForce });
   }
 }
 
@@ -214,8 +217,15 @@ export function applyAoeRiderPhase(event: DamageEvent): void {
     )
     .slice(0, rider.targetCount);
 
+  const dmgType = event.ability.dmgType;
+  const pen = dmgType ? (event.attacker as CalcAttacker).penetration?.[dmgType] ?? 0 : 0;
   for (const t of secondaries) {
-    applyEffect(t as Parameters<typeof applyEffect>[0], rider.effect);
+    let appliedTier: ResistanceTier = 'normal';
+    if (dmgType) {
+      const secondaryRes = (t as CalcTarget).resistance?.[dmgType] ?? 'normal';
+      appliedTier = shiftTier(secondaryRes, -pen);
+    }
+    applyEffect(t as Parameters<typeof applyEffect>[0], rider.effect, { appliedTier });
   }
 }
 

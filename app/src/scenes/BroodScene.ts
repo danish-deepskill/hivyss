@@ -74,10 +74,10 @@ export class BroodScene extends Phaser.Scene {
     this.runMode = data?.runMode || 'permadeath';
 
     if (this.isRunMode) {
-      // Run mode: normal (non-geneline) vyssids tier 1-2, pick 3
+      // Run mode: normal (non-geneline) vyssids tier 0-1, pick 3
       this.pool = Object.keys(UNIT_DEFS).filter(k => {
         const def = UNIT_DEFS[k];
-        return !def.geneline && (def.tier as number) <= 2;
+        return !def.geneline && (def.tier as number) <= 1;
       });
       this.deckSize = Math.min(RUN_DECK_SIZE, this.pool.length);
     } else {
@@ -272,7 +272,7 @@ export class BroodScene extends Phaser.Scene {
   private showTooltip(key: string, e: MouseEvent): void {
     const def = UNIT_DEFS[key];
     const dps = (def.atk * def.atkRate).toFixed(1);
-    const tierLbl = (TIER_DEFS[def.tier] || TIER_DEFS[1]).label;
+    const tierLbl = (TIER_DEFS[def.tier] || TIER_DEFS[0]).label;
     const glTag = def.geneline ? ` ${GENELINE_DEFS[def.geneline].symbol}` : '';
 
     let traitText = TRAIT_DESC[def.trait] || def.desc;

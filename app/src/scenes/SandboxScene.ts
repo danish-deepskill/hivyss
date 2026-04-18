@@ -310,8 +310,8 @@ export class SandboxScene extends Phaser.Scene {
   private updateLabels(): void {
     const ld = UNIT_DEFS[this.leftKey];
     const rd = UNIT_DEFS[this.rightKey];
-    const lt = TIER_DEFS[ld.tier] || TIER_DEFS[1];
-    const rt = TIER_DEFS[rd.tier] || TIER_DEFS[1];
+    const lt = TIER_DEFS[ld.tier] || TIER_DEFS[0];
+    const rt = TIER_DEFS[rd.tier] || TIER_DEFS[0];
     this.leftLabel.setText(ld.name);
     this.leftLabel.setColor(lt.color);
     this.leftCountLabel.setText(`x${this.leftCount}`);

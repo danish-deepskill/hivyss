@@ -32,7 +32,7 @@ const gruntDef = alphaDef({
   desc: "Basic Soldier",
   route: "land",
   attackRange: "melee",
-  tier: 1,
+  tier: 0,
   incubation: 3,
   caste: "soldier",
   defaultAbility: "jaw_strike",
@@ -56,9 +56,8 @@ const mandibleDef = alphaDef({
   desc: "Balanced",
   route: "land",
   attackRange: "melee",
-  tier: 2,
+  tier: 1,
   incubation: 4,
-  knockResist: 5,
   caste: "soldier",
   defaultAbility: "jaw_strike",
 });
@@ -83,9 +82,8 @@ const bombardierDef = alphaDef({
   desc: "Area ATK",
   route: "land",
   attackRange: "melee",
-  tier: 3,
+  tier: 2,
   incubation: 5,
-  knockForce: 15,
   caste: "soldier",
   deathAbility: 'death_bomb',
   defaultAbility: 'jaw_strike',
@@ -109,13 +107,14 @@ const needlerDef = alphaDef({
   desc: "Ranged",
   route: "land",
   attackRange: "ranged",
-  tier: 2,
+  tier: 1,
   incubation: 5,
   caste: "soldier",
   defaultAbility: "needle_shot",
 });
 
-// Legionnaire uses bash_strike (blunt) to pair with its knockForce;
+// Legionnaire uses bash_strike (blunt) — bash_strike carries the
+// homogenized knockForce 100 via ability tier data.
 // resistance: heavy plate soaks physical, armor cooks under fire.
 const legionnaireDef = alphaDef({
   name: "Legionnaire",
@@ -135,10 +134,8 @@ const legionnaireDef = alphaDef({
   desc: "Massive HP",
   route: "land",
   attackRange: "melee",
-  tier: 3,
+  tier: 2,
   incubation: 7,
-  knockForce: 20,
-  knockResist: 40,
   caste: "soldier",
   defaultAbility: "bash_strike",
   resistance: { blunt: 'strong', sharp: 'strong', heat: 'weak' },
@@ -165,7 +162,7 @@ const ravagerDef = alphaDef({
   desc: "Rage SPD",
   route: "air",
   attackRange: "melee",
-  tier: 3,
+  tier: 2,
   incubation: 6,
   caste: "soldier",
   defaultAbility: "jaw_strike",
@@ -199,9 +196,8 @@ const centurionDef = alphaDef({
   desc: "+20% Ally ATK",
   route: "land",
   attackRange: "melee",
-  tier: 4,
+  tier: 3,
   incubation: 8,
-  knockResist: 15,
   caste: "soldier",
   defaultAbility: "jaw_strike",
   auraModifier: {

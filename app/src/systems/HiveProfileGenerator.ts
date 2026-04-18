@@ -17,11 +17,11 @@ interface DifficultyParams {
 
 function getDifficultyParams(difficulty: number): DifficultyParams {
   switch (difficulty) {
-    case 1: return { maxTier: 1, rosterSize: 3, startNectar: 60, baseIncome: 6, maxIncome: 18, incomeRampTime: 40 };
-    case 2: return { maxTier: 2, rosterSize: 4, startNectar: 80, baseIncome: 8, maxIncome: 24, incomeRampTime: 35 };
-    case 3: return { maxTier: 3, rosterSize: 6, startNectar: 100, baseIncome: 10, maxIncome: 28, incomeRampTime: 30 };
-    case 4: return { maxTier: 4, rosterSize: 8, startNectar: 120, baseIncome: 12, maxIncome: 30, incomeRampTime: 25 };
-    default: return { maxTier: 1, rosterSize: 3, startNectar: 60, baseIncome: 6, maxIncome: 18, incomeRampTime: 40 };
+    case 1: return { maxTier: 0, rosterSize: 3, startNectar: 60, baseIncome: 6, maxIncome: 18, incomeRampTime: 40 };
+    case 2: return { maxTier: 1, rosterSize: 4, startNectar: 80, baseIncome: 8, maxIncome: 24, incomeRampTime: 35 };
+    case 3: return { maxTier: 2, rosterSize: 6, startNectar: 100, baseIncome: 10, maxIncome: 28, incomeRampTime: 30 };
+    case 4: return { maxTier: 3, rosterSize: 8, startNectar: 120, baseIncome: 12, maxIncome: 30, incomeRampTime: 25 };
+    default: return { maxTier: 0, rosterSize: 3, startNectar: 60, baseIncome: 6, maxIncome: 18, incomeRampTime: 40 };
   }
 }
 

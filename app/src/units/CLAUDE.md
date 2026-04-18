@@ -43,7 +43,7 @@ export const def: UnitDef = {
   secondary: 0x1a4880,     // Dark/accent color for outlines, limbs
   trait: 'unique_trait',   // Must be unique — maps to draw function
   desc: 'Short Desc',      // Shown on card (keep under ~15 chars)
-  tier: 3,                 // 1-11, see Tier Guidelines below
+  tier: 2,                 // 0-10, see Tier Guidelines below
   defaultAbility: 'jaw_strike',  // Every unit has one — routes through the pipeline
 };
 
@@ -124,14 +124,14 @@ For units with no visual flourish beyond the basic body, `drawBasicBody` is the 
 
 ## Tier Guidelines
 
-Numeric tiers 1-11 (see TIER_DEFS in registry.ts for full names). Rough cost bands:
+Numeric tiers 0-10 (see TIER_DEFS in registry.ts for full names). Rough cost bands:
 
 | Tier | Cost Range | Power Level |
 |------|-----------|-------------|
-| 1-2  | 15-40     | Fodder / baseline |
-| 3-4  | 50-85     | Specialists |
-| 5-6  | 85-130    | Elites |
-| 7+   | 150+      | Legendary / endgame |
+| 0-1  | 15-40     | Fodder / baseline |
+| 2-3  | 50-85     | Specialists |
+| 4-5  | 85-130    | Elites |
+| 6+   | 150+      | Legendary / endgame |
 
 ## Registry (registry.ts)
 

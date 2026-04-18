@@ -69,8 +69,6 @@ export class Unit extends Phaser.GameObjects.Container {
   foreswingTimer: number;
   backswingTimer: number;
   poiseAccum: number;
-  knockForce: number;
-  knockResist: number;
 
   // Mendwing passive-heal cooldown (plain field, not an effect).
   healTimer: number;
@@ -148,8 +146,6 @@ export class Unit extends Phaser.GameObjects.Container {
     this.foreswingTimer = 0;
     this.backswingTimer = 0;
     this.poiseAccum = 0;
-    this.knockForce = 0;
-    this.knockResist = 0;
     this.healTimer = 0;
     this.components = new Set();
     this.baseResistance = {};
@@ -230,8 +226,6 @@ export class Unit extends Phaser.GameObjects.Container {
     this.backswingTimer = 0;
 
     this.poiseAccum = 0;
-    this.knockForce = def.knockForce ?? 0;
-    this.knockResist = def.knockResist ?? 0;
     this.healTimer = 0;
 
     // Battle-scope reset. `persistent` is NOT cleared.

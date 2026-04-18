@@ -14,7 +14,7 @@ export function createUnitCard(key: string, opts?: {
     ? `<img class="uico-img" src="${opts.preview}" alt="${d.name}">`
     : `<div class="uico">${d.ico}</div>`;
 
-  const tier = TIER_DEFS[d.tier] || TIER_DEFS[1];
+  const tier = TIER_DEFS[d.tier] || TIER_DEFS[0];
   const gl = d.geneline ? GENELINE_DEFS[d.geneline] : null;
   const glHtml = gl
     ? ` <span style="display:inline-block;width:10px;height:10px;line-height:10px;text-align:center;border-radius:50%;background:${gl.color};color:#d4c4b0;font-size:7px;font-weight:bold;vertical-align:baseline">${gl.symbol}</span>`
