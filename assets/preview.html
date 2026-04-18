@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Sprite Sheet Preview</title>
+  <style>
+    body { background: #222; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: monospace; color: #ccc; gap: 20px; }
+    .viewer { position: relative; image-rendering: pixelated; background: #111; border: 1px solid #444; }
+    .viewer canvas { display: block; image-rendering: pixelated; }
+    .controls { display: flex; gap: 10px; align-items: center; }
+    input[type="range"] { width: 200px; }
+    button { padding: 6px 12px; background: #333; color: #ccc; border: 1px solid #555; cursor: pointer; }
+    button:hover { background: #444; }
+    .sheet-preview { max-width: 90vw; border: 1px solid #444; image-rendering: pixelated; }
+  </style>
+</head>
+<body>
+  <h2>Stormfly Flysheet Preview</h2>
+  <div class="viewer">
+    <canvas id="anim" width="128" height="128"></canvas>
+  </div>
+
+  <div class="controls">
+    <label>FPS: <span id="fpsLabel">8</span></label>
+    <input type="range" id="fps" min="1" max="24" value="8">
+    <label>Frames: <input type="number" id="frames" value="8" min="1" max="32" style="width:50px"></label>
+    <label>Scale: <input type="number" id="scale" value="3" min="1" max="8" style="width:40px"></label>
+    <button id="playPause">Pause</button>
+  </div>
+
+  <img class="sheet-preview" src="stormfly_flysheet.png" alt="sprite sheet">
+
+  <script>
+    const canvas = document.getElementById('anim');
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+
+    const img = new Image();
+    img.src = 'stormfly_flysheet.png';
+
+    let fps = 8;
+    let frameCount = 8;
+    let scale = 3;
+    let playing = true;
+    let currentFrame = 0;
+    let lastTime = 0;
+
+    img.onload = () => {
+      resize();
+      requestAnimationFrame(loop);
+    };
+
+    function resize() {
+      const fw = img.width / frameCount;
+      const fh = img.height;
+      canvas.width = fw * scale;
+      canvas.height = fh * scale;
+    }
+
+    function loop(t) {
+      const frameMs = 1000 / fps;
+      if (playing && t - lastTime > frameMs) {
+        currentFrame = (currentFrame + 1) % frameCount;
+        lastTime = t;
+      }
+      const fw = img.width / frameCount;
+      const fh = img.height;
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, currentFrame * fw, 0, fw, fh, 0, 0, canvas.width, canvas.height);
+      requestAnimationFrame(loop);
+    }
+
+    document.getElementById('fps').addEventListener('input', e => {
+      fps = parseInt(e.target.value);
+      document.getElementById('fpsLabel').textContent = fps;
+    });
+    document.getElementById('frames').addEventListener('input', e => {
+      frameCount = parseInt(e.target.value) || 1;
+      resize();
+    });
+    document.getElementById('scale').addEventListener('input', e => {
+      scale = parseInt(e.target.value) || 1;
+      resize();
+    });
+    document.getElementById('playPause').addEventListener('click', e => {
+      playing = !playing;
+      e.target.textContent = playing ? 'Pause' : 'Play';
+    });
+  </script>
+</body>
+</html>

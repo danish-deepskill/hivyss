@@ -116,7 +116,18 @@
       "Read(//c/c/Work/Simulation/hivyss/app/**)",
       "Bash(sed -i 's|app/src/MECHANICS_ROADMAP\\\\.md|app/docs/MECHANICS_ROADMAP.md|g' lore/HIVYSS.md)",
       "Bash(sed -i 's|app/src/DESIGN_PATTERNS\\\\.md|app/docs/DESIGN_PATTERNS.md|g' lore/HIVYSS.md)",
-      "Bash(sed -i 's|app/src/units/CLAUDE\\\\.md|app/src/units/CLAUDE.md|g' lore/HIVYSS.md)"
+      "Bash(sed -i 's|app/src/units/CLAUDE\\\\.md|app/src/units/CLAUDE.md|g' lore/HIVYSS.md)",
+      "Read(//c/Users/USER/AppData/Roaming/Code/User//**)",
+      "Read(//c/Users/USER/.claude//**)",
+      "Read(//c/Users/USER/**)",
+      "mcp__pixelforge__forge_sprite",
+      "Bash(magick:*)",
+      "Bash(where ffmpeg:*)",
+      "Bash(where convert:*)",
+      "Bash(where python:*)",
+      "Bash(where python3:*)",
+      "mcp__pixelforge__forge_animation",
+      "Bash(python:*)"
     ],
     "additionalDirectories": [
       "C:\\Work\\Simulation\\hivyss\\app\\src\\draws",
