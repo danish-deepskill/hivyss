@@ -5,6 +5,7 @@ import { SaveManager } from '../systems/SaveManager';
 import { createRunState } from '../systems/RunState';
 import type { RunMode } from '../systems/RunState';
 import { createUnitCard } from '../ui/UnitCard';
+import { TRAIT_DESC } from '../config/TraitDesc';
 import type { RenderUnit } from '../types';
 
 const MAX_DECK_SIZE = 10;
@@ -15,34 +16,6 @@ interface BroodSceneData {
   seed?: string;
   runMode?: RunMode;
 }
-
-// Trait descriptions — keyed by behavior pattern, not unit name.
-// Multiple units can share a trait if they share the same combat hook.
-// Note: 'ranged' and 'sniper' are dynamically overridden below with def.range.
-const TRAIT_DESC: Record<string, string> = {
-  // Plain / fodder
-  grub: 'Cheap fodder, no special ability',
-  grunt: 'Cheap fodder, no special ability',
-  basic: 'No special ability',
-  // Tanks
-  wall: 'Slow durable wall, high knock resist',
-  shell: 'Mid-tier shelled tank',
-  massive: 'Extremely high HP tank',
-  // DPS
-  swift: 'Glass cannon — extreme speed, very fragile',
-  berserk: 'Attack speed increases below 50% HP',
-  burn: 'Attacks set up to 3 nearby enemies on fire',
-  knockback: 'Heavy bruiser, rams enemies backward on hit',
-  area: 'Explodes on death dealing 65 AOE damage (up to 5)',
-  // Ranged
-  poker: 'Fragile ranged poker, single target',
-  // Support
-  healer: 'Heals nearest wounded ally every 2s',
-  aura: 'Nearby allies take 20% less damage',
-  rally: '+20% ATK to 5 nearest allies in range',
-  // AOE / chain
-  lightning: 'Chain lightning — hits 3 foes, 25% stun, 4th hit = 2x dmg',
-};
 
 function getDefaultDeck(max: number): string[] {
   const keys = Object.keys(UNIT_DEFS).filter(k => !UNIT_DEFS[k].unlock);

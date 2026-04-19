@@ -44,7 +44,12 @@ export class ViewportController {
   private zoomSpeed = 1.5;
   private dragMouseButton = 0;
 
-  private panKeys!: { left: Phaser.Input.Keyboard.Key; right: Phaser.Input.Keyboard.Key };
+  private panKeys!: {
+    left: Phaser.Input.Keyboard.Key;
+    right: Phaser.Input.Keyboard.Key;
+    a: Phaser.Input.Keyboard.Key;
+    d: Phaser.Input.Keyboard.Key;
+  };
   private zoomKeys!: {
     zIn: Phaser.Input.Keyboard.Key;
     zInEq: Phaser.Input.Keyboard.Key;
@@ -98,6 +103,8 @@ export class ViewportController {
     this.panKeys = {
       left: kb.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT),
       right: kb.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT),
+      a: kb.addKey(Phaser.Input.Keyboard.KeyCodes.A),
+      d: kb.addKey(Phaser.Input.Keyboard.KeyCodes.D),
     };
     this.zoomKeys = {
       zIn: kb.addKey(Phaser.Input.Keyboard.KeyCodes.PLUS),
@@ -164,9 +171,9 @@ export class ViewportController {
     const atLeftEdge = this.mouseX >= 0 && this.mouseX < this.edgeZone;
     const atRightEdge = this.mouseX > W - this.edgeZone && this.mouseX <= W;
 
-    if (this.panKeys.left.isDown) {
+    if (this.panKeys.left.isDown || this.panKeys.a.isDown) {
       this.cam.scrollX -= this.panSpeed * dt;
-    } else if (this.panKeys.right.isDown) {
+    } else if (this.panKeys.right.isDown || this.panKeys.d.isDown) {
       this.cam.scrollX += this.panSpeed * dt;
     } else if (atLeftEdge) {
       this.cam.scrollX -= this.panSpeed * dt;

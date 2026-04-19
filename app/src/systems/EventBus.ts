@@ -31,6 +31,10 @@ export interface GameEvents {
     color: string;
     timeStr: string;
   };
+  sandboxLoadPreset: { placements: Array<{ unitKey: string; side: 'player' | 'enemy'; x: number }> };
+  sandboxSaveCurrentAs: { name: string };
+  sandboxPresetsChanged: {};
+  sandboxPlacementCount: { player: number; enemy: number };
 }
 
 type EventKey = keyof GameEvents;

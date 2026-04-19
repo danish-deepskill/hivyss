@@ -82,11 +82,18 @@ export class WorldScene extends Phaser.Scene {
       }
     });
 
-    // Camera + pan/zoom controller.
+    // Suppress browser right-click menu so right-drag pan fires
+    // cleanly on the canvas.
+    this.input.mouse?.disableContextMenu();
+
+    // Camera + pan/zoom controller. Right-drag so left-click stays
+    // available for any future unit-selection UX without colliding
+    // with pan.
     this.viewport = new ViewportController(this);
     this.viewport.attach({
       worldW: this.worldW,
       zoom: 1.5,
+      dragButton: 'right',
     });
   }
 

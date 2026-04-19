@@ -1,42 +1,44 @@
 import Phaser from 'phaser';
-import { W, H } from '../config/Constants';
-import { LANE } from '../config/Layout';
-const GND = LANE.land.groundY;
-import { UNIT_DEFS, GENELINES } from '../units/registry';
+import { UNIT_DEFS, GENELINES, TIER_DEFS, GENELINE_DEFS } from '../units/registry';
 import { EventBus } from '../systems/EventBus';
+import { deleteUserPreset, loadUserPresets } from '../systems/SandboxPresets';
+import { createUnitCard } from '../ui/UnitCard';
+import { TRAIT_DESC } from '../config/TraitDesc';
 import type { GeneLine } from '../types';
 
-// Panel geometry — kept in sync with SandboxScene's screen-space
-// pointer filter. Panel grew from 180 → 210 to fit the geneline tab
-// row above the roster.
-const CONTROL_PANEL_H = 210;
-const CONTROL_PANEL_TOP_Y = H - CONTROL_PANEL_H;
-
 /**
- * HUD sibling for SandboxScene. All UI lives here at 1.0× zoom so it
- * stays fixed on screen while SandboxScene zooms and scrolls under it.
+ * HUD sibling for SandboxScene. All UI is DOM — mirrors MenuUIScene's
+ * pattern: raw `document.createElement`, inline cssText for root
+ * shell, class names defined in index.html `<style>`, wrapped once
+ * via `scene.add.dom(640, 360, outer)` so Phaser owns the lifecycle
+ * + Scale.FIT.
+ *
  * Communicates with SandboxScene via EventBus stored on the scene
  * registry under `sandbox.eventBus`.
  */
 export class SandboxHUDScene extends Phaser.Scene {
   private eventBus!: EventBus;
 
-  // Locally-tracked UI state. HUD owns "what's selected" and "which
-  // geneline tab is active"; SandboxScene mirrors selection via the
-  // event stream. Side is derived from pointer position in SandboxScene.
   private selectedKey: string | null = null;
   private activeGeneline: GeneLine = 'alpha';
   private running = false;
 
-  // UI refs
-  private clearBtn!: Phaser.GameObjects.Text;
-  private selectedLabel!: Phaser.GameObjects.Text;
-  private rosterIcons!: Phaser.GameObjects.Image[];
-  private rosterLabels!: Phaser.GameObjects.Text[];
-  private rosterY = 0;
-  private genelineTabs!: Map<GeneLine, Phaser.GameObjects.Text>;
-  private resultText!: Phaser.GameObjects.Text;
-  private statsText!: Phaser.GameObjects.Text;
+  // DOM refs — only the elements we mutate imperatively need refs.
+  private root!: HTMLDivElement;
+  private selectedLabel!: HTMLDivElement;
+  private countLabel!: HTMLDivElement;
+  private presetSelect!: HTMLSelectElement;
+  private resultLabel!: HTMLDivElement;
+  private statsLabel!: HTMLDivElement;
+  private rosterRow!: HTMLDivElement;
+  private tooltip!: HTMLDivElement;
+  private tabRefs: Map<GeneLine, HTMLButtonElement> = new Map();
+  private cardRefs: Map<string, HTMLDivElement> = new Map();
+
+  // Data-URL cache for preview textures — built once at scene create,
+  // reused across tab rebuilds. Matches MenuUIScene's `previews`
+  // registry pattern.
+  private previewCache: Map<string, string> = new Map();
 
   constructor() {
     super('SandboxHUDScene');
@@ -44,22 +46,326 @@ export class SandboxHUDScene extends Phaser.Scene {
 
   create(): void {
     this.eventBus = this.registry.get('sandbox.eventBus');
-    this.rosterIcons = [];
-    this.rosterLabels = [];
-    this.genelineTabs = new Map();
+    this.buildPreviewCache();
+    this.buildDOM();
+    this.wireEvents();
+  }
 
-    this.buildTopBar();
-    this.buildResultText();
-    this.buildControlPanel();
+  // ---------------------------------------------------------------
+  // DOM construction
+  // ---------------------------------------------------------------
+
+  private buildPreviewCache(): void {
+    for (const key of Object.keys(UNIT_DEFS)) {
+      const texKey = `_sb_preview_${key}`;
+      if (!this.textures.exists(texKey)) continue;
+      const src = this.textures.get(texKey).getSourceImage() as HTMLCanvasElement;
+      this.previewCache.set(key, src.toDataURL('image/png'));
+    }
+  }
+
+  private buildDOM(): void {
+    this.root = document.createElement('div');
+    this.root.className = 'sb-hud';
+    this.root.style.cssText = 'width:1280px;height:720px;position:relative;pointer-events:none;';
+
+    this.root.appendChild(this.buildTopBar());
+    this.root.appendChild(this.buildResultArea());
+    this.root.appendChild(this.buildControlPanel());
+
+    // Phaser's DOMElement renderer injects `pointer-events: auto`
+    // onto the wrapped element every render frame. Force it to
+    // 'none' here so sb-hud root doesn't capture canvas clicks.
+    const wrapper = this.add.dom(640, 360, this.root);
+    wrapper.pointerEvents = 'none';
+  }
+
+  private buildTopBar(): HTMLElement {
+    const bar = document.createElement('div');
+    bar.className = 'sb-hud__topbar';
+
+    const back = this.makeBtn('\u25C0 BACK', 'sb-hud__back-btn', () => {
+      this.scene.stop('SandboxScene');
+      this.scene.start('MainMenuScene');
+    });
+
+    const title = document.createElement('div');
+    title.className = 'sb-hud__title';
+    title.textContent = 'SANDBOX \u2014 CLICK UNIT TO PLACE';
+
+    const actions = document.createElement('div');
+    actions.className = 'sb-hud__actions';
+    const clearBtn = this.makeBtn('\u2716 CLEAR',
+      'sb-hud__action-btn sb-hud__clear-btn sb-hud__mutator',
+      () => this.eventBus.emit('sandboxClear', {}));
+    const fightBtn = this.makeBtn('\u2694 FIGHT',
+      'sb-hud__action-btn sb-hud__fight-btn',
+      () => this.eventBus.emit('sandboxFight', {}));
+    const resetBtn = this.makeBtn('\u21BB RESET',
+      'sb-hud__action-btn',
+      () => this.eventBus.emit('sandboxReset', {}));
+    actions.append(clearBtn, fightBtn, resetBtn);
+
+    // Order: BACK (left), actions (center), title (right). Top bar
+    // uses `justify-content: space-between` so the three children
+    // spread cleanly across the row.
+    bar.append(back, actions, title);
+    return bar;
+  }
+
+  private buildResultArea(): HTMLElement {
+    const area = document.createElement('div');
+    area.className = 'sb-hud__result-area';
+    this.resultLabel = document.createElement('div');
+    this.resultLabel.className = 'sb-hud__result';
+    this.statsLabel = document.createElement('div');
+    this.statsLabel.className = 'sb-hud__stats';
+    area.append(this.resultLabel, this.statsLabel);
+    return area;
+  }
+
+  private buildControlPanel(): HTMLElement {
+    const panel = document.createElement('div');
+    panel.className = 'sb-hud__panel';
+
+    // Header row: selected label + placement count (left cluster)
+    // and preset dropdown (right).
+    const header = document.createElement('div');
+    header.className = 'sb-hud__panel-header';
+
+    const headerLeft = document.createElement('div');
+    headerLeft.className = 'sb-hud__header-left';
+
+    this.selectedLabel = document.createElement('div');
+    this.selectedLabel.className = 'sb-hud__selected sb-hud__mutator';
+
+    this.countLabel = document.createElement('div');
+    this.countLabel.className = 'sb-hud__count';
+    this.updateCountLabel(0, 0);
+
+    headerLeft.append(this.selectedLabel, this.countLabel);
+    header.append(headerLeft, this.buildPresetDropdown());
+
+    // Tabs row.
+    const tabs = document.createElement('div');
+    tabs.className = 'sb-hud__tabs';
+    this.buildTabs(tabs);
+
+    // Roster row.
+    this.rosterRow = document.createElement('div');
+    this.rosterRow.className = 'sb-hud__roster';
+    this.buildRoster();
+
+    panel.append(header, tabs, this.rosterRow);
     this.updateSelectedLabel();
 
-    // ESC deselects.
-    this.input.keyboard?.on('keydown-ESC', () => {
+    // Tooltip lives at panel level so it renders on top of cards;
+    // hidden by default, shown on card hover.
+    this.tooltip = document.createElement('div');
+    this.tooltip.className = 'sb-hud__tooltip';
+    panel.appendChild(this.tooltip);
+
+    return panel;
+  }
+
+  private buildPresetDropdown(): HTMLElement {
+    const wrap = document.createElement('div');
+    wrap.className = 'sb-hud__presets sb-hud__mutator';
+
+    const lbl = document.createElement('span');
+    lbl.className = 'sb-hud__presets-label';
+    lbl.textContent = 'PRESETS:';
+
+    this.presetSelect = document.createElement('select');
+    this.presetSelect.className = 'sb-hud__preset-select';
+    this.rebuildPresetOptions();
+
+    this.presetSelect.addEventListener('change', () => {
+      const val = this.presetSelect.value;
+      if (!val) return;
+      if (val === '__save_as__') {
+        const raw = window.prompt('Save preset as:');
+        const name = raw?.trim() ?? '';
+        if (name) {
+          this.eventBus.emit('sandboxSaveCurrentAs', { name });
+        }
+      } else if (val === '__delete__') {
+        const saved = loadUserPresets();
+        const names = saved.map((p) => p.name);
+        const raw = window.prompt(
+          `Delete which saved preset?\nAvailable: ${names.join(', ')}`,
+        );
+        const name = raw?.trim() ?? '';
+        if (name && names.includes(name)) {
+          deleteUserPreset(name);
+          this.eventBus.emit('sandboxPresetsChanged', {});
+        } else if (name) {
+          console.warn(`[SandboxHUD] No saved preset named "${name}".`);
+        }
+      } else if (val.startsWith('saved:')) {
+        const name = val.slice('saved:'.length);
+        const saved = loadUserPresets().find((p) => p.name === name);
+        if (saved) {
+          this.eventBus.emit('sandboxLoadPreset', {
+            placements: saved.placements.map((p) => ({ ...p })),
+          });
+        }
+      }
+      // Reset to placeholder so re-selecting the same preset fires
+      // change again.
+      this.presetSelect.value = '';
+    });
+
+    wrap.append(lbl, this.presetSelect);
+    return wrap;
+  }
+
+  private rebuildPresetOptions(): void {
+    this.presetSelect.innerHTML = '';
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    placeholder.textContent = 'Select preset\u2026';
+    this.presetSelect.appendChild(placeholder);
+
+    const saved = loadUserPresets();
+    if (saved.length > 0) {
+      const savedGroup = document.createElement('optgroup');
+      savedGroup.label = 'Saved';
+      saved.forEach((p) => {
+        const opt = document.createElement('option');
+        opt.value = `saved:${p.name}`;
+        opt.textContent = p.name;
+        savedGroup.appendChild(opt);
+      });
+      this.presetSelect.appendChild(savedGroup);
+    }
+
+    const saveAsOpt = document.createElement('option');
+    saveAsOpt.value = '__save_as__';
+    saveAsOpt.textContent = '\u2014 Save Current As\u2026 \u2014';
+    this.presetSelect.appendChild(saveAsOpt);
+
+    // Delete action only surfaces when there's something to delete.
+    if (saved.length > 0) {
+      const deleteOpt = document.createElement('option');
+      deleteOpt.value = '__delete__';
+      deleteOpt.textContent = '\u2014 Delete saved preset\u2026 \u2014';
+      this.presetSelect.appendChild(deleteOpt);
+    }
+  }
+
+  private buildTabs(container: HTMLElement): void {
+    const genelines = Object.keys(GENELINES).sort() as GeneLine[];
+    for (const g of genelines) {
+      const tab = document.createElement('button');
+      tab.className = 'sb-hud__tab sb-hud__mutator';
+      tab.textContent = this.genelineLabel(g);
+      tab.addEventListener('click', () => {
+        if (this.running) return;
+        this.setActiveGeneline(g);
+      });
+      container.appendChild(tab);
+      this.tabRefs.set(g, tab);
+    }
+    this.refreshTabs();
+  }
+
+  private genelineLabel(g: GeneLine): string {
+    return GENELINE_DEFS[g]?.symbol ?? g;
+  }
+
+  private buildRoster(): void {
+    this.rosterRow.innerHTML = '';
+    this.cardRefs.clear();
+    const keys = GENELINES[this.activeGeneline] ?? [];
+    for (const key of keys) {
+      const card = createUnitCard(key, {
+        preview: this.previewCache.get(key),
+        onClick: () => {
+          if (this.running) return;
+          this.onRosterClick(key);
+        },
+      });
+      card.classList.add('sb-hud__mutator');
+      card.onmouseenter = (e) => { if (!this.running) this.showTooltip(key, e); };
+      card.onmousemove = (e) => this.positionTooltip(e);
+      card.onmouseleave = () => this.hideTooltip();
+      this.rosterRow.appendChild(card);
+      this.cardRefs.set(key, card);
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Stat tooltip on roster-card hover
+  // ---------------------------------------------------------------
+
+  private showTooltip(key: string, e: MouseEvent): void {
+    const def = UNIT_DEFS[key];
+    const dps = (def.atk * def.atkRate).toFixed(1);
+    const tierLbl = (TIER_DEFS[def.tier] || TIER_DEFS[0]).label;
+    const glTag = def.geneline !== 'normal'
+      ? ` ${GENELINE_DEFS[def.geneline]?.symbol ?? ''}` : '';
+    let traitText = TRAIT_DESC[def.trait] || def.desc;
+    if (def.trait === 'ranged') traitText = `Attacks from ${def.range}px range`;
+    else if (def.trait === 'sniper') traitText = `Extreme ${def.range}px range, pierces 2 enemies`;
+
+    this.tooltip.innerHTML = `
+      <div style="font-size:13px;font-weight:bold;color:#ffe080;margin-bottom:4px">${def.name}&nbsp;&nbsp;[${tierLbl}]${glTag}</div>
+      <div style="font-size:12px;color:#ccc;margin-bottom:2px">HP: ${def.hp} &nbsp; ATK: ${def.atk} &nbsp; DPS: ${dps}</div>
+      <div style="font-size:11px;color:#999;margin-bottom:4px">Spd: ${def.spd} &nbsp; Range: ${def.range} &nbsp; Rate: ${def.atkRate}/s</div>
+      <div style="font-size:11px;color:#80c0ff">${traitText}</div>
+    `;
+    this.tooltip.style.display = 'block';
+    this.positionTooltip(e);
+  }
+
+  private positionTooltip(e: MouseEvent): void {
+    if (this.tooltip.style.display === 'none') return;
+    // Tooltip is parented to .sb-hud__panel; position relative to
+    // the panel's bounding box, accounting for Scale.FIT scaling.
+    const panel = this.tooltip.parentElement as HTMLElement;
+    const rect = panel.getBoundingClientRect();
+    const scale = rect.width / 1280;
+    const mx = (e.clientX - rect.left) / scale;
+    const my = (e.clientY - rect.top) / scale;
+    const tw = 260;
+    const th = 100;
+    let tx = mx + 14;
+    let ty = my - th - 14;
+    if (tx + tw > 1276) tx = mx - tw - 14;
+    if (tx < 4) tx = 4;
+    if (ty < 4) ty = my + 14;
+    this.tooltip.style.left = tx + 'px';
+    this.tooltip.style.top = ty + 'px';
+  }
+
+  private hideTooltip(): void {
+    this.tooltip.style.display = 'none';
+  }
+
+  private makeBtn(label: string, cls: string, onClick: () => void): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.className = cls;
+    btn.textContent = label;
+    btn.addEventListener('click', onClick);
+    return btn;
+  }
+
+  // ---------------------------------------------------------------
+  // Event wiring
+  // ---------------------------------------------------------------
+
+  private wireEvents(): void {
+    const escHandler = () => {
       if (this.selectedKey === null) return;
       this.selectedKey = null;
       this.updateSelectedLabel();
       this.eventBus.emit('sandboxSelectUnit', { unitKey: null });
-    });
+    };
+    this.input.keyboard?.on('keydown-ESC', escHandler);
 
     const onSelect = (evt: { unitKey: string | null }) => {
       this.selectedKey = evt.unitKey;
@@ -67,175 +373,44 @@ export class SandboxHUDScene extends Phaser.Scene {
     };
     const onRunning = (evt: { running: boolean }) => {
       this.running = evt.running;
-      this.setRunningLock(evt.running);
+      this.root.classList.toggle('sb-hud--running', evt.running);
+      this.presetSelect.disabled = evt.running;
+      if (evt.running && this.selectedKey !== null) {
+        this.selectedKey = null;
+        this.updateSelectedLabel();
+        this.eventBus.emit('sandboxSelectUnit', { unitKey: null });
+      }
     };
     const onResult = (evt: { result: string; message: string; color: string; timeStr: string }) => {
-      this.resultText.setText(evt.message);
-      this.resultText.setColor(evt.color);
-      this.statsText.setText(evt.timeStr);
+      this.resultLabel.textContent = evt.message;
+      this.resultLabel.style.color = evt.color;
+      this.statsLabel.textContent = evt.timeStr;
+    };
+    const onPresetsChanged = () => {
+      this.rebuildPresetOptions();
+    };
+    const onCount = (evt: { player: number; enemy: number }) => {
+      this.updateCountLabel(evt.player, evt.enemy);
     };
 
     this.eventBus.on('sandboxSelectUnit', onSelect);
     this.eventBus.on('sandboxRunningState', onRunning);
     this.eventBus.on('sandboxFightResult', onResult);
+    this.eventBus.on('sandboxPresetsChanged', onPresetsChanged);
+    this.eventBus.on('sandboxPlacementCount', onCount);
 
     this.events.once('shutdown', () => {
       this.eventBus.off('sandboxSelectUnit', onSelect);
       this.eventBus.off('sandboxRunningState', onRunning);
       this.eventBus.off('sandboxFightResult', onResult);
+      this.eventBus.off('sandboxPresetsChanged', onPresetsChanged);
+      this.eventBus.off('sandboxPlacementCount', onCount);
+      this.input.keyboard?.off('keydown-ESC', escHandler);
     });
   }
 
   // ---------------------------------------------------------------
-  // UI construction
-  // ---------------------------------------------------------------
-
-  private buildTopBar(): void {
-    const topY = 12;
-
-    this.makeBtn(60, topY, '\u25C0 BACK', () => {
-      this.scene.stop('SandboxScene');
-      this.scene.start('MainMenuScene');
-    }, '#888', '13px');
-
-    this.add.text(W * 0.45, topY - 2, 'SANDBOX \u2014 CLICK UNIT TO PLACE', {
-      fontFamily: '"Press Start 2P", monospace',
-      fontSize: '14px', color: '#f0c040',
-    }).setOrigin(0.5, 0);
-
-    this.clearBtn = this.makeBtn(W - 240, topY, '\u2716 CLEAR',
-      () => this.eventBus.emit('sandboxClear', {}), '#aaa', '13px');
-    this.makeBtn(W - 140, topY - 2, '\u2694 FIGHT',
-      () => this.eventBus.emit('sandboxFight', {}), '#f0c040', '16px');
-    this.makeBtn(W - 50, topY, '\u21BB RESET',
-      () => this.eventBus.emit('sandboxReset', {}), '#888', '13px');
-  }
-
-  private buildResultText(): void {
-    this.resultText = this.add.text(W / 2, GND + 20, '', {
-      fontFamily: '"Press Start 2P", monospace',
-      fontSize: '17px', color: '#f0c040',
-    }).setOrigin(0.5, 0);
-
-    this.statsText = this.add.text(W / 2, GND + 42, '', {
-      fontFamily: '"Courier New", monospace',
-      fontSize: '13px', color: '#666',
-    }).setOrigin(0.5, 0);
-  }
-
-  private buildControlPanel(): void {
-    const panelY = CONTROL_PANEL_TOP_Y;
-
-    const panelBg = this.add.graphics();
-    panelBg.fillStyle(0x0a0a14, 0.85);
-    panelBg.fillRect(0, panelY, W, H - panelY);
-    panelBg.lineStyle(1, 0xffffff, 0.1);
-    panelBg.lineBetween(0, panelY, W, panelY);
-
-    // Selected indicator at the top of the panel.
-    this.selectedLabel = this.add.text(20, panelY + 14, '', {
-      fontFamily: '"Press Start 2P", monospace',
-      fontSize: '11px', color: '#ccc',
-    }).setOrigin(0, 0);
-
-    // Geneline tabs in the middle band.
-    this.buildGenelineTabs(panelY + 44);
-
-    // Roster at the bottom. Y cached so setActiveGeneline can rebuild
-    // with the same origin without recomputing.
-    this.rosterY = panelY + 120;
-    this.buildRoster();
-  }
-
-  private buildGenelineTabs(tabY: number): void {
-    const populated = Object.keys(GENELINES).sort() as GeneLine[];
-    const tabW = 140;
-    const gap = 8;
-    const totalW = populated.length * tabW + (populated.length - 1) * gap;
-    let x = (W - totalW) / 2 + tabW / 2;
-
-    for (const g of populated) {
-      const tab = this.add.text(x, tabY, this.genelineLabel(g), {
-        fontFamily: '"Press Start 2P", monospace',
-        fontSize: '11px', color: '#ccc',
-        backgroundColor: '#0a0a14',
-        padding: { x: 11, y: 6 },
-        fixedWidth: tabW,
-        align: 'center',
-      }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true });
-      tab.on('pointerover', () => tab.setAlpha(0.7));
-      tab.on('pointerout', () => tab.setAlpha(this.running ? 0.4 : 1));
-      tab.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-        if (!pointer.leftButtonDown()) return;
-        if (this.running) return;
-        this.setActiveGeneline(g);
-      });
-      this.genelineTabs.set(g, tab);
-      x += tabW + gap;
-    }
-    this.refreshGenelineTabs();
-  }
-
-  private genelineLabel(g: GeneLine): string {
-    if (g === 'normal') return 'UNCLASSIFIED';
-    return g.toUpperCase();
-  }
-
-  private buildRoster(): void {
-    const keys = GENELINES[this.activeGeneline] ?? [];
-    const slotW = 65;
-    const totalW = keys.length * slotW;
-    const startX = (W - totalW) / 2 + slotW / 2;
-
-    for (let i = 0; i < keys.length; i++) {
-      const key = keys[i];
-      const x = startX + i * slotW;
-      const icon = this.add.image(x, this.rosterY, '_sb_preview_' + key);
-      icon.setScale(1.5);
-      icon.setInteractive({ useHandCursor: true });
-      icon.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-        if (!pointer.leftButtonDown()) return;
-        if (this.running) return;
-        this.onRosterClick(key);
-      });
-      this.rosterIcons.push(icon);
-
-      const def = UNIT_DEFS[key];
-      const lbl = this.add.text(x, this.rosterY + 38, def.name, {
-        fontFamily: '"Courier New", monospace',
-        fontSize: '10px', color: '#888',
-      }).setOrigin(0.5, 0);
-      this.rosterLabels.push(lbl);
-    }
-
-    // Re-apply lock styling if rebuilt mid-fight.
-    if (this.running) {
-      this.rosterIcons.forEach((ic) => ic.setAlpha(0.4));
-      this.rosterLabels.forEach((lbl) => lbl.setAlpha(0.4));
-    }
-  }
-
-  private makeBtn(
-    x: number, y: number, label: string, cb: () => void,
-    color: string = '#ccc', size: string = '14px',
-  ): Phaser.GameObjects.Text {
-    const btn = this.add.text(x, y, label, {
-      fontFamily: '"Press Start 2P", monospace',
-      fontSize: size, color: color,
-      backgroundColor: '#0a0a14',
-      padding: { x: 11, y: 6 },
-    }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true });
-    btn.on('pointerover', () => btn.setAlpha(0.7));
-    btn.on('pointerout', () => btn.setAlpha(1));
-    btn.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      if (!pointer.leftButtonDown()) return;
-      cb();
-    });
-    return btn;
-  }
-
-  // ---------------------------------------------------------------
-  // User input handlers
+  // Handlers / state
   // ---------------------------------------------------------------
 
   private onRosterClick(key: string): void {
@@ -248,57 +423,33 @@ export class SandboxHUDScene extends Phaser.Scene {
   private setActiveGeneline(g: GeneLine): void {
     if (this.activeGeneline === g) return;
     this.activeGeneline = g;
-    this.refreshGenelineTabs();
-    // Rebuild the roster with the new geneline's keys.
-    this.rosterIcons.forEach((ic) => ic.destroy());
-    this.rosterIcons = [];
-    this.rosterLabels.forEach((lbl) => lbl.destroy());
-    this.rosterLabels = [];
+    this.refreshTabs();
     this.buildRoster();
-    // Switching tabs should NOT deselect — keep whatever the user had.
-    // If the previously-selected key is no longer in the visible tab,
-    // that's fine; the ghost in SandboxScene stays; user can re-select
-    // from the new tab or switch back.
+    // Selection persists across tab flips (Session C-2 Item 3).
   }
 
   // ---------------------------------------------------------------
   // Visual state
   // ---------------------------------------------------------------
 
-  private refreshGenelineTabs(): void {
-    this.genelineTabs.forEach((tab, g) => {
-      const active = g === this.activeGeneline;
-      tab.setBackgroundColor(active ? '#1a2c40' : '#0a0a14');
-      tab.setColor(active ? '#f0c040' : '#888');
+  private refreshTabs(): void {
+    this.tabRefs.forEach((tab, g) => {
+      tab.classList.toggle('sb-hud__tab--active', g === this.activeGeneline);
     });
   }
 
   private updateSelectedLabel(): void {
     if (!this.selectedKey) {
-      this.selectedLabel.setText('Selected: \u2014');
+      this.selectedLabel.textContent = 'Selected: \u2014';
     } else {
-      const def = UNIT_DEFS[this.selectedKey];
-      this.selectedLabel.setText(`Selected: ${def.name}`);
+      this.selectedLabel.textContent = `Selected: ${UNIT_DEFS[this.selectedKey].name}`;
     }
   }
 
-  /**
-   * Running-state lock. Dim mutator controls + tabs to alpha 0.4
-   * during a fight; restore on reset / win. Click handlers all
-   * early-return on `this.running` so the dimming is purely visual.
-   * Auto-deselects on lock so the ghost in SandboxScene clears.
-   */
-  private setRunningLock(locked: boolean): void {
-    const a = locked ? 0.4 : 1;
-    this.rosterIcons.forEach((ic) => ic.setAlpha(a));
-    this.rosterLabels.forEach((lbl) => lbl.setAlpha(a));
-    this.genelineTabs.forEach((tab) => tab.setAlpha(a));
-    this.selectedLabel.setAlpha(a);
-    this.clearBtn.setAlpha(a);
-    if (locked && this.selectedKey !== null) {
-      this.selectedKey = null;
-      this.updateSelectedLabel();
-      this.eventBus.emit('sandboxSelectUnit', { unitKey: null });
-    }
+  private updateCountLabel(player: number, enemy: number): void {
+    this.countLabel.innerHTML =
+      `<span class="sb-hud__count-p">PLAYER: ${player}</span>` +
+      `&nbsp;&nbsp;` +
+      `<span class="sb-hud__count-e">ENEMY: ${enemy}</span>`;
   }
 }

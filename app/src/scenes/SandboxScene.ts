@@ -14,6 +14,7 @@ import { ParticleManager } from '../systems/ParticleManager';
 import { AudioManager } from '../systems/AudioManager';
 import { HpHud } from '../systems/HpHud';
 import { ViewportController } from '../systems/ViewportController';
+import { saveUserPreset, type Placement } from '../systems/SandboxPresets';
 import type { EffectBearer } from '../config/combat/effects/types';
 import type { RenderUnit, Side, UnitDef } from '../types';
 
@@ -33,14 +34,8 @@ const HIVE_PAD = 57;
 // by screen-space pointer.y instead of world-Y. Zoom-independent.
 // CONTROL_PANEL_H must stay in sync with SandboxHUDScene's constant.
 const TOP_BAR_BOTTOM_Y = 50;
-const CONTROL_PANEL_H = 210;
+const CONTROL_PANEL_H = 240;
 const CONTROL_PANEL_TOP_Y = H - CONTROL_PANEL_H;
-
-interface Placement {
-  unitKey: string;
-  side: Side;
-  x: number;
-}
 
 export class SandboxScene extends Phaser.Scene {
   // Placement state
@@ -166,11 +161,19 @@ export class SandboxScene extends Phaser.Scene {
     const onFight = () => { this.startFight(); };
     const onReset = () => { this.resetArena(); };
     const onClear = () => { this.clearPlacements(); };
+    const onLoadPreset = (evt: { placements: Placement[] }) => {
+      this.handleLoadPreset(evt.placements);
+    };
+    const onSaveAs = (evt: { name: string }) => {
+      this.handleSaveCurrentAs(evt.name);
+    };
 
     this.eventBus.on('sandboxSelectUnit', onSelect);
     this.eventBus.on('sandboxFight', onFight);
     this.eventBus.on('sandboxReset', onReset);
     this.eventBus.on('sandboxClear', onClear);
+    this.eventBus.on('sandboxLoadPreset', onLoadPreset);
+    this.eventBus.on('sandboxSaveCurrentAs', onSaveAs);
 
     if (import.meta.env.DEV) {
       HpHud.attachSource(() => this.units);
@@ -181,6 +184,8 @@ export class SandboxScene extends Phaser.Scene {
       this.eventBus.off('sandboxFight', onFight);
       this.eventBus.off('sandboxReset', onReset);
       this.eventBus.off('sandboxClear', onClear);
+      this.eventBus.off('sandboxLoadPreset', onLoadPreset);
+      this.eventBus.off('sandboxSaveCurrentAs', onSaveAs);
       HpHud.detachSource();
       this.scene.stop('SandboxHUDScene');
     });
@@ -349,6 +354,15 @@ export class SandboxScene extends Phaser.Scene {
     if (!key) return;
     this.placements.push({ unitKey: key, side: this.sideForX(x), x });
     this.renderPlacementSprite(this.placements.length - 1);
+    this.emitPlacementCount();
+  }
+
+  private emitPlacementCount(): void {
+    let player = 0, enemy = 0;
+    for (const p of this.placements) {
+      if (p.side === 'player') player++; else enemy++;
+    }
+    this.eventBus.emit('sandboxPlacementCount', { player, enemy });
   }
 
   /**
@@ -371,6 +385,7 @@ export class SandboxScene extends Phaser.Scene {
       if (dx <= def.w / 2 + 6 && dy <= def.h) {
         this.placements.splice(i, 1);
         this.rerenderAllPlacementSprites();
+        this.emitPlacementCount();
         return;
       }
     }
@@ -412,6 +427,37 @@ export class SandboxScene extends Phaser.Scene {
     this.eventBus.emit('sandboxFightResult', {
       result: 'draw', message: '', color: '#f0c040', timeStr: '',
     });
+    this.emitPlacementCount();
+  }
+
+  /**
+   * Replace the current placement set with a preset's placements.
+   * Mirrors clearPlacements then renders each placement sprite.
+   * No-op during a running fight.
+   */
+  private handleLoadPreset(placements: Placement[]): void {
+    if (this.running) return;
+    this.placements = placements.map((p) => ({ ...p }));
+    this.clearGhost();
+    this.clearPlacementSprites();
+    this.resetBases();
+    this.rerenderAllPlacementSprites();
+    this.selectedUnitKey = null;
+    this.ghostSide = null;
+    this.eventBus.emit('sandboxSelectUnit', { unitKey: null });
+    this.eventBus.emit('sandboxFightResult', {
+      result: 'draw', message: '', color: '#f0c040', timeStr: '',
+    });
+    this.emitPlacementCount();
+  }
+
+  /**
+   * Persist the current placements under the given name. HUD re-
+   * reads the dropdown after the sandboxPresetsChanged broadcast.
+   */
+  private handleSaveCurrentAs(name: string): void {
+    saveUserPreset(name, this.placements);
+    this.eventBus.emit('sandboxPresetsChanged', {});
   }
 
   private resetArena(): void {
@@ -553,6 +599,10 @@ export class SandboxScene extends Phaser.Scene {
     drawUnit(g, renderUnit, pw / 2, pad);
     g.generateTexture(texKey, pw, ph);
     g.destroy();
+    // Pixel-perfect upscale for roster thumbnails + placement ghost
+    // + pre-fight placement sprites at 1.5× camera zoom × 1.2× scale.
+    // Default LINEAR blurs; NEAREST matches the game's pixel-art look.
+    this.textures.get(texKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
   }
 
   // ---------------------------------------------------------------

@@ -45,7 +45,7 @@ export const TIER_DEFS: Record<TierKey, TierDef> = {
 // `def.geneline !== 'normal'` to preserve the "untagged" visual.
 export const GENELINE_DEFS: Partial<Record<GeneLine, GeneLineDef>> = {
   alpha: { symbol: 'α', name: 'Alpha', color: '#c03030' },
-  normal: { symbol: '', name: 'Normal', color: '#888888' },
+  normal: { symbol: '\u2014', name: 'Normal', color: '#888888' },
 };
 
 // Build UNIT_DEFS from all unit modules

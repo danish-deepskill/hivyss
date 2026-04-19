@@ -66,6 +66,41 @@
     .abl-btn:hover:not(:disabled) { filter: brightness(1.3); border-color: #666; }
     .abl-btn:disabled { opacity: .3; cursor: not-allowed; }
     .abl-cd { position: absolute; bottom: 0; left: 0; height: 3px; background: #f0c040; transition: width .1s; }
+
+    /* Sandbox HUD (used by SandboxHUDScene DOM).
+       Root has pointer-events:none so canvas right-drag pans through
+       the HUD panel backdrop; interactive children re-enable auto. */
+    .sb-hud, .sb-hud * { box-sizing: border-box; }
+    .sb-hud__topbar { position: absolute; top: 0; left: 0; right: 0; height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 8px 20px; pointer-events: none; }
+    .sb-hud__title { font-family: 'Press Start 2P', monospace; font-size: 14px; color: #f0c040; pointer-events: none; }
+    .sb-hud__actions { display: flex; gap: 8px; align-items: center; }
+    .sb-hud__back-btn, .sb-hud__action-btn { font-family: 'Press Start 2P', monospace; font-size: 13px; border: none; border-radius: 0; background: #0a0a14; color: #888; padding: 6px 12px; cursor: pointer; pointer-events: auto; transition: opacity .1s; }
+    .sb-hud__back-btn:hover, .sb-hud__action-btn:hover { opacity: 0.7; }
+    .sb-hud__clear-btn { color: #aaa; }
+    .sb-hud__fight-btn { color: #f0c040; font-size: 16px; }
+    .sb-hud__result-area { position: absolute; top: 400px; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; }
+    .sb-hud__result { font-family: 'Press Start 2P', monospace; font-size: 17px; color: #f0c040; }
+    .sb-hud__stats { font-family: 'Courier New', monospace; font-size: 13px; color: #666; }
+    .sb-hud__panel { position: absolute; bottom: 0; left: 0; right: 0; height: 240px; background: rgba(10, 10, 20, 0.85); border-top: 1px solid rgba(255, 255, 255, 0.1); display: flex; flex-direction: column; pointer-events: none; }
+    .sb-hud__panel-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px 0; gap: 20px; pointer-events: none; }
+    .sb-hud__header-left { display: flex; align-items: center; gap: 14px; }
+    .sb-hud__selected { font-family: 'Press Start 2P', monospace; font-size: 11px; color: #ccc; pointer-events: none; }
+    .sb-hud__count { font-family: 'Courier New', monospace; font-size: 11px; color: #888; pointer-events: none; }
+    .sb-hud__count .sb-hud__count-p { color: #40c0ff; }
+    .sb-hud__count .sb-hud__count-e { color: #ff6040; }
+    .sb-hud__tooltip { position: absolute; display: none; background: #0a0a18; border: 1px solid #444466; border-radius: 6px; padding: 8px 12px; pointer-events: none; z-index: 200; width: 260px; font-family: 'Courier New', monospace; color: #ddd; }
+    .sb-hud__presets { display: flex; align-items: center; gap: 8px; pointer-events: auto; }
+    .sb-hud__presets-label { font-family: 'Press Start 2P', monospace; font-size: 10px; color: #888; }
+    .sb-hud__preset-select { font-family: 'Courier New', monospace; font-size: 12px; background: #0a0a14; color: #ccc; border: 1px solid #333; padding: 4px 6px; cursor: pointer; min-width: 180px; }
+    .sb-hud__preset-select:disabled { cursor: not-allowed; }
+    .sb-hud__tabs { display: flex; justify-content: center; gap: 8px; margin-top: 10px; pointer-events: none; }
+    .sb-hud__tab { width: 50px; padding: 6px 0; text-align: center; font-family: 'Press Start 2P', monospace; font-size: 14px; border: 1px solid #222; border-radius: 4px; background: #0e0e1a; color: #888; cursor: pointer; pointer-events: auto; transition: border-color .1s, filter .1s; }
+    .sb-hud__tab:hover { border-color: #555; filter: brightness(1.25); }
+    .sb-hud__tab--active { background: #1a2c40; color: #f0c040; border-color: #f0c040; }
+    .sb-hud__roster { display: flex; justify-content: center; gap: 6px; margin-top: 10px; flex-wrap: wrap; pointer-events: none; }
+    .sb-hud__roster .ucard { pointer-events: auto; }
+    .sb-hud__roster .ucost-row { display: none; }
+    .sb-hud--running .sb-hud__mutator { opacity: 0.4; pointer-events: none; }
   </style>
 </head>
 <body>
