@@ -16,7 +16,7 @@ function buildEnemyPool(geneline: string): EnemyPool {
   const byTier: Record<number, string[]> = {};
 
   Object.entries(UNIT_DEFS).forEach(([key, def]) => {
-    const isMatch = geneline === 'normal' ? !def.geneline : def.geneline === geneline;
+    const isMatch = def.geneline === geneline;
     if (!isMatch) return;
 
     const eKey = 'e' + key;

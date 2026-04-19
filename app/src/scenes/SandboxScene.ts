@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
-import { W, H, SBW } from '../config/Constants';
+import { H, SBW, DEFAULT_WORLD_W } from '../config/Constants';
 import { LANE } from '../config/Layout';
 const GND = LANE.land.groundY;
-import { UNIT_DEFS, TIER_DEFS, drawUnit } from '../units/registry';
+import { UNIT_DEFS, drawUnit } from '../units/registry';
+import { ENEMY_DEFS } from '../config/EnemyDefs';
 import { resolveColors } from '../config/Palettes';
 import { Unit, resetUid } from '../entities/Unit';
 import { BaseStructure } from '../entities/BaseStructure';
@@ -12,53 +13,68 @@ import { EventBus } from '../systems/EventBus';
 import { ParticleManager } from '../systems/ParticleManager';
 import { AudioManager } from '../systems/AudioManager';
 import { HpHud } from '../systems/HpHud';
-import { ScenarioEngine } from '../debug/scenarioEngine';
-import { registerPhase8Scenarios } from '../debug/phase8Scenarios';
+import { ViewportController } from '../systems/ViewportController';
 import type { EffectBearer } from '../config/combat/effects/types';
-import type { RenderUnit, Side } from '../types';
+import type { RenderUnit, Side, UnitDef } from '../types';
 
-// Sandbox base HP — matches production BASE_HP. Low enough that a
-// sustained front line breaks through in 10-30 seconds (fast enough
-// for smoke iteration), high enough that a single unit observing
-// burn/DOT has time to watch ticks before the base falls.
+// Sandbox base HP — matches production BASE_HP.
 const SANDBOX_BASE_HP = 1000;
 const UNIT_KEYS: string[] = Object.keys(UNIT_DEFS);
 
+// Horizontal placement bounds. Each side owns its half of the
+// battlefield; within that half, HIVE_PAD keeps the placement zone
+// outside the hive structure on its own side. Continuity with the
+// pre-rewrite arena offset (player units used to spawn at x=57).
+const HIVE_PAD = 57;
+
+// Screen-space HUD filter — SandboxHUDScene owns these zones. Scene-
+// level pointerdown / pointermove in SandboxScene still fires on HUD
+// background clicks (panel graphics aren't interactive), so we filter
+// by screen-space pointer.y instead of world-Y. Zoom-independent.
+// CONTROL_PANEL_H must stay in sync with SandboxHUDScene's constant.
+const TOP_BAR_BOTTOM_Y = 50;
+const CONTROL_PANEL_H = 210;
+const CONTROL_PANEL_TOP_Y = H - CONTROL_PANEL_H;
+
+interface Placement {
+  unitKey: string;
+  side: Side;
+  x: number;
+}
+
 export class SandboxScene extends Phaser.Scene {
-  private leftKey!: string;
-  private rightKey!: string;
-  private leftCount!: number;
-  private rightCount!: number;
+  // Placement state
+  private placements!: Placement[];
+  private selectedUnitKey!: string | null;
+  // Current ghost tint side (null while no ghost exists). Tracked so
+  // onPointerMove doesn't call setTexture every frame — only when the
+  // pointer crosses the midline and the side actually changes.
+  private ghostSide!: Side | null;
+
+  // Live-battle state
   private units!: Unit[];
   private running!: boolean;
   private elapsed!: number;
   private combat!: CombatSystem;
   private particles!: ParticleManager;
   private audio!: AudioManager;
-  private previews!: void;
-  // Base targets wired via the production BaseStructure + BaseEntity
-  // pair so sandbox smoke tests exercise the same code paths as
-  // WorldScene (ranged base targeting, applyEffectsPhase on
-  // BaseEntity, etc.).
+
+  // Cross-scene comms
+  private eventBus!: EventBus;
+  private viewport!: ViewportController;
+
+  // Base targets
   private playerBaseStructure!: BaseStructure;
   private enemyBaseStructure!: BaseStructure;
   private playerBaseEntity!: BaseEntity;
   private enemyBaseEntity!: BaseEntity;
-  // HP bars drawn above each base. WorldScene gets its bars from
-  // HUDScene (registry-driven); sandbox draws them inline to avoid
-  // launching a second scene just for two bars.
   private playerHpBar!: Phaser.GameObjects.Graphics;
   private enemyHpBar!: Phaser.GameObjects.Graphics;
-  private leftIcon!: Phaser.GameObjects.Image;
-  private leftLabel!: Phaser.GameObjects.Text;
-  private leftCountLabel!: Phaser.GameObjects.Text;
-  private rightIcon!: Phaser.GameObjects.Image;
-  private rightLabel!: Phaser.GameObjects.Text;
-  private rightCountLabel!: Phaser.GameObjects.Text;
-  private fightBtn!: Phaser.GameObjects.Text;
-  private resetBtn!: Phaser.GameObjects.Text;
-  private resultText!: Phaser.GameObjects.Text;
-  private statsText!: Phaser.GameObjects.Text;
+
+  // Placement rendering (world-space)
+  private ghostSprite!: Phaser.GameObjects.Image | null;
+  private ghostInvalidOutline!: Phaser.GameObjects.Graphics;
+  private placementSprites!: Phaser.GameObjects.Image[];
 
   constructor() {
     super('SandboxScene');
@@ -68,95 +84,112 @@ export class SandboxScene extends Phaser.Scene {
     resetUid();
 
     // State
-    this.leftKey = UNIT_KEYS[0];
-    this.rightKey = UNIT_KEYS[1];
-    this.leftCount = 3;
-    this.rightCount = 3;
+    this.placements = [];
+    this.selectedUnitKey = null;
+    this.ghostSide = null;
     this.units = [];
     this.running = false;
-    // Pass W as worldW so the in-CombatSystem wall checks (at
-    // `this.worldW - SBW`) align with the sandbox's visible arena
-    // instead of DEFAULT_WORLD_W=2560. Without this, player units
-    // would march past the visible right edge chasing an invisible
-    // wall, and the BaseEntity wired below would never be reached.
-    this.combat = new CombatSystem(this, new EventBus(), W);
+    this.elapsed = 0;
+    this.ghostSprite = null;
+    this.placementSprites = [];
+
+    // Cross-scene EventBus — stored under a sandbox-prefixed key so
+    // it doesn't collide with WorldScene's 'eventBus'. Must be on the
+    // registry BEFORE SandboxHUDScene launches so the HUD can pick it
+    // up in its own create().
+    this.eventBus = new EventBus();
+    this.registry.set('sandbox.eventBus', this.eventBus);
+
+    // Combat pipeline + rendering helpers. worldW now matches a real
+    // run (DEFAULT_WORLD_W = 2560), so CombatSystem wall checks align
+    // with the expanded arena and combat pacing feels like playtest.
+    this.combat = new CombatSystem(this, new EventBus(), DEFAULT_WORLD_W);
     this.particles = new ParticleManager(this);
     this.audio = new AudioManager();
 
-    // Generate unit preview textures
-    this.previews = this.generatePreviews();
+    // Preview textures for both sides — HUD reads from the same
+    // shared TextureManager, so they must exist before HUD's create()
+    // builds its roster. generatePreviews runs here; scene.launch
+    // for HUD happens after this call.
+    this.generatePreviews();
 
-    // Draw background
     this.drawBackground();
 
-    // Build UI
-    this.buildUI();
-
-    // Real BaseEntity wiring — mirrors GameManager.ts:104-125 but
-    // without larvae / cocoons / wave logic / HP UI. HP is bumped to
-    // SANDBOX_BASE_HP so scenarios have room to observe DOT and
-    // repeated hits before the base dies.
+    // Base wiring — enemy hive pushed to the far end of the expanded
+    // arena.
     this.playerBaseStructure = new BaseStructure(this, 0, 'player');
     this.playerBaseStructure.maxHp = SANDBOX_BASE_HP;
     this.playerBaseStructure.setHp(SANDBOX_BASE_HP);
-    this.enemyBaseStructure = new BaseStructure(this, W - SBW, 'enemy');
+    this.enemyBaseStructure = new BaseStructure(this, DEFAULT_WORLD_W - SBW, 'enemy');
     this.enemyBaseStructure.maxHp = SANDBOX_BASE_HP;
     this.enemyBaseStructure.setHp(SANDBOX_BASE_HP);
     this.playerBaseEntity = new BaseEntity(this.playerBaseStructure, SBW);
-    this.enemyBaseEntity = new BaseEntity(this.enemyBaseStructure, W - SBW);
+    this.enemyBaseEntity = new BaseEntity(this.enemyBaseStructure, DEFAULT_WORLD_W - SBW);
     this.combat.setBaseEntities(this.playerBaseEntity, this.enemyBaseEntity);
 
-    // HP bars above each hive, drawn inline (no HUDScene in sandbox).
     this.playerHpBar = this.add.graphics();
     this.enemyHpBar = this.add.graphics();
     this.redrawHpBars();
 
-    // Spawn initial preview
-    this.resetArena();
+    // Invalid-placement outline reused across pointer moves.
+    this.ghostInvalidOutline = this.add.graphics();
+    this.ghostInvalidOutline.setVisible(false);
 
-    // Debug HP HUD — type `hphud` in the debug console to toggle.
-    // Smoke scenarios — type `scenarios list` in the debug console.
+    // Camera + drag/zoom + keyboard pan. initialCenter at arena
+    // center so both hives read equally at load; sandbox is a
+    // symmetric surface, not a one-sided run. edgeZone: 0 disables
+    // mouse-edge pan — user wants hover near RESET to not scroll.
+    this.viewport = new ViewportController(this);
+    this.viewport.attach({
+      worldW: DEFAULT_WORLD_W,
+      initialCenter: { x: DEFAULT_WORLD_W / 2, y: H / 2 },
+      edgeZone: 0,
+      // Right-click drag so left-click stays dedicated to placement.
+      dragButton: 'right',
+    });
+
+    // Browser right-click menu suppression — right-click is the
+    // placement-delete gesture.
+    this.input.mouse?.disableContextMenu();
+
+    // Battlefield pointer handling — ghost follow + place / delete.
+    this.input.on('pointermove', this.onPointerMove, this);
+    this.input.on('pointerdown', this.onPointerDown, this);
+
+    // HUD launches after previews exist + EventBus is on registry.
+    this.scene.launch('SandboxHUDScene');
+
+    // EventBus subscriptions for HUD-initiated actions.
+    const onSelect = (evt: { unitKey: string | null }) => {
+      this.handleSelectUnit(evt.unitKey);
+    };
+    const onFight = () => { this.startFight(); };
+    const onReset = () => { this.resetArena(); };
+    const onClear = () => { this.clearPlacements(); };
+
+    this.eventBus.on('sandboxSelectUnit', onSelect);
+    this.eventBus.on('sandboxFight', onFight);
+    this.eventBus.on('sandboxReset', onReset);
+    this.eventBus.on('sandboxClear', onClear);
+
     if (import.meta.env.DEV) {
       HpHud.attachSource(() => this.units);
-      ScenarioEngine.attachSandbox(() => ({
-        spawn: (key, side, x) => this.scenarioSpawn(key, side, x),
-        clear: () => this.scenarioClear(),
-        startFight: () => this.scenarioStartFight(),
-      }));
-      registerPhase8Scenarios();
-      this.events.once('shutdown', () => {
-        HpHud.detachSource();
-        ScenarioEngine.detachSandbox();
-      });
     }
+
+    this.events.once('shutdown', () => {
+      this.eventBus.off('sandboxSelectUnit', onSelect);
+      this.eventBus.off('sandboxFight', onFight);
+      this.eventBus.off('sandboxReset', onReset);
+      this.eventBus.off('sandboxClear', onClear);
+      HpHud.detachSource();
+      this.scene.stop('SandboxHUDScene');
+    });
   }
 
-  /**
-   * Scenario API — used by the `/scenarios` dev command to set up
-   * Phase-scoped smoke tests. These helpers mirror the internal
-   * resetArena spawn path but let callers position units at specific
-   * coordinates and mix unit types on the same side. No gameplay
-   * code should call these; they're debug tooling only.
-   */
-  scenarioClear(): void {
-    this.resultText.setText('');
-    this.statsText.setText('');
-    this.running = false;
-    this.elapsed = 0;
-    this.units.forEach((u: Unit) => u.kill());
-    this.units = [];
-    this.resetBases();
-  }
+  // ---------------------------------------------------------------
+  // Base management
+  // ---------------------------------------------------------------
 
-  /**
-   * Restore bases to full HP and wipe any ActiveEffects they may
-   * have accumulated (e.g., burn from a previous Cinderfly run).
-   * Called from both resetArena and scenarioClear so every fresh
-   * scenario starts with clean base state. EffectBearer.activeEffects
-   * is set by EffectSystem.applyEffect lazily; BaseEntity does not
-   * declare the field in its class shape so the reset casts through
-   * the interface the EffectSystem uses.
-   */
   private resetBases(): void {
     this.playerBaseStructure.setHp(SANDBOX_BASE_HP);
     this.enemyBaseStructure.setHp(SANDBOX_BASE_HP);
@@ -167,11 +200,10 @@ export class SandboxScene extends Phaser.Scene {
     if (this.playerHpBar) this.redrawHpBars();
   }
 
-  /** Redraw HP bars above each hive. Mirrors HUDScene.drawHpBar. */
   private redrawHpBars(): void {
     this.drawHpBar(this.playerHpBar, 2, GND - 114, SBW - 4,
       this.playerBaseStructure.hp, this.playerBaseStructure.maxHp, 'player');
-    this.drawHpBar(this.enemyHpBar, W - SBW + 2, GND - 114, SBW - 4,
+    this.drawHpBar(this.enemyHpBar, DEFAULT_WORLD_W - SBW + 2, GND - 114, SBW - 4,
       this.enemyBaseStructure.hp, this.enemyBaseStructure.maxHp, 'enemy');
   }
 
@@ -191,316 +223,366 @@ export class SandboxScene extends Phaser.Scene {
     g.strokeRect(x, y, w, 6);
   }
 
-  scenarioSpawn(key: string, side: Side, x: number): Unit {
-    const def = UNIT_DEFS[key];
-    if (!def) throw new Error(`Unknown unit key: ${key}`);
-    const unit = new Unit(this, { ...def, _key: key }, side, x);
-    this.units.push(unit);
-    return unit;
+  // ---------------------------------------------------------------
+  // HUD-driven state mutators
+  // ---------------------------------------------------------------
+
+  private handleSelectUnit(unitKey: string | null): void {
+    this.selectedUnitKey = unitKey;
+    if (unitKey === null) {
+      this.clearGhost();
+      this.ghostInvalidOutline.clear();
+      this.ghostInvalidOutline.setVisible(false);
+      return;
+    }
+    // Default to player tint on creation; onPointerMove corrects
+    // based on current pointer position once it fires.
+    const initialSide: Side = 'player';
+    const texKey = this.previewKeyForSide(unitKey, initialSide);
+    const def = UNIT_DEFS[unitKey];
+    // Feet-anchor: generateOnePreview uses asymmetric padding (10px
+    // top, 20px bottom). originY = (top_pad + def.h) / texture_height
+    // puts the unit's bottom edge at the passed-in y coord.
+    const originY = (10 + def.h) / (def.h + 30);
+    if (!this.ghostSprite) {
+      this.ghostSprite = this.add.image(-100, -100, texKey);
+      this.ghostSprite.setOrigin(0.5, originY);
+      this.ghostSprite.setAlpha(0.55);
+      this.ghostSprite.setScale(1.2);
+    } else {
+      this.ghostSprite.setTexture(texKey);
+      this.ghostSprite.setOrigin(0.5, originY);
+    }
+    this.ghostSide = initialSide;
   }
 
-  scenarioStartFight(): void {
-    this.running = true;
-    this.elapsed = 0;
-    this.resultText.setText('');
-    this.statsText.setText('');
+  /** Side is derived from the pointer's world X relative to midline. */
+  private sideForX(x: number): Side {
+    return x < DEFAULT_WORLD_W / 2 ? 'player' : 'enemy';
   }
 
-  private buildUI(): void {
-    const cy: number = 28;
-
-    // Title
-    this.add.text(W / 2, 10, 'SANDBOX', {
-      fontFamily: '"Press Start 2P", monospace',
-      fontSize: '20px', color: '#f0c040',
-    }).setOrigin(0.5, 0);
-
-    // Left side controls
-    this.leftIcon = this.add.image(W * 0.2 - 71, cy + 8, '_sb_preview_' + this.leftKey).setScale(1.5);
-    this.leftLabel = this.add.text(W * 0.2 + 14, cy, '', {
-      fontFamily: '"Press Start 2P", monospace',
-      fontSize: '14px', color: '#40c0ff',
-    }).setOrigin(0.5, 0);
-
-    this.leftCountLabel = this.add.text(W * 0.2, cy + 22, '', {
-      fontFamily: '"Courier New", monospace',
-      fontSize: '14px', color: '#aaa',
-    }).setOrigin(0.5, 0);
-
-    // Left arrows
-    this.makeBtn(W * 0.2 - 114, cy, '\u25C0', () => this.cycleUnit('left', -1));
-    this.makeBtn(W * 0.2 + 114, cy, '\u25B6', () => this.cycleUnit('left', 1));
-    this.makeBtn(W * 0.2 - 57, cy + 20, '-', () => this.adjustCount('left', -1));
-    this.makeBtn(W * 0.2 + 57, cy + 20, '+', () => this.adjustCount('left', 1));
-
-    // Right side controls (capped so it doesn't overflow on wide screens)
-    const rx: number = Math.min(W * 0.8, W - 157);
-    this.rightIcon = this.add.image(rx + 71, cy + 8, '_sb_preview_' + this.rightKey).setScale(1.5);
-    this.rightLabel = this.add.text(rx - 14, cy, '', {
-      fontFamily: '"Press Start 2P", monospace',
-      fontSize: '14px', color: '#ff6040',
-    }).setOrigin(0.5, 0);
-
-    this.rightCountLabel = this.add.text(rx, cy + 22, '', {
-      fontFamily: '"Courier New", monospace',
-      fontSize: '14px', color: '#aaa',
-    }).setOrigin(0.5, 0);
-
-    this.makeBtn(rx - 114, cy, '\u25C0', () => this.cycleUnit('right', -1));
-    this.makeBtn(rx + 114, cy, '\u25B6', () => this.cycleUnit('right', 1));
-    this.makeBtn(rx - 57, cy + 20, '-', () => this.adjustCount('right', -1));
-    this.makeBtn(rx + 57, cy + 20, '+', () => this.adjustCount('right', 1));
-
-    // Center buttons
-    this.fightBtn = this.makeBtn(W / 2, cy + 4, '\u2694 FIGHT', () => this.startFight(), '#f0c040', '16px');
-    this.resetBtn = this.makeBtn(W / 2, cy + 26, '\u21BB RESET', () => this.resetArena(), '#888', '13px');
-
-    // Back button
-    this.makeBtn(85, H - 30, '\u25C0 BACK', () => {
-      this.scene.start('MainMenuScene');
-    }, '#888', '13px');
-
-    // Result text
-    this.resultText = this.add.text(W / 2, GND + 20, '', {
-      fontFamily: '"Press Start 2P", monospace',
-      fontSize: '17px', color: '#f0c040',
-    }).setOrigin(0.5, 0);
-
-    // Stats text
-    this.statsText = this.add.text(W / 2, GND + 38, '', {
-      fontFamily: '"Courier New", monospace',
-      fontSize: '13px', color: '#666',
-    }).setOrigin(0.5, 0);
-
-    this.updateLabels();
+  private clearGhost(): void {
+    if (this.ghostSprite) {
+      this.ghostSprite.destroy();
+      this.ghostSprite = null;
+    }
   }
 
-  private makeBtn(x: number, y: number, label: string, cb: () => void, color: string = '#ccc', size: string = '14px'): Phaser.GameObjects.Text {
-    const btn: Phaser.GameObjects.Text = this.add.text(x, y, label, {
-      fontFamily: '"Press Start 2P", monospace',
-      fontSize: size, color: color,
-      backgroundColor: '#0a0a14',
-      padding: { x: 11, y: 6 },
-    }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true });
-    btn.on('pointerover', () => btn.setAlpha(0.7));
-    btn.on('pointerout', () => btn.setAlpha(1));
-    btn.on('pointerdown', cb);
-    return btn;
+  private previewKeyForSide(key: string, side: Side): string {
+    return (side === 'enemy' ? '_sb_preview_e' : '_sb_preview_') + key;
   }
 
-  private cycleUnit(side: string, dir: number): void {
+  // ---------------------------------------------------------------
+  // Pointer handling (battlefield click-to-place + ghost follow)
+  // ---------------------------------------------------------------
+
+  private onPointerMove(pointer: Phaser.Input.Pointer): void {
+    if (!this.ghostSprite || this.selectedUnitKey === null) return;
+
+    // Screen-space HUD filter — zoom-independent. World-space clicks
+    // that happen to land over HUD zones in screen terms are rejected.
+    const inBattlefield =
+      pointer.y >= TOP_BAR_BOTTOM_Y &&
+      pointer.y < CONTROL_PANEL_TOP_Y;
+
+    if (!inBattlefield) {
+      // Pointer is over the HUD — hide the ghost + outline entirely
+      // so a half-sprite doesn't poke above the panel edge.
+      this.ghostSprite.setVisible(false);
+      this.ghostInvalidOutline.setVisible(false);
+      return;
+    }
+
+    this.ghostSprite.setVisible(true);
+    this.ghostSprite.setPosition(pointer.worldX, pointer.worldY);
+
+    // Auto-side: tint flips across the midline. setTexture only on
+    // actual side change so pointermove doesn't thrash the texture.
+    const side = this.sideForX(pointer.worldX);
+    if (side !== this.ghostSide && this.selectedUnitKey) {
+      this.ghostSprite.setTexture(this.previewKeyForSide(this.selectedUnitKey, side));
+      this.ghostSide = side;
+    }
+
+    const valid = this.isValidPlacementForPointer(pointer.worldX);
+
+    if (valid) {
+      this.ghostSprite.clearTint();
+      this.ghostSprite.setAlpha(0.55);
+      this.ghostInvalidOutline.clear();
+      this.ghostInvalidOutline.setVisible(false);
+    } else {
+      this.ghostSprite.setTint(0xff3030);
+      this.ghostSprite.setAlpha(0.4);
+      const w = this.ghostSprite.displayWidth;
+      const h = this.ghostSprite.displayHeight;
+      this.ghostInvalidOutline.clear();
+      this.ghostInvalidOutline.lineStyle(2, 0xff3030, 0.8);
+      this.ghostInvalidOutline.strokeRect(
+        pointer.worldX - w / 2,
+        pointer.worldY - h / 2,
+        w, h,
+      );
+      this.ghostInvalidOutline.setVisible(true);
+    }
+  }
+
+  private onPointerDown(pointer: Phaser.Input.Pointer): void {
     if (this.running) return;
-    const key: 'leftKey' | 'rightKey' = side === 'left' ? 'leftKey' : 'rightKey';
-    let idx: number = UNIT_KEYS.indexOf(this[key]) + dir;
-    if (idx < 0) idx = UNIT_KEYS.length - 1;
-    if (idx >= UNIT_KEYS.length) idx = 0;
-    this[key] = UNIT_KEYS[idx];
-    this.updateLabels();
-    this.resetArena();
+
+    // Screen-space filter — reject clicks on HUD zones.
+    if (pointer.y < TOP_BAR_BOTTOM_Y) return;
+    if (pointer.y >= CONTROL_PANEL_TOP_Y) return;
+
+    if (pointer.rightButtonDown()) {
+      this.tryDeletePlacementAt(pointer.worldX, pointer.worldY);
+      return;
+    }
+
+    if (this.selectedUnitKey === null) return;
+    if (!this.isValidPlacementForPointer(pointer.worldX)) return;
+    this.placeUnit(pointer.worldX);
   }
 
-  private adjustCount(side: string, dir: number): void {
+  private placeUnit(x: number): void {
+    const key = this.selectedUnitKey;
+    if (!key) return;
+    this.placements.push({ unitKey: key, side: this.sideForX(x), x });
+    this.renderPlacementSprite(this.placements.length - 1);
+  }
+
+  /**
+   * Hive exclusion only — side is derived from x via sideForX, so the
+   * only invalid zones are the two hive structures. Midline just
+   * flips which side a placement goes to; no "wrong-side" error.
+   */
+  private isValidPlacementForPointer(x: number): boolean {
+    return x >= HIVE_PAD && x <= DEFAULT_WORLD_W - HIVE_PAD;
+  }
+
+  private tryDeletePlacementAt(x: number, y: number): void {
+    for (let i = this.placements.length - 1; i >= 0; i--) {
+      const p = this.placements[i];
+      const def = UNIT_DEFS[p.unitKey];
+      if (!def) continue;
+      const unitY = LANE[def.route ?? 'land'].groundY;
+      const dx = Math.abs(x - p.x);
+      const dy = Math.abs(y - unitY);
+      if (dx <= def.w / 2 + 6 && dy <= def.h) {
+        this.placements.splice(i, 1);
+        this.rerenderAllPlacementSprites();
+        return;
+      }
+    }
+  }
+
+  private renderPlacementSprite(idx: number): void {
+    const p = this.placements[idx];
+    const def = UNIT_DEFS[p.unitKey];
+    const y = LANE[def.route ?? 'land'].groundY;
+    const spr = this.add.image(p.x, y, this.previewKeyForSide(p.unitKey, p.side));
+    // Feet-anchor — see handleSelectUnit comment for the originY math.
+    spr.setOrigin(0.5, (10 + def.h) / (def.h + 30));
+    spr.setAlpha(0.6);
+    spr.setScale(1.2);
+    this.placementSprites.push(spr);
+  }
+
+  private clearPlacementSprites(): void {
+    this.placementSprites.forEach(s => s.destroy());
+    this.placementSprites = [];
+  }
+
+  private rerenderAllPlacementSprites(): void {
+    this.clearPlacementSprites();
+    for (let i = 0; i < this.placements.length; i++) {
+      this.renderPlacementSprite(i);
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Fight / reset / clear
+  // ---------------------------------------------------------------
+
+  private clearPlacements(): void {
     if (this.running) return;
-    const key: 'leftCount' | 'rightCount' = side === 'left' ? 'leftCount' : 'rightCount';
-    this[key] = Math.max(1, Math.min(10, this[key] + dir));
-    this.updateLabels();
-    this.resetArena();
-  }
-
-  private updateLabels(): void {
-    const ld = UNIT_DEFS[this.leftKey];
-    const rd = UNIT_DEFS[this.rightKey];
-    const lt = TIER_DEFS[ld.tier] || TIER_DEFS[0];
-    const rt = TIER_DEFS[rd.tier] || TIER_DEFS[0];
-    this.leftLabel.setText(ld.name);
-    this.leftLabel.setColor(lt.color);
-    this.leftCountLabel.setText(`x${this.leftCount}`);
-    this.leftIcon.setTexture('_sb_preview_' + this.leftKey);
-    this.rightLabel.setText(rd.name);
-    this.rightLabel.setColor(rt.color);
-    this.rightCountLabel.setText(`x${this.rightCount}`);
-    this.rightIcon.setTexture('_sb_preview_' + this.rightKey);
+    this.placements = [];
+    this.clearPlacementSprites();
+    this.resetBases();
+    this.eventBus.emit('sandboxFightResult', {
+      result: 'draw', message: '', color: '#f0c040', timeStr: '',
+    });
   }
 
   private resetArena(): void {
     resetUid();
     this.running = false;
-    this.resultText.setText('');
-    this.statsText.setText('');
     this.elapsed = 0;
-
-    // Clear existing units
     this.units.forEach((u: Unit) => u.kill());
     this.units = [];
-
-    // Restore bases to full HP so repeat reset/fight cycles don't
-    // accumulate damage across runs.
     this.resetBases();
-
-    // Spawn left team (player side)
-    const ld = UNIT_DEFS[this.leftKey];
-    const spacing: number = Math.round((ld.w + 4) * 1.2);
-    for (let i = 0; i < this.leftCount; i++) {
-      const x: number = Math.round(57) + i * spacing;
-      const unit: Unit = new Unit(this, { ...ld, _key: this.leftKey }, 'player', x);
-      this.units.push(unit);
-    }
-
-    // Spawn right team (enemy side)
-    const rd = UNIT_DEFS[this.rightKey];
-    const rSpacing: number = Math.round((rd.w + 4) * 1.2);
-    for (let i = 0; i < this.rightCount; i++) {
-      const x: number = Math.round(W - 57) - i * rSpacing - Math.round(rd.w);
-      const unit: Unit = new Unit(this, { ...rd, _key: this.rightKey, primary: this.toEnemyColor(rd.primary ?? 0xffffff), secondary: this.toEnemyDark(rd.secondary ?? 0x808080) }, 'enemy', x);
-      this.units.push(unit);
-    }
+    this.rerenderAllPlacementSprites();
+    this.eventBus.emit('sandboxRunningState', { running: false });
+    this.eventBus.emit('sandboxFightResult', {
+      result: 'draw', message: '', color: '#f0c040', timeStr: '',
+    });
   }
 
   private startFight(): void {
     if (this.running) return;
+    if (this.placements.length === 0) return;
+
+    resetUid();
+
+    this.clearPlacementSprites();
+    this.units.forEach((u: Unit) => u.kill());
+    this.units = [];
+
+    for (const p of this.placements) {
+      const baseDef = p.side === 'enemy'
+        ? ENEMY_DEFS['e' + p.unitKey]
+        : UNIT_DEFS[p.unitKey];
+      if (!baseDef) continue;
+      const unit = new Unit(this, { ...baseDef, _key: p.unitKey }, p.side, p.x);
+      this.units.push(unit);
+    }
+
+    this.resetBases();
     this.running = true;
     this.elapsed = 0;
-    this.resultText.setText('');
-    this.statsText.setText('');
+    this.eventBus.emit('sandboxRunningState', { running: true });
+    this.eventBus.emit('sandboxFightResult', {
+      result: 'draw', message: '', color: '#f0c040', timeStr: '',
+    });
   }
 
-  update(time: number, delta: number): void {
+  // ---------------------------------------------------------------
+  // Game loop
+  // ---------------------------------------------------------------
+
+  update(_time: number, delta: number): void {
     const dt: number = Math.min(delta / 1000, 0.05);
 
+    this.viewport.update(dt);
     this.particles.update(dt);
 
     if (!this.running) return;
 
     this.elapsed += dt;
 
-    // Advance base flash animations (mirrors GameManager.tick's
-    // per-frame base.update). Even though the structures are hidden,
-    // update is cheap and keeps state consistent.
     this.playerBaseStructure.update(dt);
     this.enemyBaseStructure.update(dt);
 
     this.combat.resolve(
-      this.units,
-      dt,
-      this.playerBaseStructure,
-      this.enemyBaseStructure,
-      this.particles,
-      0,
-      this.audio,
+      this.units, dt,
+      this.playerBaseStructure, this.enemyBaseStructure,
+      this.particles, 0, this.audio,
     );
 
-    // Re-derive BaseEntity.dead so spatial-index / _findTarget
-    // queries stop returning a destroyed base on the next frame.
-    // Mirrors GameManager.ts:296-297.
     this.playerBaseEntity.syncDead();
     this.enemyBaseEntity.syncDead();
 
     this.redrawHpBars();
 
-    // Clean up dead units
     this.units = this.units.filter((u: Unit) => {
       if (u.dead) { u.kill(); return false; }
       return true;
     });
 
-    // Win condition: a base was destroyed. Mirrors WorldScene/
-    // GameManager victory semantics so sandbox smoke tests reflect
-    // real-match win state. Unit wipeout does NOT end the fight on
-    // its own — the surviving side marches to the opposing wall and
-    // naturally destroys the enemy base.
     const playerBaseDead = this.playerBaseStructure.hp <= 0;
     const enemyBaseDead = this.enemyBaseStructure.hp <= 0;
 
     if (playerBaseDead || enemyBaseDead) {
       this.running = false;
-      const leftAlive = this.units.filter((u: Unit) => u.side === 'player');
-      const rightAlive = this.units.filter((u: Unit) => u.side === 'enemy');
+      this.eventBus.emit('sandboxRunningState', { running: false });
 
+      const timeStr = `${this.elapsed.toFixed(1)}s`;
       if (playerBaseDead && enemyBaseDead) {
-        this.resultText.setText('DRAW!');
-        this.resultText.setColor('#888888');
-        this.statsText.setText(`both bases destroyed | ${this.elapsed.toFixed(1)}s`);
+        this.eventBus.emit('sandboxFightResult', {
+          result: 'draw', message: 'DRAW!', color: '#888888', timeStr,
+        });
       } else if (enemyBaseDead) {
-        this.resultText.setText('PLAYER WINS!');
-        this.resultText.setColor('#40c0ff');
-        const totalHp = leftAlive.reduce((s: number, u: Unit) => s + u.hp, 0);
-        const maxHp = leftAlive.reduce((s: number, u: Unit) => s + u.maxHp, 0);
-        this.statsText.setText(`${leftAlive.length} survived | ${totalHp}/${maxHp} HP | ${this.elapsed.toFixed(1)}s`);
+        this.eventBus.emit('sandboxFightResult', {
+          result: 'player', message: 'PLAYER WINS!', color: '#40c0ff', timeStr,
+        });
       } else {
-        this.resultText.setText('ENEMY WINS!');
-        this.resultText.setColor('#ff6040');
-        const totalHp = rightAlive.reduce((s: number, u: Unit) => s + u.hp, 0);
-        const maxHp = rightAlive.reduce((s: number, u: Unit) => s + u.maxHp, 0);
-        this.statsText.setText(`${rightAlive.length} survived | ${totalHp}/${maxHp} HP | ${this.elapsed.toFixed(1)}s`);
+        this.eventBus.emit('sandboxFightResult', {
+          result: 'enemy', message: 'ENEMY WINS!', color: '#ff6040', timeStr,
+        });
       }
     }
   }
 
+  // ---------------------------------------------------------------
+  // Preview textures — one per (unit, side)
+  // ---------------------------------------------------------------
+
   private generatePreviews(): void {
-    // Clean up any leftover textures from previous visits
     UNIT_KEYS.forEach((key: string) => {
-      const texKey: string = '_sb_preview_' + key;
-      if (this.textures.exists(texKey)) this.textures.remove(texKey);
+      [`_sb_preview_${key}`, `_sb_preview_e${key}`].forEach((texKey) => {
+        if (this.textures.exists(texKey)) this.textures.remove(texKey);
+      });
     });
+
     UNIT_KEYS.forEach((key: string) => {
-      const def = UNIT_DEFS[key];
-      const pad: number = 10;
-      const pw: number = def.w + pad * 2;
-      const ph: number = def.h + pad * 2 + 10;
-      const g: Phaser.GameObjects.Graphics = this.add.graphics();
-      const renderUnit: RenderUnit = {
-        w: def.w, h: def.h,
-        ...resolveColors(def),
-        palette: def.palette,
-        facing: 1, bob: 0,
-        state: 'march' as const, atkCd: 0, atkRate: def.atkRate,
-        trait: def.trait, hp: def.hp, maxHp: def.hp,
-        burrowed: false, foreswingTimer: 0, backswingTimer: 0,
-      };
-      drawUnit(g, renderUnit, pw / 2, pad);
-      const texKey: string = '_sb_preview_' + key;
-      g.generateTexture(texKey, pw, ph);
-      g.destroy();
+      const playerDef = UNIT_DEFS[key];
+      // Player units face right (east) in live spawns; enemies face
+      // left (west). Bake the facing into the preview so the pre-
+      // fight ghost + placement sprite match the live Unit's facing
+      // and don't flip on FIGHT.
+      this.generateOnePreview(playerDef, `_sb_preview_${key}`, 1);
+      const enemyDef = ENEMY_DEFS['e' + key];
+      if (enemyDef) this.generateOnePreview(enemyDef, `_sb_preview_e${key}`, -1);
     });
   }
 
-  private toEnemyColor(col: number): number {
-    const r: number = (col >> 16) & 0xff, g: number = (col >> 8) & 0xff, b: number = col & 0xff;
-    const lum: number = (r + g + b) / 3;
-    return (Math.min(255, Math.round(lum * 0.5 + 140)) << 16) | (Math.round(lum * 0.25 + 16) << 8) | Math.round(lum * 0.2 + 16);
+  private generateOnePreview(def: UnitDef, texKey: string, facing: number): void {
+    const pad = 10;
+    const pw = def.w + pad * 2;
+    const ph = def.h + pad * 2 + 10;
+    const g = this.add.graphics();
+    const renderUnit: RenderUnit = {
+      w: def.w, h: def.h,
+      ...resolveColors(def),
+      palette: def.palette,
+      facing, bob: 0,
+      state: 'march' as const, atkCd: 0, atkRate: def.atkRate,
+      trait: def.trait, hp: def.hp, maxHp: def.hp,
+      burrowed: false, foreswingTimer: 0, backswingTimer: 0,
+    };
+    drawUnit(g, renderUnit, pw / 2, pad);
+    g.generateTexture(texKey, pw, ph);
+    g.destroy();
   }
 
-  private toEnemyDark(dk: number): number {
-    const r: number = (dk >> 16) & 0xff, g: number = (dk >> 8) & 0xff, b: number = dk & 0xff;
-    const lum: number = (r + g + b) / 3;
-    return (Math.min(255, Math.round(lum * 0.4 + 80)) << 16) | (Math.round(lum * 0.12 + 8) << 8) | Math.round(lum * 0.1 + 8);
-  }
+  // ---------------------------------------------------------------
+  // Background (extended across the expanded arena)
+  // ---------------------------------------------------------------
 
   private drawBackground(): void {
-    const bg: Phaser.GameObjects.Graphics = this.add.graphics();
+    const ww = DEFAULT_WORLD_W;
+    const bg = this.add.graphics();
     bg.fillStyle(0x0e0e18);
-    bg.fillRect(0, 0, W, H);
+    bg.fillRect(0, 0, ww, H);
     bg.fillStyle(0xffffff, 0.1);
-    for (let i = 0; i < 50; i++) {
-      bg.fillRect((i * 137.5) % W, (i * 73) % (GND - 20), 1, 1);
+    for (let i = 0; i < 100; i++) {
+      bg.fillRect((i * 137.5) % ww, (i * 73) % (GND - 20), 1, 1);
     }
     bg.fillStyle(0x1e1a0c);
-    bg.fillRect(0, GND, W, H - GND);
+    bg.fillRect(0, GND, ww, H - GND);
     bg.fillStyle(0x2a2410);
-    bg.fillRect(0, GND, W, 8);
+    bg.fillRect(0, GND, ww, 8);
 
-    // VS divider
     bg.lineStyle(1, 0xffffff, 0.08);
     for (let y = 50; y < GND; y += 12) {
       bg.beginPath();
-      bg.moveTo(W / 2, y);
-      bg.lineTo(W / 2, Math.min(y + 4, GND));
+      bg.moveTo(ww / 2, y);
+      bg.lineTo(ww / 2, Math.min(y + 4, GND));
       bg.strokePath();
     }
-    this.add.text(W / 2, GND * 0.5, 'VS', {
+    this.add.text(ww / 2, GND * 0.5, 'VS', {
       fontFamily: '"Press Start 2P", monospace',
       fontSize: '28px', color: '#ffffff',
     }).setOrigin(0.5).setAlpha(0.06);
   }
-
 }

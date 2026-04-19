@@ -19,6 +19,18 @@ export interface GameEvents {
   useAbility: { key: string };
   cancelIncubation: { index: number };
   logMessage: { message: string };
+  // Sandbox events (SandboxHUDScene ↔ SandboxScene)
+  sandboxSelectUnit: { unitKey: string | null };
+  sandboxFight: {};
+  sandboxReset: {};
+  sandboxClear: {};
+  sandboxRunningState: { running: boolean };
+  sandboxFightResult: {
+    result: 'player' | 'enemy' | 'draw';
+    message: string;
+    color: string;
+    timeStr: string;
+  };
 }
 
 type EventKey = keyof GameEvents;

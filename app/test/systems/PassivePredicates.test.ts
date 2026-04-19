@@ -105,8 +105,8 @@ describe('PassivePredicates — lookupPredicate helper', () => {
 describe('PassivePredicates — table completeness pin', () => {
   it('PREDICATE_TABLE contains exactly the documented Stage 4 inventory', () => {
     // Inventory pin — adding a new predicate requires updating this
-    // test, matching the phase8Scenarios cleanup pattern. Stage 4
-    // ships with one predicate: `hp_below_half` (Ravager rage).
+    // test. Stage 4 ships with one predicate: `hp_below_half`
+    // (Ravager rage).
     const keys = Object.keys(PREDICATE_TABLE).sort();
     expect(keys).toEqual(['hp_below_half']);
   });

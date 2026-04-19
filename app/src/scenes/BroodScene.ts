@@ -77,7 +77,7 @@ export class BroodScene extends Phaser.Scene {
       // Run mode: normal (non-geneline) vyssids tier 0-1, pick 3
       this.pool = Object.keys(UNIT_DEFS).filter(k => {
         const def = UNIT_DEFS[k];
-        return !def.geneline && (def.tier as number) <= 1;
+        return def.geneline === 'normal' && (def.tier as number) <= 1;
       });
       this.deckSize = Math.min(RUN_DECK_SIZE, this.pool.length);
     } else {
@@ -273,7 +273,7 @@ export class BroodScene extends Phaser.Scene {
     const def = UNIT_DEFS[key];
     const dps = (def.atk * def.atkRate).toFixed(1);
     const tierLbl = (TIER_DEFS[def.tier] || TIER_DEFS[0]).label;
-    const glTag = def.geneline ? ` ${GENELINE_DEFS[def.geneline].symbol}` : '';
+    const glTag = def.geneline !== 'normal' ? ` ${GENELINE_DEFS[def.geneline]?.symbol ?? ''}` : '';
 
     let traitText = TRAIT_DESC[def.trait] || def.desc;
     if (def.trait === 'ranged') traitText = `Attacks from ${def.range}px range`;

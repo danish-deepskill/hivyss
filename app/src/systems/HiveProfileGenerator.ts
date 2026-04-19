@@ -32,7 +32,7 @@ export function generateHiveProfile(seedNum: number, nodeIndex: number, nodeDef:
   // Build enemy pool by geneline and tier
   const pool: string[] = [];
   Object.entries(UNIT_DEFS).forEach(([key, def]) => {
-    const isMatch = nodeDef.geneline === 'normal' ? !def.geneline : def.geneline === nodeDef.geneline;
+    const isMatch = def.geneline === nodeDef.geneline;
     if (!isMatch) return;
     if ((def.tier as number) > params.maxTier) return;
     pool.push('e' + key);

@@ -38,6 +38,7 @@ const hardshellDef: UnitDef = {
   tier: 0,
   incubation: 5,
   caste: "soldier",
+  geneline: "normal",
   resistance: { blunt: 'strong' },
   defaultAbility: "jaw_strike",
 };
@@ -64,6 +65,7 @@ const grubDef: UnitDef = {
   tier: 0,
   incubation: 3,
   caste: "soldier",
+  geneline: "normal",
   defaultAbility: "jaw_strike",
 };
 
@@ -89,6 +91,7 @@ const prickerDef: UnitDef = {
   tier: 0,
   incubation: 5,
   caste: "soldier",
+  geneline: "normal",
   defaultAbility: "pricker_jab",
 };
 
@@ -116,6 +119,7 @@ const domebackDef: UnitDef = {
   tier: 1,
   incubation: 9,
   caste: "soldier",
+  geneline: "normal",
   defaultAbility: "jaw_strike",
 };
 
@@ -141,6 +145,7 @@ const skitterlingDef: UnitDef = {
   tier: 1,
   incubation: 4,
   caste: "soldier",
+  geneline: "normal",
   defaultAbility: "jaw_strike",
 };
 
@@ -171,6 +176,7 @@ const mendwingDef: UnitDef = {
   tier: 1,
   incubation: 8,
   caste: "soldier",
+  geneline: "normal",
   defaultAbility: "needle_shot",
   passiveHeal: {
     abilityName: "heal_pulse",
@@ -204,6 +210,7 @@ const cinderflyDef: UnitDef = {
   tier: 2,
   incubation: 8,
   caste: "soldier",
+  geneline: "normal",
   resistance: { heat: 'strong', cold: 'weak' },
   defaultAbility: "fire_bite",
 };
@@ -230,6 +237,7 @@ const longeyeDef: UnitDef = {
   tier: 2,
   incubation: 14,
   caste: "soldier",
+  geneline: "normal",
   defaultAbility: "piercing_shot",
 };
 
@@ -259,6 +267,7 @@ const wardlingDef: UnitDef = {
   tier: 2,
   incubation: 11,
   caste: "soldier",
+  geneline: "normal",
   defaultAbility: "jaw_strike",
   auraModifier: {
     stat: "dmg_taken",
@@ -296,6 +305,7 @@ const bashguardDef: UnitDef = {
   tier: 3,
   incubation: 14,
   caste: "soldier",
+  geneline: "normal",
   defaultAbility: "bash_strike",
 };
 
@@ -324,6 +334,7 @@ const stormflyDef: UnitDef = {
   tier: 3,
   incubation: 18,
   caste: "elite",
+  geneline: "normal",
   defaultAbility: "chain_lightning",
 };
 

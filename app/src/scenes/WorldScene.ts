@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
-import { W, DEFAULT_WORLD_W, H } from '../config/Constants';
+import { DEFAULT_WORLD_W, H } from '../config/Constants';
 import { BG_THEMES } from '../config/BackgroundDefs';
 import { LANE } from '../config/Layout';
 const GND = LANE.land.groundY;
 import { ABILITY_DEFS } from '../config/AbilityDefs';
 import { GameManager } from '../systems/GameManager';
 import { capUsed, MAX_CAPACITY } from '../systems/Capacity';
+import { ViewportController } from '../systems/ViewportController';
 import type { PlayerAbilityKey, WaveDef, HiveProfile } from '../types';
 import type { RunBuff } from '../systems/RunState';
 
@@ -24,12 +25,7 @@ export class WorldScene extends Phaser.Scene {
   gm!: GameManager;
   private worldW: number = DEFAULT_WORLD_W;
   private theme: string = 'random';
-  private mouseX: number = -1;
-  private dragStartX: number = 0;
-  private camStartX: number = 0;
-  private dragging: boolean = false;
-  private panKeys!: { left: Phaser.Input.Keyboard.Key; right: Phaser.Input.Keyboard.Key };
-  private zoomKeys!: { zIn: Phaser.Input.Keyboard.Key; zInEq: Phaser.Input.Keyboard.Key; zOut: Phaser.Input.Keyboard.Key; zOutEq: Phaser.Input.Keyboard.Key };
+  private viewport!: ViewportController;
 
   constructor() {
     super('WorldScene');
@@ -75,18 +71,6 @@ export class WorldScene extends Phaser.Scene {
       this.gm.events.off('cancelIncubation', onCancel);
     });
 
-    // Arrow keys for camera pan + zoom
-    this.panKeys = {
-      left: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT),
-      right: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT),
-    };
-    this.zoomKeys = {
-      zIn: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.PLUS),
-      zInEq: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_ADD),
-      zOut: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.MINUS),
-      zOutEq: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_SUBTRACT),
-    };
-
     // ESC — toggle pause overlay
     this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC).on('down', () => {
       if (this.scene.isPaused()) {
@@ -98,50 +82,23 @@ export class WorldScene extends Phaser.Scene {
       }
     });
 
-    // Camera setup — scrollable world wider than viewport
-    const cam = this.cameras.main;
-    cam.setZoom(1.5);
-    cam.setBounds(0, 0, this.worldW, H);
-    cam.centerOn(W / (2 * 1.5), H / 2); // start centered on player hive
-
-    // Track mouse position via canvas event (bypasses DOM container)
-    const canvas = this.sys.game.canvas;
-    const onMouseMove = (e: MouseEvent) => {
-      const rect = canvas.getBoundingClientRect();
-      this.mouseX = ((e.clientX - rect.left) / rect.width) * W;
-    };
-    const onMouseLeave = () => { this.mouseX = -1; };
-    canvas.parentElement!.addEventListener('mousemove', onMouseMove);
-    canvas.parentElement!.addEventListener('mouseleave', onMouseLeave);
-    this.events.once('shutdown', () => {
-      canvas.parentElement!.removeEventListener('mousemove', onMouseMove);
-      canvas.parentElement!.removeEventListener('mouseleave', onMouseLeave);
-    });
-
-    // Drag to pan camera
-    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
-      this.dragStartX = p.x;
-      this.camStartX = cam.scrollX;
-      this.dragging = false;
-    });
-    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
-      if (!p.isDown) return;
-      const dx = this.dragStartX - p.x;
-      if (Math.abs(dx) > 5) this.dragging = true;
-      if (this.dragging) {
-        cam.scrollX = this.camStartX + dx;
-        this.gm.manualPanTimer = 2;
-      }
+    // Camera + pan/zoom controller.
+    this.viewport = new ViewportController(this);
+    this.viewport.attach({
+      worldW: this.worldW,
+      zoom: 1.5,
     });
   }
 
   update(_time: number, delta: number): void {
     const dt: number = Math.min(delta / 1000, 0.05);
 
+    // Pan/zoom tick — owned by ViewportController.
+    this.viewport.update(dt);
+
     // Write shared state to registry every frame (HUDScene + MenuUIScene read these)
-    const cam = this.cameras.main;
-    this.registry.set('cam.scrollX', cam.scrollX);
-    this.registry.set('cam.zoom', cam.zoom);
+    this.registry.set('cam.scrollX', this.viewport.getScrollX());
+    this.registry.set('cam.zoom', this.viewport.getZoom());
     if (this.gm) {
       // Base HP (HUDScene)
       this.registry.set('playerBase.hp', this.gm.playerHive.base.hp);
@@ -197,30 +154,6 @@ export class WorldScene extends Phaser.Scene {
 
     // Tick game logic
     this.gm.tick(dt);
-
-    // Camera zoom — +/- keys
-    const MIN_ZOOM = 1;
-    const MAX_ZOOM = 3;
-    const ZOOM_SPEED = 1.5;
-    if (this.zoomKeys.zIn.isDown || this.zoomKeys.zInEq.isDown) {
-      cam.zoom = Math.min(MAX_ZOOM, cam.zoom + ZOOM_SPEED * dt);
-    } else if (this.zoomKeys.zOut.isDown || this.zoomKeys.zOutEq.isDown) {
-      cam.zoom = Math.max(MIN_ZOOM, cam.zoom - ZOOM_SPEED * dt);
-    }
-
-    // Camera pan — keyboard or mouse at screen edge
-    const panSpeed = 2000;
-    const edgeZone = 200;
-    const atLeftEdge = this.mouseX >= 0 && this.mouseX < edgeZone;
-    const atRightEdge = this.mouseX > W - edgeZone && this.mouseX <= W;
-
-    if (this.panKeys.left.isDown || atLeftEdge) {
-      cam.scrollX -= panSpeed * dt;
-      this.gm.manualPanTimer = 1;
-    } else if (this.panKeys.right.isDown || atRightEdge) {
-      cam.scrollX += panSpeed * dt;
-      this.gm.manualPanTimer = 1;
-    }
   }
 
   private drawBackground(): void {

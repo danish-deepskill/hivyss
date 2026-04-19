@@ -7,6 +7,7 @@ import { BattleScene } from '../scenes/BattleScene';
 import { GameOverScene } from '../scenes/GameOverScene';
 import { BroodScene } from '../scenes/BroodScene';
 import { SandboxScene } from '../scenes/SandboxScene';
+import { SandboxHUDScene } from '../scenes/SandboxHUDScene';
 import { WorldScene } from '../scenes/WorldScene';
 import { HUDScene } from '../scenes/HUDScene';
 import { MenuUIScene } from '../scenes/MenuUIScene';
@@ -25,7 +26,7 @@ export const GameConfig = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [BootScene, PreloadScene, MainMenuScene, BroodScene, BattleScene, WorldScene, HUDScene, MenuUIScene, ModalScene, PauseScene, NodeMapScene, RewardScene, GameOverScene, SandboxScene],
+  scene: [BootScene, PreloadScene, MainMenuScene, BroodScene, BattleScene, WorldScene, HUDScene, MenuUIScene, ModalScene, PauseScene, NodeMapScene, RewardScene, GameOverScene, SandboxScene, SandboxHUDScene],
   dom: { createContainer: true },
   banner: false,
 };

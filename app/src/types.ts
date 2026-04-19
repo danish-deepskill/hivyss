@@ -50,7 +50,16 @@ export interface WorldEntity {
 
 export type TierKey = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 export type CasteKey = 'soldier' | 'elite' | 'royal';
-export type GeneLine = 'alpha';
+// Full 24-letter Greek alphabet + 'normal' as the untagged baseline.
+// Only a few are populated in UNIT_DEFS today (alpha + normal); the
+// rest are declared up front so future content additions typecheck
+// without touching this file.
+export type GeneLine =
+  | 'alpha' | 'beta' | 'gamma' | 'delta' | 'epsilon'
+  | 'zeta' | 'eta' | 'theta' | 'iota' | 'kappa'
+  | 'lambda' | 'mu' | 'nu' | 'xi' | 'omicron'
+  | 'pi' | 'rho' | 'sigma' | 'tau' | 'upsilon'
+  | 'phi' | 'chi' | 'psi' | 'omega' | 'normal';
 export type Route = 'air' | 'land' | 'tunnel';
 export type AttackRange = 'melee' | 'ranged';
 export type UnitRole = 'tank' | 'dps' | 'support' | 'ranged';
@@ -153,7 +162,7 @@ export interface UnitDef {
   tier: TierKey;
   incubation: number;      // [sec] seconds to hatch in Larva Mound (0 = instant, for enemies)
   caste?: CasteKey;
-  geneline?: GeneLine;
+  geneline: GeneLine;
   unlock?: string;
   foreswing?: number;      // [sec] wind-up time before damage lands (default: 30% of 1/atkRate)
   backswing?: number;      // [sec] cosmetic recovery after damage (default: 0.15)

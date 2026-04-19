@@ -69,9 +69,6 @@ export class GameManager {
   kills: number;
   elapsed: number;
 
-  // Camera
-  manualPanTimer: number;
-
   constructor(scene: Phaser.Scene, deckKeys: string[], startWave: number = 1, worldW: number = DEFAULT_WORLD_W, customWaves?: WaveDef[], runBuffs?: RunBuff[], hiveProfile?: HiveProfile, hiveSeed?: number) {
     this.scene = scene;
     this.events = new EventBus();
@@ -136,7 +133,6 @@ export class GameManager {
     this.won = null;
     this.kills = 0;
     this.elapsed = 0;
-    this.manualPanTimer = 0;
 
     // Attach this battle's units to the HpHud overlay (DEV only — the
     // HpHud command is registered at module load and is a no-op until a
@@ -461,28 +457,4 @@ export class GameManager {
     return save.recordGameResult(data.wavesCleared, data.kills, data.won, data.elapsed);
   }
 
-  updateCamera(dt: number): void {
-    if (this.manualPanTimer > 0) {
-      this.manualPanTimer -= dt;
-      return;
-    }
-
-    // Find frontline — rightmost player unit and leftmost enemy unit
-    let playerFront = this.SBW;
-    let enemyFront = this.worldW - this.SBW;
-
-    for (const u of this.units) {
-      if (u.dead) continue;
-      if (u.side === 'player' && u.x > playerFront) playerFront = u.x;
-      if (u.side === 'enemy' && u.x < enemyFront) enemyFront = u.x;
-    }
-
-    // Camera target: center viewport on midpoint between frontlines
-    const cam = this.scene.cameras.main;
-    const viewW = W / cam.zoom;
-    const midpoint = (playerFront + enemyFront) / 2;
-    const targetX = Math.max(0, Math.min(midpoint - viewW / 2, this.worldW - viewW));
-
-    cam.scrollX += (targetX - cam.scrollX) * Math.min(1, 2 * dt); // smooth lerp
-  }
 }

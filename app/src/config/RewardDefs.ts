@@ -26,7 +26,6 @@ function getAvailableVyssids(geneline: string, roster: string[]): string[] {
   return Object.entries(UNIT_DEFS)
     .filter(([key, def]) => {
       if (rosterSet.has(key)) return false;
-      if (geneline === 'normal') return !def.geneline;
       return def.geneline === geneline;
     })
     .map(([key]) => key);

@@ -1,36 +1,26 @@
-// Phase 8 Stage 1 — scaffold correctness tests.
+// CombatSystem behavior tests.
 //
 // Coverage:
 //   - F5 IP-4 `applyDeathTriggerPhase` latch semantics (pure function)
 //   - F5 IP-4 / Finding 12 asymmetric ownership (check-only legacy +
 //     check-and-set death-trigger), simulated with mock legacy + real
 //     applyDeathTriggerPhase on a fresh CombatPipeline
-//   - post_apply registration-order pin via
-//     `registerPhase8PostApplyHandlers` — failing this test catches
+//   - post_apply registration-order pin — failing this test catches
 //     any future refactor that moves the subscribers out of the
 //     [_applyDeathEffectsPhase, applyEffectsPhase, applyDeathTriggerPhase]
 //     order
 //   - F11 placeholder `knockback` EffectDef: `lookupEffect` resolves
 //     (no throw), `applyEffect` lands a clean no-op, `updateEffects`
 //     sweeps the one-frame transient
+//   - Per-unit migration primitives (Legionnaire/Bashguard/Ravager/
+//     Wardling/Centurion/Mendwing/Bombardier/Stormfly/Longeye),
+//     aura dispatch + cleanup, multi-source stacking, pipeline drain,
+//     targetFalloff, effectChance, aoeRider.
 //
 // Strategy: mirrors phase6/phase7a/phase7b shape — do NOT instantiate
 // CombatSystem (it pulls in Phaser). Build a fresh CombatPipeline,
-// register the phase 8 subscribers via the real helper, drive synthetic
-// events through, assert side effects.
-//
-// F3 FORK REVERSAL — no direct test here. The F3 logic lives inline
-// in `CombatSystem.resolve()`'s per-unit attack forEach, which needs
-// a full CombatSystem + Phaser scene to exercise. F3 is pinned
-// indirectly by:
-//   (a) Phase 6/7a/7b parity tests continuing to pass (the canMigrate
-//       path still routes migrated units through the pipeline)
-//   (b) live smoke on `phase7bParity` scenario in phase8Scenarios.ts
-//       (Longeye + Stormfly, whose legacy hooks are onAttack-keyed,
-//       still attack correctly via the new `else if (handler.onAttack)`
-//       fallback branch)
-// If F3's inline fork logic needs to be refactored into a pure
-// helper in a future phase, a direct test can land then.
+// register subscribers via the real helper, drive synthetic events
+// through, assert side effects.
 
 import { describe, it, expect } from 'vitest';
 import { CombatPipeline } from '../../src/systems/CombatPipeline';

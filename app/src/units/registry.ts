@@ -36,9 +36,16 @@ export const TIER_DEFS: Record<TierKey, TierDef> = {
   10: { label: 'QV', name: 'Quettavyss', color: '#ffffff' },
 };
 
-// Geneline display definitions
-export const GENELINE_DEFS: Record<GeneLine, GeneLineDef> = {
+// Geneline display definitions. Partial so only populated genelines
+// need entries — the GeneLine union itself carries all 25 names so
+// future content additions typecheck without touching this map.
+//
+// 'normal' symbol is intentionally empty: consumer sites that render
+// a geneline badge (UnitCard, BroodScene) guard on
+// `def.geneline !== 'normal'` to preserve the "untagged" visual.
+export const GENELINE_DEFS: Partial<Record<GeneLine, GeneLineDef>> = {
   alpha: { symbol: 'α', name: 'Alpha', color: '#c03030' },
+  normal: { symbol: '', name: 'Normal', color: '#888888' },
 };
 
 // Build UNIT_DEFS from all unit modules
@@ -46,6 +53,17 @@ export const UNIT_DEFS: Record<string, UnitDef> = {};
 for (const [key, mod] of Object.entries(UNITS)) {
   UNIT_DEFS[key] = mod.def;
 }
+
+// GENELINES: populated-only map from geneline name → unit keys in
+// that geneline. Sandbox HUD iterates this for tab ordering; non-UI
+// consumers can use it for roster grouping without scanning all defs.
+export const GENELINES: Partial<Record<GeneLine, string[]>> = (() => {
+  const out: Partial<Record<GeneLine, string[]>> = {};
+  for (const [key, def] of Object.entries(UNIT_DEFS)) {
+    (out[def.geneline] ??= []).push(key);
+  }
+  return out;
+})();
 
 // Build draw map: trait -> draw function
 const DRAW_MAP: Record<string, DrawFunction> = {};
