@@ -41,7 +41,12 @@
 | 2. Combat Rewrite Program (10 phases + Phase 7 split) | ✅ DONE 2026-04-17 (634 tests, all 10 phases shipped, architecture closed). Balance v1 number tuning iterative, AI Hive v2 unblocked. | P0 |
 | 4. AI Hive v2 resume | ⏳ UNBLOCKED 2026-04-17 — combat rewrite DONE, primitives live. See AI_PLAN.md. | P1 |
 | 5. Balance v2 (post-AI tuning) | BLOCKED on 4 | P2 |
-| 6. New content / Beta geneline | BLOCKED on 5 | P3 |
+| 6. New content / Beta geneline | BLOCKED on 5 — supersedes by 7 for scope discipline | P3 |
+| 7. MVP geneline slice (v1 scope lock) | 📋 BACKLOG — defines v1.0 vertical-slice geneline set | P2 |
+| 8. Effect System v1 | 📋 BACKLOG — 12-effect body-language layer (Qud-inspired) | P2 |
+| 9. Territory & Garrison System | 📋 BACKLOG — non-linear map, node capture, garrison/expedition split, raid events, ally quests | P2 |
+| 10. Royal Queen-Avatar Implementation | 📋 BACKLOG — unified Queen/Avatar/Hero caste; 4-mode state machine; style package; direct-control hero | P1 |
+| 11. Gene Library & Roster Expansion | 📋 BACKLOG — gene acquisition, chamber tuning, reproduction lore mechanics, individual identity (Tier B) | P1 |
 
 ---
 
@@ -333,6 +338,211 @@ Adding new units mid-rewrite means double-touching every unit. Adding new geneli
 
 ---
 
+## Item 7 — MVP Geneline Slice (P2, 📋 BACKLOG)
+
+> **Added 2026-04-19** during cosmology review. The full Hivyss cosmology specifies ~58 genelines × ~7 units = ~400+ base units, plus evolution branches and mutation forms. At current solo-dev velocity (18 units built over the project lifetime), the full vision is a 10-20 year build. Item 7 locks the **v1 vertical slice** — the minimum geneline set that demonstrates the full design language and cosmology in microcosm.
+
+### Why this is on the roadmap now
+
+- The alphabet + faction + tier refinements in `lore/HIVYSS.md` v1.1 establish what the cosmology *requires structurally*. Item 7 defines what the cosmology *ships in v1.0*.
+- Without a locked MVP, Item 6 ("new content / Beta geneline") risks expanding into all 58 genelines before the battle mechanics v1 spec stabilizes.
+- Pairs with Item 8 (Effect System v1) to define "what ships for the vertical slice."
+
+### Scope
+
+Lock a 5-6 geneline set spanning the cosmology's full design language:
+
+- **1 Classic-tier geneline** — α Alpha (already shipped — the disciplined military baseline)
+- **2 Distinct-tier genelines** — β Multitudes (swarm) + θ Feeders (biomass consume-to-upgrade)
+- **1 Alien-tier geneline** — pick the cheapest Alien to prototype (ν Beacons OR λ Mirrors; ν is cheaper as a prototype)
+- **1 Core-boss geneline** — ω Whole (the Core's answer; contains all 5 primordial aspects at a conceptual level)
+- **1 Phoenician dark-mirror** — ℵ Aleph as the shadow of α (proves the dark-mirror system works)
+
+Additionally, mark all other 50+ genelines as **post-launch** — they exist in the doc as proof of depth (Tolkien lesson) but are not authored until v1.0 proves the cosmology is playable and finds an audience.
+
+### Action items when this resumes
+
+- Lock the exact MVP geneline list with user (the 5-6 above is a proposal; user may pivot)
+- Author full 9-axis geneline spec (per `lore/HIVYSS.md` §6) for each MVP geneline
+- Define per-geneline unit counts and tier distribution within MVP scope
+- Create `app/docs/MVP_GENELINE_SPEC.md` when specs settle
+- Supersede Item 6 "Beta geneline" — β is now part of the MVP slice, not a standalone item
+
+### Open design questions
+
+- Should ω be a shipped geneline or deferred as post-MVP? (Currently in MVP — but ω is architecturally heavy because it bundles 5 primordial aspects)
+- Should Husk/Archaic appear in v1.0 at all? (Currently no — defer all Reckoning content)
+- Should Phoenician appear beyond the one ℵ shadow? (Currently no — ℵ only for v1)
+- What's the **minimum unit count per geneline** for a legibility test? (Guess: 5-7 per geneline, matching α)
+
+### Estimated v1.0 unit count
+
+- 6 genelines × ~6 units/geneline = ~36 units
+- Existing shipped: 18 units (α + Normal)
+- Remaining: ~18 new units to author
+- At current velocity: tractable for 2026
+
+---
+
+## Item 8 — Effect System v1 (P2, 📋 BACKLOG)
+
+> **Added 2026-04-19** during design review of Caves of Qud's effects pattern. Hivyss currently has damage types (9) with per-ability effects, but lacks a unified "body-language" effect system where each effect has a mechanical definition + narrative flavor + visual signature. This item captures the 12-effect v1 that builds the foundation.
+
+### Why this is on the roadmap now
+
+- Your cosmology is **body-as-planet**. Qud's effect design (effects as body-language, not stat-mods) maps directly to your premise more than any other game's pattern.
+- Biome environmental rules (fog, heat, gravity, corruption) per `lore/HIVYSS.md` §8 are currently invisible modifiers — need to become visible effects on units.
+- Mutation system (future) needs progressive/transformation effects as a foundation.
+- Pairs with Item 7 to define "what the MVP slice's combat feels like."
+
+### Scope (v1 = 12 effects)
+
+Each effect has: mechanic + flavor sentence + visual signature (particle color, body tint, silhouette change).
+
+| Effect | Mechanics | Flavor sentence |
+|---|---|---|
+| **Burning** | 2 HP/turn (tier-scaled) | *Chitin splitting from within.* |
+| **Poisoned** | 2% max HP/turn | *Hemolymph curdling.* |
+| **Frozen** | Cannot move, AV up | *Joints seized by cold.* |
+| **Stunned (electric)** | Cannot act 1s | *Nerve-flash.* |
+| **Fear (psychic)** | Flees 2s | *Hive-bond breaking.* |
+| **Void-erased** | Buffs stripped | *Reality forgets this form briefly.* |
+| **Cleansed (holy)** | DOTs removed, +regen | *Burned clean.* |
+| **Husking** | Vulnerable 1s, then +HP | *Shedding what no longer fits.* |
+| **Spore-bloated** | Death AOE, +damage | *Carrying tomorrow's swarm inside.* |
+| **Swarm-lust** | +atkSpeed, -accuracy | *Killing has taught the body wanting.* |
+| **Hive-severed** | -morale, flee chance | *The commander's scent is gone.* |
+| **Mutating** | Transforming, uninterruptible | *In the process of becoming.* |
+
+### Out of scope for v1
+
+- Mental/social states beyond Fear + Hive-severed (defer "lovesick," "shamed," etc. to v2)
+- Environmental effects (biome rules applying as visible unit effects) — v2
+- Phase/reality effects — v2+
+- Equipment/item-level effects — no items shipped yet; N/A
+- Progressive effects beyond Mutating + Husking — v2
+
+### Action items when this resumes
+
+- Write `app/docs/EFFECT_SYSTEM_V1_DESIGN.md` with the 12-effect spec
+- Audit existing damage-type → effect mapping (burn, poison, freeze, stun, fear already exist implicitly)
+- Define the `EffectDef` shape (mechanics, flavor string, visual signature reference)
+- Integrate with existing `EffectVisualSystem` (no redraw of unit draw functions)
+- Write Vitest coverage per effect
+- Audit every existing ability to ensure it applies effects via the new system, not bespoke logic
+
+### Open design questions
+
+- Does "Flavor sentence" belong in `EffectDef` directly, or in a locale-like string table? (Flat in EffectDef for v1; extract when localization is considered)
+- Should Husking be mutually exclusive with Burning? (Probably yes — husking implies an intact carapace cycle; burning = carapace already compromised)
+- Does Hive-severed trigger on commander-role death specifically, or on any T4+ ally death? (Probably role-specific — only commanders grant the severed effect on death)
+- How does Swarm-lust interact with β's Eternal Swarm T6 ability? (Open — test once ω-level abilities exist)
+
+### Dependencies
+
+- Should ship AFTER Item 4 (AI Hive v2) so AI can reason about effects as first-class game state
+- Should ship BEFORE Item 7 (MVP geneline slice) because MVP genelines' abilities will want to emit these effects
+- Parallel-authorable once battle mechanics v1 spec locks
+
+---
+
+## Item 9 — Territory & Garrison System (P2, 📋 BACKLOG)
+
+> **Added 2026-04-19 session 2.** Captures the non-linear strategic-layer mechanics designed in `lore/HIVYSS.md` §9 "Territory & garrison system."
+
+### Scope
+
+- **Node capture mechanics** — only hostile-faction hives (Phoenician, or Hostile/Vengeful rep Greek/Archaic) can be captured
+- **Captured territory states** — generic outpost (no Royal) vs styled sub-hive (Royal placed)
+- **Expedition force vs garrison broods** — two separate unit pools; expedition travels, garrison defends
+- **Conquest loot** — 4 categories (gene-imprint, egg, larva, specimen) with distinct mechanical meaning
+- **Hostile raid events** — periodic rolls for enemy factions to attack captured nodes; 3 player responses (intercept / rush / let garrison fight alone)
+- **Allied faction territory & quests** — 5 ally quest categories (defend ally, capture-for-ally, escort, joint assault, artifact delivery)
+- **Enemy faction offensive** — factions expand, reinforce, besiege, occasionally raid Home Hive (game-ender)
+
+### Dependencies
+
+- Blocks: Long-form run feel (strategic layer carrying 8-15 hours of gameplay)
+- Depends on: AI Hive v2 (factions need strategic-map AI beyond battle AI)
+- Interacts with: Item 10 (Royal defines styled hives), Item 11 (gene library grows via conquest loot)
+
+### Action items when this resumes
+
+- Write `app/docs/TERRITORY_SYSTEM_V1_DESIGN.md`
+- Define node-capture battle conditions (when does a battle trigger capture option?)
+- Define garrison slot count per node (fixed? scales with hive level?)
+- Define raid event frequency and targeting rules (deterministic schedule vs random roll?)
+- Define ally-quest templates and how they interlock with reputation progression
+- Define Home Hive invasion trigger conditions (rare, late-game, high-stakes)
+
+---
+
+## Item 10 — Royal Queen-Avatar Implementation (P1, 📋 BACKLOG)
+
+> **Added 2026-04-19 session 2.** Captures the unified Queen/Avatar/Hero Royal caste designed in `lore/HIVYSS.md` §8.
+
+### Scope
+
+- **4-mode state machine** — docked / traveling / in battle / dead (respawn)
+- **Style package (5 facets)** — visual architecture, passive aura, unit production, pheromone signature, neighbor-reputation effect
+- **Direct-control combat** — WASD/click input bindings for battle mode; combat stats/abilities
+- **Royal Special Bar** — charge through army kills, geneline-specific ultimate
+- **Death/respawn flow** — 90-second timer, hive style fully suspended
+- **Dormant-hive mechanic** — when Royal is traveling or dead, her hive's style effects are suspended (garrison still defends)
+- **Multi-Royal support** — each captured node with a placed Royal becomes a styled sub-hive; acquire additional Royals via T5 evolution, Cooperative faction gift, or post-boss rewards
+
+### Dependencies
+
+- Blocks: ω implementation (ω is a Royal-tier encounter)
+- Blocks: Item 9 (Territory & Garrison — styled hives depend on Royals)
+- Depends on: Battle mechanics v1 spec, capacity system (done), combat rewrite (done)
+
+### Action items when this resumes
+
+- Write `app/docs/ROYAL_CASTE_V1_DESIGN.md`
+- Implement 4-mode state machine as a proper Unit subclass or Comp System
+- Define per-geneline Royal unit data (starting with α Supreme Commander as reference)
+- Implement style package as a subscription-based effect system (Royal's presence subscribes, departure unsubscribes)
+- Integrate with existing Capacity system (Royal has her own cap cost; is she counted toward cap?)
+- UI: Royal HUD (charge bar, abilities, position indicator on map)
+- Animation: Royal has unique idle/combat/ultimate animations
+
+---
+
+## Item 11 — Gene Library & Roster Expansion (P1, 📋 BACKLOG)
+
+> **Added 2026-04-19 session 2.** Captures the gene-based roster system designed in `lore/HIVYSS.md` §11.
+
+### Scope
+
+- **Gene library data model** — Royal's personal collection of accessible genes; persists across battles in a run
+- **9 acquisition paths** — Hive Production (passive), Allied Recruitment, Quest-gated rights, Ally gifts, Captured territory, Evolution, Discovery events, Boss unlocks, Cross-run meta
+- **Chamber tuning** — Larva Chambers attune to a gene; tuned chamber produces that form
+- **Vyss-egg mechanic** — Royal lays unformed eggs; chamber shapes them during incubation
+- **Unit identity tiers** — Generic (gene-spawn, unlimited, death-replaceable) vs Individual (egg/specimen, named, death-permanent)
+- **Individual metadata** — name, quality roll, mutation history, kill count, special abilities per Tier B unit
+- **Conquest loot integration** — gene-imprint extraction (time-limited 1-2 ticks), egg/larva/specimen acquisition
+- **Corruption drift** — Phoenician gene-looting adds Corruption accumulation to Royal
+- **Memory Vault** (Home Hive upgrade) — physical preservation of gene library independent of Royal
+
+### Dependencies
+
+- Blocks: v1 roster feeling rich enough to carry 8-15 hour runs
+- Depends on: Item 10 (Royal carries the library), Item 9 (conquest gives loot)
+- Related to: existing Incubation/Larva system (gene expression happens during incubation)
+
+### Action items when this resumes
+
+- Write `app/docs/GENE_LIBRARY_V1_DESIGN.md`
+- Data model: `Gene` type (geneline, formName, baseStats, abilityRefs), `GeneLibrary` on Royal, `Individual` type for Tier B
+- Refactor existing UnitDef system to be gene-driven (current hardcoded roster → data-driven library)
+- UI: Gene library panel at Home Hive; egg/specimen inventory UI; loot screen with clear "gene added to library" vs "individual joined roster" messaging
+- Chamber tuning UI (which gene is this chamber currently producing?)
+- Corruption tracking per Royal
+- Named individual tracking (names, histories, death permanence)
+
+---
+
 ## Decision log
 
 - **2026-04-12** — User questioned whether AI Hive v2 was premature given missing mechanics (capacity, combat completeness). I agreed. Pivoted to mechanics-first roadmap. AI_PLAN.md marked DEFERRED. This doc created.
@@ -341,6 +551,9 @@ Adding new units mid-rewrite means double-touching every unit. Adding new geneli
 - **2026-04-12** — Capacity implementation pre-review. Executor session surfaced 7 inline questions + 5 findings. Resolved: module (not class) for Capacity.ts, minimal Vitest for pure functions, `[5]` cap label default, stacked vertical bar layout, cyan/teal color, "HIVE FULL" rejection text, distinct red cap-blocked card state (NOT same as can't-afford). Asymmetry of chamber × cap (swarm=chamber-bound, elite=cap-bound) validated as intentional design.
 - **2026-04-12** — Capacity implementation REVIEWED and APPROVED. All review criteria passed. Executor made three improvements beyond spec: structural typing in Capacity.ts for test isolation (no Unit/Chamber import dependency), dependency-injection `unitsProvider` pattern for AI (cleaner than coupling to GameManager), bonus cap bar color-shift at 80%/100% thresholds for early warning. Zero scope creep. 20/20 tests passing. TypeScript clean. Minor non-blocking notes: Centurion cost silently changed from 140 to 100 (flag for balance pass), CAPACITY_DESIGN.md still shows "SPEC" status (should be marked implemented), one awkward comment phrasing. Ready for browser playtest validation.
 - **2026-04-12** — Capacity system implemented. 20 unit tests passing, production build clean. Architectural deviation: built as stateless module instead of `CapacityManager` class (capacity is fully derived state — 0 mutable fields would have made the class cargo-culted parallel structure). Two design surprises during impl: (1) `Unit` class doesn't store `UnitDef` reference, so added `cap` field copied in `init()` matching the existing `cost` pattern; (2) `AIHiveController` had no `gameManager` reference, so threaded `unitsProvider: () => readonly Unit[]` getter through constructor. Awaiting browser playtest.
+- **2026-04-19** — Cosmology/tier design review. Updated `lore/HIVYSS.md` to v1.1: §3 reframed as Expression Tier (biological sophistication, not raw power) with mechanical-complexity + civilization-style columns; §6 added 9th axis (Coptic ancestry); §7 added faction groupings (5 Coptic factions containing Greek+Archaic+Phoenician); §9 reputation restructured per-faction with Phoenician universally hostile for v1; §10 added Reckoning tier (Husk as Primordial prerequisite); §17 added (The Unchosen — unused alphabets as load-bearing absence). Created `app/docs/TIER_CONTRACT.md` as the unit authoring discipline doc (tier complexity ladder, code budget per tier, ability examples per tier, visual signature rules). Added Items 7 (MVP geneline slice) + 8 (Effect System v1) to the roadmap backlog. Scope discipline call: stop adding alphabets, lock 4-alphabet cosmology, ship MVP slice.
+- **2026-04-19 (session 3)** — **Cosmology pivot: Archaic ↔ Coptic roles swapped.** Updated `lore/HIVYSS.md` to v1.4. Archaic Greek (7 letters) promoted to Primordials at T10; Coptic (7 letters, expanded from 5) demoted to Husk-preserved at T5-7. Resolves long-running 5-vs-7 tension: 7 primordials emerge naturally from Archaic's letter count, 7 Coptic letters pair 1:1 with primordials as preserved-variants on the Husk. Primordial aspects rewritten as concrete 7 (Motion/Number/Voice/Gradience/Breath/Territory/Wonder) replacing abstract 5 (Being/Form/Hunger/Echo/Turning). Faction count 5 → 7. Reputation tiers 9 → 7 (Favorable + Suspicious collapsed). α Alpha retheme Primal/Foundational (was Military); δ Delta retheme Disciplined Military (was Hunters). σ-χ Greek letters' "Dark Realm bleed" framing removed (stale — Dark Realm is strictly Phoenician). Geneline count 58 → 60. Historical-genealogical coherence recovered (Archaic Greek actually IS older than Coptic). Also updated `TIER_CONTRACT.md` Primordial mechanical theses for the 7 new aspects. All map files (`lore/primordials_map.svg`, `lore/data/primordials_map.json`) will need regeneration — pentagonal → heptagonal.
+- **2026-04-19 (session 2)** — Deep design session on run length, territory/garrison, castes, Royal, and gene system. Updated `lore/HIVYSS.md` to v1.3: §3 expanded with Civilization lore per tier (T0-T10 human analogs); §10 added long-form tiered run length (CoQ/DCSS-scale: Casual 2-4h / Main 8-15h / True 20-30h / Beyond 40-60h); §9 expanded into full territory/garrison system (non-linear capture, expedition/garrison split, raids, ally quests, enemy offensive, 4 conquest loot types); §8 caste table rewritten (Caste × Tier orthogonal, Elite = auto+player-trigger+smarter AI, Royal = unified Queen+Avatar+Hero with 4 modes); §11 restructured with gene terminology (gene, gene library, gene-imprint, chamber tuning, vyss-egg, specimen), 9 acquisition paths, Lore of Reproduction 7-step process, Unit Identity Tiers (Generic vs Individual); §14 added terminology discipline; §6 added 10th axis (Elite tactical doctrine). Updated `app/docs/TIER_CONTRACT.md` to v1.1 with §11 Caste authoring contract and §12 Unit identity tier. Added Items 9 (Territory & Garrison), 10 (Royal Queen-Avatar Implementation), 11 (Gene Library & Roster Expansion) to roadmap backlog. Design direction locked: long-form tiered roguelike in CoQ/DCSS tradition, not Hades/StS territory. Royal is a microcosm of the Core. Terminology: "gene" over invented alternatives (consistent with existing "geneline").
 - **2026-04-12** — Capacity Item 1 CLOSED. Browser playtest passed all 7 scenarios (deploy cap, cap bar, cap-blocked card visual, death frees, cancel refunds, AI limit, exact 20/20 fit). Two close-out fixes bundled with the roadmap update: (1) AI cap line added to `ai` debug overlay in `GameManager.ts` so future playtests can watch AI cap live, (2) mound slot click-through fix in `index.html` — pre-existing bug since `f5d3da2` where draggable `<img class="lm-preview">` suppressed clicks on the center of the chamber slot. Root cause: HTML images are draggable-by-default, the browser's native drag start suppresses the click event. Fix: `.lm-slot > * { pointer-events: none; }` passes clicks through to the parent onclick. Same latent issue exists on `.ucard .uico-img` but cards are large enough that users never noticed — not fixed proactively, flagged here if anyone hits it later.
 - **2026-04-12** — Item 3 combat audit STARTED and reordered ahead of Item 2 (counter matrix depends on stable damage pipeline). Audit surfaced 9 findings via Explore agent; orchestrator verified each against current code before acting. Finding 5 (Stormfly `hitCount` pool leak) verified as **false positive** — `Unit.init()` already resets it at line 173, agent missed it. Avoided fixing a non-existent bug.
 - **2026-04-12** — Item 3 combat audit CLOSED. 4 commits planned, 3 committed (Stormfly commit skipped due to false positive). `ea29e1f` landed Centurion rally fade-on-exit with multi-centurion `_ralliedByUid` scoping. `74cb2bf` landed `COMBAT_REFERENCE.md` (224 lines) as the source-of-truth reference for Item 2 counter design. 7 findings deferred as tech debt with file:line refs. 11 subsystems verified clean. Scope discipline held: no structural changes to `CombatSystem.ts`, no hook API changes, no refactors. **Key insight for Item 2:** base attacks bypass `hitUnit`, so counter matrix must slot in BEFORE the branch to cover both unit-vs-unit and unit-vs-base — documented in COMBAT_REFERENCE.md. Also flagged: damage variance is asymmetric `[−3, +2]`, `afterHit` fires unconditionally including for `onAttack` units (contract note in reference doc).
