@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { UnitDef, Side, UnitState, RenderUnit, Route, AttackRange, GenePalette, ComponentTag, UnitPersistent, SelfModifierConfig, AuraModifierConfig, PassiveHealConfig } from '../types';
+import type { UnitDef, Side, UnitState, RenderUnit, Route, AttackRange, GenePalette, ComponentTag, UnitPersistent, PassiveDef } from '../types';
 import { hasActiveEffect } from '../systems/EffectSystem';
 import type { DamageType } from '../config/combat/damageTypes';
 import type { ResistanceTier } from '../config/combat/resistances';
@@ -55,9 +55,7 @@ export class Unit extends Phaser.GameObjects.Container {
   // Per-unit ability/behavior fields copied from def in init().
   defaultAbility?: string;
   deathAbility?: string;
-  selfModifier?: SelfModifierConfig;
-  auraModifier?: AuraModifierConfig;
-  passiveHeal?: PassiveHealConfig;
+  passives?: PassiveDef[];
 
   // Direct properties (hot-path / rendering)
   burrowed: boolean;
@@ -203,9 +201,7 @@ export class Unit extends Phaser.GameObjects.Container {
     this.attackRange = def.attackRange ?? 'melee';
     this.defaultAbility = def.defaultAbility;
     this.deathAbility = def.deathAbility;
-    this.selfModifier = def.selfModifier;
-    this.auraModifier = def.auraModifier;
-    this.passiveHeal = def.passiveHeal;
+    this.passives = def.passives;
 
     this.state = 'march';
     this.facing = isPlayer ? 1 : -1;
@@ -338,6 +334,28 @@ export class Unit extends Phaser.GameObjects.Container {
     return this.atk;
   }
 
+  /**
+   * Normalized attack-swing progress for the presentation layer — a
+   * semantic signal, NOT raw timers. `windup` ramps 0→1 across the
+   * foreswing (1 = the impact frame); `recover` falls 1→0 across the
+   * backswing; both 0 when idle. The simulation owns this normalization;
+   * draws / FX / sound consume it (via `getStrike`) and never see the
+   * raw timers or durations. Recovery wins if the two ever overlap.
+   */
+  swingProgress(): { windup: number; recover: number } {
+    if (this.backswingTimer > 0) {
+      const bs = this.backswing > 1e-4 ? this.backswing : 1e-4;
+      const r = this.backswingTimer / bs;
+      return { windup: 0, recover: r < 0 ? 0 : r > 1 ? 1 : r };
+    }
+    if (this.foreswingTimer > 0) {
+      const fs = this.foreswing > 1e-4 ? this.foreswing : 1e-4;
+      const w = 1 - this.foreswingTimer / fs;
+      return { windup: w < 0 ? 0 : w > 1 ? 1 : w, recover: 0 };
+    }
+    return { windup: 0, recover: 0 };
+  }
+
   redraw(): void {
     const g = this.gfx;
     g.clear();
@@ -373,8 +391,7 @@ export class Unit extends Phaser.GameObjects.Container {
       state: this.state, atkCd: this.atkCd, atkRate: this.atkRate,
       trait: this.trait, hp: this.hp, maxHp: this.maxHp,
       burrowed: this.burrowed,
-      foreswingTimer: this.foreswingTimer,
-      backswingTimer: this.backswingTimer,
+      ...this.swingProgress(),
     };
     drawUnit(g, renderUnit, this.unitW / 2, uy);
 

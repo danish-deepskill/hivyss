@@ -14,11 +14,11 @@ import { shiftTier, type ResistanceTier } from '../config/combat/resistances';
 import type { CalcAttacker, CalcTarget } from './CombatPipeline';
 import { setDotDispatcher } from '../config/combat/effects/dispatch';
 import { setStunFxDispatcher, setStaggerFxDispatcher } from '../config/combat/effects/cc';
-import { applyModifiers, addModifier, removeModifiersBySource } from './ModifierSystem';
+import { applyModifiers } from './ModifierSystem';
 import { getResource, addResource } from './ResourceSystem';
-import { lookupPredicate } from './PassivePredicates';
 import { runSelectorInRange } from './Targeting';
 import { lookupAbility } from '../config/combat/abilities';
+import { PASSIVE_HANDLERS, type PassiveTickEnv } from './PassiveHandlers';
 
 /**
  * Variance + crit modify-phase subscriber. Deterministic by default;
@@ -836,131 +836,32 @@ export class CombatSystem {
    * the pre-filtered live roster.
    */
   private updatePassives(units: IUnit[], alive: IUnit[], dt: number): void {
-    // Self-modifier branch.
-    for (const u of alive) {
-      const selfMod = u.selfModifier;
-      if (!selfMod) continue;
-
-      const predicate = lookupPredicate(selfMod.condition);
-      if (!predicate) continue; // unknown predicate — silent skip
-
-      const sourceTag = `self:${u.id}:${selfMod.stat}`;
-      const shouldBeActive = predicate(u);
-      const hasModifier = u.modifiers?.some((m) => m.source === sourceTag) ?? false;
-
-      if (shouldBeActive && !hasModifier) {
-        addModifier(u, {
-          stat: selfMod.stat,
-          type: selfMod.type,
-          value: selfMod.value,
-          source: sourceTag,
-        });
-      } else if (!shouldBeActive && hasModifier) {
-        removeModifiersBySource(u, sourceTag);
-      }
-    }
-
-    // Aura branch. Walks ALL units (dead included) with an
-    // `auraModifier` config; maintains a source-tagged modifier on
-    // every in-range same-side ally.
+    // Registry driver. Each handler sweeps its declared list once and
+    // ticks every matching PassiveDef entry on each carrying unit. The
+    // three handlers (self → aura → heal) are verbatim ports of the
+    // former branches; sweep order and per-unit iteration order are
+    // preserved, so behavior is byte-identical for single-passive units.
     //
-    // Three states:
-    //   - Dead owner + `_auraCleanedUp: false` → ONE-TIME cleanup
-    //     pass removes the owner's source tag from every same-side
-    //     unit carrying it; latch flips to true.
-    //   - Dead owner + `_auraCleanedUp: true` → skip.
-    //   - Alive owner → walked-list: Walk 1 (enter) adds the tag to
-    //     in-range allies missing it; Walk 2 (exit) removes the tag
-    //     from allies already carrying it that are now out of range.
-    //
-    // Source tag `aura:${ownerId}:${stat}` keeps multi-owner overlap
-    // clean: two Wardlings produce two distinct tags on a shared ally,
-    // stacking additively; one owner dying removes ONLY its own tag.
-    //
-    // Distance uses strict-less-than (`>= aura.range` is OUT) for
-    // legacy byte-parity on the boundary.
-    for (const u of units) {
-      const aura = u.auraModifier;
-      if (!aura) continue;
+    // To add a passive kind: add a union variant in types.ts + register
+    // a handler in PassiveHandlers.ts. Nothing changes here.
+    const env: PassiveTickEnv = { alive, units, dt, pipeline: this.pipeline };
 
-      const sourceTag = `aura:${u.id}:${aura.stat}`;
-
-      if (u.dead) {
-        if (u._auraCleanedUp) continue;
-        for (const ally of units) {
-          if (ally === u) continue;
-          if (ally.side !== u.side) continue;
-          if (!ally.modifiers?.some((m) => m.source === sourceTag)) continue;
-          removeModifiersBySource(ally, sourceTag);
-        }
-        u._auraCleanedUp = true;
-        continue;
-      }
-
-      const ux = u.x + u.unitW / 2;
-
-      // Walk 1 — enter.
-      for (const ally of alive) {
-        if (ally === u) continue;
-        if (ally.side !== u.side) continue;
-        const ax = ally.x + ally.unitW / 2;
-        const distance = Math.abs(ax - ux);
-        if (distance >= aura.range) continue;
-        const hasModifier = ally.modifiers?.some((m) => m.source === sourceTag) ?? false;
-        if (!hasModifier) {
-          addModifier(ally, {
-            stat: aura.stat,
-            type: aura.type,
-            value: aura.value,
-            source: sourceTag,
-          });
-        }
-      }
-
-      // Walk 2 — exit.
-      for (const ally of alive) {
-        if (ally === u) continue;
-        if (ally.side !== u.side) continue;
-        const hasModifier = ally.modifiers?.some((m) => m.source === sourceTag) ?? false;
-        if (!hasModifier) continue;
-        const ax = ally.x + ally.unitW / 2;
-        const distance = Math.abs(ax - ux);
-        if (distance >= aura.range) {
-          removeModifiersBySource(ally, sourceTag);
+    for (const handler of PASSIVE_HANDLERS) {
+      const list = handler.sweep === 'all' ? units : alive;
+      for (const u of list) {
+        const passives = u.passives;
+        if (!passives) continue;
+        for (const p of passives) {
+          if (p.kind === handler.kind) handler.tick(u, p, env);
         }
       }
     }
 
-    // Passive-heal branch. Each `passiveHeal`-carrying unit's
-    // `healTimer` accumulates dt; when >= cooldown AND a valid target
-    // exists, queues a heal event and resets the timer. When no
-    // target exists, the timer STAYS at/above cooldown — next-frame
-    // target acquisition fires immediately, no artificial delay.
-    for (const u of alive) {
-      const healCfg = u.passiveHeal;
-      if (!healCfg) continue;
-
-      u.healTimer = (u.healTimer ?? 0) + dt;
-      if (u.healTimer < healCfg.cooldown) continue;
-
-      const ability = lookupAbility(healCfg.abilityName);
-      const targets = runSelectorInRange(
-        ability.targeting,
-        u,
-        ability,
-        alive,
-      );
-      if (targets.length === 0) continue;
-
-      u.healTimer = 0;
-      this.pipeline.queueAbility(u, targets[0] as IUnit, healCfg.abilityName, {});
-    }
-
-    // Drain heal events queued above. Runs BEFORE the attack forEach
-    // so heals land before same-frame damage (Mendwing saves the ally
-    // from the incoming attack). Safe: updatePassives is called from
-    // resolve() before any phase subscriber runs, so this is not
-    // reentrant.
+    // Drain heal events queued by the heal-cast handler. Runs BEFORE the
+    // attack forEach so heals land before same-frame damage (Mendwing
+    // saves the ally from the incoming attack). Safe: updatePassives is
+    // called from resolve() before any phase subscriber runs, so this is
+    // not reentrant.
     this.pipeline.resolveFrame();
   }
 

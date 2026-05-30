@@ -100,7 +100,7 @@ const prickerDef: UnitDef = {
 const domebackDef: UnitDef = {
   name: "Domeback",
   ico: "\u{1FAB2}",
-  hp: 280,
+  hp: 320,
   atk: 22,
   spd: 1.0,
   range: 24,
@@ -127,7 +127,7 @@ const skitterlingDef: UnitDef = {
   name: "Skitterling",
   ico: "\u{1F4A8}",
   hp: 38,
-  atk: 42,
+  atk: 30,
   spd: 4.8,
   range: 24,
   atkRate: 1.3,
@@ -178,10 +178,11 @@ const mendwingDef: UnitDef = {
   caste: "soldier",
   geneline: "normal",
   defaultAbility: "needle_shot",
-  passiveHeal: {
+  passives: [{
+    kind: "heal_cast",
     abilityName: "heal_pulse",
     cooldown: 2,
-  },
+  }],
 };
 
 // --- T3 specialists (70-90n) ---
@@ -218,11 +219,11 @@ const cinderflyDef: UnitDef = {
 const longeyeDef: UnitDef = {
   name: "Longeye",
   ico: "\u{1F52D}",
-  hp: 100,
+  hp: 30,
   atk: 60,
   spd: 0.85,
-  range: 240,
-  atkRate: 0.4,
+  range: 200,
+  atkRate: 0.3,
   cost: 85,
   cap: 3,
   reward: 36,
@@ -248,7 +249,7 @@ const longeyeDef: UnitDef = {
 const wardlingDef: UnitDef = {
   name: "Wardling",
   ico: "\u{1F6E1}\uFE0F",
-  hp: 280,
+  hp: 420,
   atk: 14,
   spd: 1.0,
   range: 30,
@@ -269,12 +270,13 @@ const wardlingDef: UnitDef = {
   caste: "soldier",
   geneline: "normal",
   defaultAbility: "jaw_strike",
-  auraModifier: {
+  passives: [{
+    kind: "aura_modifier",
     stat: "dmg_taken",
     type: "percent",
     value: -20,
     range: 114,
-  },
+  }],
 };
 
 // --- T4 elites (110-130n) ---
@@ -286,8 +288,8 @@ const wardlingDef: UnitDef = {
 const bashguardDef: UnitDef = {
   name: "Bashguard",
   ico: "\u{1F98F}",
-  hp: 320,
-  atk: 50,
+  hp: 380,
+  atk: 16,
   spd: 1.4,
   range: 32,
   atkRate: 0.7,
@@ -302,7 +304,7 @@ const bashguardDef: UnitDef = {
   desc: "Knockback Bruiser",
   route: "land",
   attackRange: "melee",
-  tier: 3,
+  tier: 2,
   incubation: 14,
   caste: "soldier",
   geneline: "normal",

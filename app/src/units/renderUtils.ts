@@ -17,6 +17,42 @@ export function lerpColor(a: number, b: number, t: number): number {
 }
 
 
+/* ── Attack swing animation ──────────────────────────── */
+
+/**
+ * Visual easing of a unit's attack swing. Consumes the simulation's
+ * normalized progress signal (`u.windup` / `u.recover` — see
+ * `Unit.swingProgress`) and shapes it into render-ready values. This
+ * helper owns ONLY the look (the easing curves); the sim owns the timing.
+ *
+ * - `coil`   0 (relaxed) → 1 (fully wound back), during wind-up.
+ * - `lunge`  1 (peak forward thrust at impact) → 0 (recovered), during recovery.
+ * - `reach`  signed body offset: −0.45·coil while winding up, +lunge while striking.
+ * - `impact` sharp 1→0 spike at the contact frame (for hit flashes/sparks).
+ *
+ * Only one of coil/lunge is ever non-zero, so a draw can blend them freely.
+ */
+export interface Strike {
+  coil: number;
+  lunge: number;
+  reach: number;
+  impact: number;
+}
+
+export function getStrike(u: RenderUnit): Strike {
+  // Recovery — the strike + follow-through (fires the moment damage lands).
+  if (u.recover > 0) {
+    const lunge = u.recover * u.recover;       // fast snap-out, eased settle
+    return { coil: 0, lunge, reach: lunge, impact: u.recover * u.recover * u.recover };
+  }
+  // Wind-up.
+  if (u.windup > 0) {
+    const coil = u.windup * u.windup;          // accelerating coil
+    return { coil, lunge: 0, reach: -0.45 * coil, impact: 0 };
+  }
+  return { coil: 0, lunge: 0, reach: 0, impact: 0 };
+}
+
 /* ── Rotation helpers (for tilted body poses) ────────── */
 
 export type RotFn = (px: number, py: number) => [number, number];

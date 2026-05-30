@@ -4,9 +4,9 @@
 import type { AbilityDef } from '../../../types';
 
 export const utilityAbilities: Record<string, AbilityDef> = {
-  // Mendwing's passive heal cast. Dispatched by updatePassives's heal
-  // branch every `passiveHeal.cooldown` seconds against the lowest-HP
-  // in-range ally.
+  // Mendwing's passive heal cast. Dispatched by the heal_cast passive
+  // handler (PassiveHandlers.ts) every `cooldown` seconds against the
+  // lowest-HP in-range ally.
   heal_pulse: {
     name: 'Heal Pulse',
     category: 'heal',
@@ -17,9 +17,9 @@ export const utilityAbilities: Record<string, AbilityDef> = {
     healAmount: 20,
   },
 
-  // Centurion rally aura. Runs via updatePassives's aura dispatch
-  // branch reading `auraModifier` on the unit def, NOT via this
-  // ability — declaration is retained for registry coverage parity.
+  // Centurion rally aura. Runs via the aura_modifier passive handler
+  // reading the unit's `aura_modifier` passive, NOT via this ability —
+  // declaration is retained for registry coverage parity.
   rally_aura: {
     name: 'Rally Aura',
     category: 'passive',
@@ -31,7 +31,7 @@ export const utilityAbilities: Record<string, AbilityDef> = {
   },
 
   // Wardling guardian ward. Same story as rally_aura — real dispatch
-  // reads `auraModifier` on the unit def.
+  // reads the unit's `aura_modifier` passive.
   guardian_ward: {
     name: 'Guardian Ward',
     category: 'passive',

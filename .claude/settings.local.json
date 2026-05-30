@@ -134,7 +134,17 @@
       "Bash(awk 'NR>=353 && NR<=395' c:/Files/Phaser/hivyss/app/docs/MECHANICS_ROADMAP.md)",
       "Bash(awk 'NR>=353 && NR<=395 { gsub\\(/[^[:print:]]/, \"\"\\); if \\(length\\($0\\) > 500\\) { print NR \": [LONG] \" substr\\($0, 1, 300\\) \" ...\"; } else { print NR \": \" $0; } }' c:/Files/Phaser/hivyss/app/docs/MECHANICS_ROADMAP.md)",
       "Bash(awk 'NR==358' c:/Files/Phaser/hivyss/app/docs/MECHANICS_ROADMAP.md)",
-      "Bash(awk 'NR==388' c:/Files/Phaser/hivyss/app/docs/MECHANICS_ROADMAP.md)"
+      "Bash(awk 'NR==388' c:/Files/Phaser/hivyss/app/docs/MECHANICS_ROADMAP.md)",
+      "Bash(git push *)",
+      "WebFetch(domain:hours-roblox.fandom.com)",
+      "Bash(git -C /c/Files/Phaser/hivyss rm app/src/debug/phase8Scenarios.ts app/test/debug/phase8Scenarios.test.ts)",
+      "Bash(git -C /c/Files/Phaser/hivyss mv app/test/systems/CombatSystem.phase8.test.ts app/test/systems/CombatSystem.test.ts)",
+      "Bash(git -C /c/Files/Phaser/hivyss diff --stat app/src/scenes/WorldScene.ts app/src/systems/ViewportController.ts)",
+      "Bash(git -C /c/Files/Phaser/hivyss log --oneline app/src/scenes/WorldScene.ts)",
+      "Bash(git -C /c/Files/Phaser/hivyss log --oneline --all -n 20)",
+      "Bash(git -C /c/Files/Phaser/hivyss show HEAD --stat)",
+      "Bash(git -C /c/Files/Phaser/hivyss log -p --all -- app/src/scenes/WorldScene.ts)",
+      "Bash(git -C /c/Files/Phaser/hivyss log --oneline --all -- app/src/scenes/WorldScene.ts)"
     ],
     "additionalDirectories": [
       "C:\\Work\\Simulation\\hivyss\\app\\src\\draws",

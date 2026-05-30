@@ -2,8 +2,8 @@
 
 **Status:** LOCKED 2026-04-14 (pre-kickoff design session, re-locked 2026-04-14 after Max-budget review pass)
 **Applies to:** Phase 8 unit migration tier 3 (Bashguard, Ravager, Legionnaire, Wardling, Centurion, Bombardier, Stormfly + Mendwing + Longeye)
-**Supersedes:** Phase 8 handoff inputs F1–F14 from the Phase 7b closure entry in [MECHANICS_ROADMAP.md](MECHANICS_ROADMAP.md). F3–F13 are resolved here. F14 is an audit log, not a decision.
-**Read first:** [COMBAT_REWRITE_DECISIONS.md](COMBAT_REWRITE_DECISIONS.md) (6 structural decisions), [COMBAT_REWRITE_PLAN.md](COMBAT_REWRITE_PLAN.md) Phase 8 section (deliverables + exit criteria), [COMBAT_REFERENCE.md](COMBAT_REFERENCE.md) (legacy baseline).
+**Supersedes:** Phase 8 handoff inputs F1–F14 from the Phase 7b closure entry in [MECHANICS_ROADMAP.md](../active/MECHANICS_ROADMAP.md). F3–F13 are resolved here. F14 is an audit log, not a decision.
+**Read first:** [COMBAT_REWRITE_DECISIONS.md](COMBAT_REWRITE_DECISIONS.md) (6 structural decisions), [COMBAT_REWRITE_PLAN.md](COMBAT_REWRITE_PLAN.md) Phase 8 section (deliverables + exit criteria), [COMBAT_REFERENCE.md](../reference/COMBAT_REFERENCE.md) (legacy baseline).
 
 ## Re-lock history (2026-04-14)
 
@@ -692,7 +692,7 @@ No other Phase 5 amendments have been authorized. Phase 8 kickoff should verify 
 Executor, as task #1 of the Phase 8 session, BEFORE any migration work:
 
 1. `grep -rn 'ActiveEffect\|EffectContext\|EffectDef' app/src/systems/EffectSystem.ts app/src/config/combat/effects/types.ts`
-2. Compare the current shape of `ActiveEffect`, `EffectContext`, `EffectDef`, `EffectBearer`, and the EffectSystem public API against what Phase 5 shipped (see [MECHANICS_ROADMAP.md decision log entry for Phase 5, 2026-04-13](MECHANICS_ROADMAP.md)).
+2. Compare the current shape of `ActiveEffect`, `EffectContext`, `EffectDef`, `EffectBearer`, and the EffectSystem public API against what Phase 5 shipped (see [MECHANICS_ROADMAP.md decision log entry for Phase 5, 2026-04-13](../active/MECHANICS_ROADMAP.md)).
 3. The only authorized additions post-Phase 5 are:
    - `ActiveEffect.accumulator?: number` (Phase 7a)
    - `EffectContext.instance: ActiveEffect` (Phase 7a)
@@ -923,7 +923,7 @@ Per the refined scope discipline (see memory `feedback_behavior_patches` — Men
    - `_deathTriggerFired` reset in `Unit.init()`
    - `_legacyPostApplyPhase` guard updated
    - `applyDeathTriggerPhase` guard inline (per F5 IP-4)
-2. Finding 12 entry added to Combat Audit tech debt section of [MECHANICS_ROADMAP.md](MECHANICS_ROADMAP.md) in the Phase 8 closure commit. Entry shape mirrors Findings 10 and 11 from Phase 7b closure.
+2. Finding 12 entry added to Combat Audit tech debt section of [MECHANICS_ROADMAP.md](../active/MECHANICS_ROADMAP.md) in the Phase 8 closure commit. Entry shape mirrors Findings 10 and 11 from Phase 7b closure.
 3. Test coverage: `phase8.test.ts` adds a re-entry test — "Bombardier hit twice in one drain cycle triggers death_bomb exactly once" — verifies the guard works.
 
 ---

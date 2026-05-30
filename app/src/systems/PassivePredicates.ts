@@ -19,8 +19,9 @@
 //   2. Add a test in `PassivePredicates.test.ts` covering the
 //      predicate's truth table (positive case, negative case,
 //      boundary case).
-//   3. Reference the new key from a `UnitDef.selfModifier.condition`
-//      field on the consuming unit.
+//   3. Reference the new key from a `self_modifier` passive's
+//      `condition` (an entry in `UnitDef.passives`) on the consuming
+//      unit.
 //
 // NO STATE:
 //   Predicates are STATELESS. They read `u.hp / u.maxHp` or

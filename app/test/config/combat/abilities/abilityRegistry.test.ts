@@ -54,8 +54,8 @@ describe('legacy unit attack-pattern coverage', () => {
     // Phase 8 Stage 4 item 14 — migrated via F5 IP-5 passiveHeal
     // + F13=B locked 90px range. `needle_shot` is Mendwing's
     // offensive (defaultAbility); `heal_pulse` is the passive heal
-    // queued by the updatePassives heal dispatch branch via
-    // `passiveHeal: { abilityName: 'heal_pulse', cooldown: 2 }`.
+    // queued by the heal_cast passive handler via a
+    // `{ kind: 'heal_cast', abilityName: 'heal_pulse', cooldown: 2 }` passive.
     // Legacy mendwingCombat.onUpdate DELETED.
     { unit: 'mendwing',    ability: 'needle_shot' },
     { unit: 'mendwing',    ability: 'heal_pulse' },
@@ -64,8 +64,8 @@ describe('legacy unit attack-pattern coverage', () => {
     // Phase 8 Stage 4 item 12 — migrated via F5 IP-1 + walked-list
     // aura (dmg_taken -20%, range 114). `jaw_strike` is Wardling's
     // offensive; `guardian_ward` AbilityDef is now pre-rewrite
-    // design-doc data (the aura runs via wardlingDef.auraModifier,
-    // not via the ability dispatch). Both entries retained — the
+    // design-doc data (the aura runs via wardlingDef's aura_modifier
+    // passive, not via the ability dispatch). Both entries retained — the
     // dual-coverage pattern matches pre-migration design intent
     // that a unit with an offensive attack + passive aura has
     // TWO abilities in the registry.
@@ -95,8 +95,8 @@ describe('legacy unit attack-pattern coverage', () => {
     // aura (atk +20%, range 80). SECOND consumer of the aura
     // dispatch branch (first: Wardling item 12). `jaw_strike` is
     // Centurion's offensive; `rally_aura` AbilityDef is now pre-
-    // rewrite design-doc data (the aura runs via
-    // centurionDef.auraModifier, not via the ability dispatch).
+    // rewrite design-doc data (the aura runs via centurionDef's
+    // aura_modifier passive, not via the ability dispatch).
     // Matches the Wardling + guardian_ward dual-coverage pattern.
     { unit: 'centurion',   ability: 'jaw_strike' },
     { unit: 'centurion',   ability: 'rally_aura' },

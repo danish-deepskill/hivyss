@@ -342,7 +342,7 @@ Phase 10 ───────────────────────�
    - Safety cap: 200 events per `resolveFrame` call.
    - **Dead-target skip:** events with `target.dead === true` skipped at start of resolution.
 
-2. **`DamageEvent` interface in `types.ts`** — matches the spec from [DESIGN_PATTERNS.md:803](DESIGN_PATTERNS.md#L803):
+2. **`DamageEvent` interface in `types.ts`** — matches the spec from [DESIGN_PATTERNS.md:803](../reference/DESIGN_PATTERNS.md#L803):
    ```ts
    interface DamageEvent {
      attacker: WorldEntity;
@@ -423,7 +423,7 @@ Phase 10 ───────────────────────�
    - `debuff.ts` — atk_debuff, armor_crack, marked
    - `special.ts` — lifesteal, reflect, soul_linked, rally_target
 
-2. **`EffectDef` interface and lifecycle hooks** — matches spec from [DESIGN_PATTERNS.md:660](DESIGN_PATTERNS.md#L660):
+2. **`EffectDef` interface and lifecycle hooks** — matches spec from [DESIGN_PATTERNS.md:660](../reference/DESIGN_PATTERNS.md#L660):
    - `onApply`, `onTick`, `onExpire`, `onStack`
    - Stackable / non-stackable rules
    - Per-tier stats
@@ -872,7 +872,7 @@ event.finalDamage = Math.round(dmg);
 The following are explicitly NOT part of the combat rewrite:
 
 1. **World rollback / divergent timeline abilities** (Butterfly Effect class). Requires deterministic simulation engine across AI/movement/RNG/particles. Separate workstream if ever pursued.
-2. **AI plan.** Deferred until after Combat Rewrite + Balance v1. See [MECHANICS_ROADMAP.md](MECHANICS_ROADMAP.md).
+2. **AI plan.** Deferred until after Combat Rewrite + Balance v1. See [MECHANICS_ROADMAP.md](../active/MECHANICS_ROADMAP.md).
 3. **New unit content.** No new units during the rewrite. Migrate existing units only. New units come post-rewrite.
 4. **Visual rewrites.** Effect visuals stay on the legacy `EffectVisualSystem` path. Replacing the visual system is a separate concern.
 5. **New genelines.** Beta and beyond wait for combat rewrite to land. Adding genelines mid-rewrite would double-touch every unit.
@@ -913,8 +913,8 @@ When Phase 10 ships:
 ## Related docs
 
 - [COMBAT_REWRITE_DECISIONS.md](COMBAT_REWRITE_DECISIONS.md) — locked decisions this plan is built on
-- [COMBAT_REFERENCE.md](COMBAT_REFERENCE.md) — legacy combat baseline (what we're replacing)
-- [DESIGN_PATTERNS.md](DESIGN_PATTERNS.md#L460) — original 5-layer spec (now extended)
-- [GAME_DESIGN.md](GAME_DESIGN.md#L715) — damage types and resistance design
-- [MECHANICS_ROADMAP.md](MECHANICS_ROADMAP.md) — overall program tracking
+- [COMBAT_REFERENCE.md](../reference/COMBAT_REFERENCE.md) — legacy combat baseline (what we're replacing)
+- [DESIGN_PATTERNS.md](../reference/DESIGN_PATTERNS.md#L460) — original 5-layer spec (now extended)
+- [GAME_DESIGN.md](../reference/GAME_DESIGN.md#L715) — damage types and resistance design
+- [MECHANICS_ROADMAP.md](../active/MECHANICS_ROADMAP.md) — overall program tracking
 - [Capacity.ts](../src/systems/Capacity.ts), [Capacity.test.ts](../test/systems/Capacity.test.ts) — pure-function test pattern reference

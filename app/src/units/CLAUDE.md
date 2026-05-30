@@ -57,7 +57,7 @@ export const draw: DrawFunction = (g, u, cx, uy) => {
 **There are no `CombatHooks` anymore.** Unit behavior is defined entirely in data:
 
 - **Basic attack** — `defaultAbility: 'ability_name'` on the def. The ability lives in `config/combat/abilities/` and carries dmgType, targeting, range, targetCount, tiers, appliesEffects, targetFalloff, chainRange, overchargeEvery, aoeRider — everything the pipeline needs.
-- **Passive behaviors** — `auraModifier`, `selfModifier`, `passiveHeal` fields on the def. The IP-5 passive tick loop reads these every frame and dispatches source-tracked modifiers / heal casts.
+- **Passive behaviors** — `passives: PassiveDef[]` on the def — a discriminated union keyed by `kind` (`'self_modifier' | 'aura_modifier' | 'heal_cast'`). The `PASSIVE_HANDLERS` registry (`systems/PassiveHandlers.ts`) ticks each entry every frame, dispatching source-tracked modifiers / heal casts. To add a per-frame tick-passive kind: add a union variant in `types.ts` + register a handler — no new UnitDef field. SCOPE: this is only the per-frame tick band; event-driven behaviors (reflect, thorns, lifesteal) belong in pipeline phases, terrain in the WorldEntity layer.
 - **Death triggers** — `deathAbility: 'ability_name'` on the def. `applyDeathTriggerPhase` queues the named ability when the unit dies.
 - **Status effects** — `appliesEffects: ['burn', 'stun', ...]` on the ability. EffectDef declares `duration`, `tiers`, lifecycle hooks (`onApply`, `onTick`, `onExpire`, `onStack`).
 - **AOE spread** — `aoeRider: { effect, radius, targetCount, excludePrimary }` on the ability. `applyAoeRiderPhase` applies the effect to nearby targets.

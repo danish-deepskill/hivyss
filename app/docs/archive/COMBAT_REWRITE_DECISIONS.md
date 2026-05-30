@@ -10,7 +10,7 @@ Read each decision. Approve the recommendation, redirect, or request more analys
 
 ## Background
 
-Driven by 20-ability validation across 4 test rounds. The original 5-layer spec from [DESIGN_PATTERNS.md:460](DESIGN_PATTERNS.md#L460) was necessary but incomplete. Test abilities surfaced load-bearing gaps:
+Driven by 20-ability validation across 4 test rounds. The original 5-layer spec from [DESIGN_PATTERNS.md:460](../reference/DESIGN_PATTERNS.md#L460) was necessary but incomplete. Test abilities surfaced load-bearing gaps:
 
 - **WorldEntity** — zones, projectiles, pylons, pickups, trail segments don't fit "Unit"
 - **Resources** — charges, ammo, mana need a non-HP non-cooldown primitive
@@ -303,4 +303,4 @@ If any decision is redirected, Doc 2 waits. That's why this split exists — loc
 ## Out of scope (already decided, restated for fresh sessions)
 
 - **World rollback / divergent timeline abilities** (Butterfly Effect class) — combat rewrite cannot enable these. Requires deterministic simulation engine spanning AI/movement/RNG/particles. Separate workstream if ever pursued.
-- **AI plan** — deferred until after Combat Rewrite + Balance v1. See [MECHANICS_ROADMAP.md](MECHANICS_ROADMAP.md) sequencing.
+- **AI plan** — deferred until after Combat Rewrite + Balance v1. See [MECHANICS_ROADMAP.md](../active/MECHANICS_ROADMAP.md) sequencing.

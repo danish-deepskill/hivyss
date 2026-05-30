@@ -141,6 +141,39 @@ export interface PassiveHealConfig {
   cooldown: number;
 }
 
+/**
+ * Discriminator for the per-frame passive tick band. Each kind has a
+ * registered handler in `PASSIVE_HANDLERS` (systems/PassiveHandlers.ts)
+ * that knows how to tick it. Add a new kind here + a handler there —
+ * no new UnitDef field, no new branch wired into the combat loop.
+ *
+ * SCOPE: this union is ONLY the per-frame tick band (auras, self-buff
+ * toggles, heal casts, future regen/shield-pulse). Event-driven
+ * behaviors (reflect, thorns, lifesteal — fire on a damage/hit event)
+ * belong in PIPELINE PHASES, not here. Terrain/structures belong in the
+ * WorldEntity layer. T6+ apex behaviors are bespoke subsystems.
+ */
+export type PassiveKind = 'self_modifier' | 'aura_modifier' | 'heal_cast';
+
+/**
+ * A single always-on passive behavior, discriminated by `kind`. Variant
+ * payloads reuse the existing config interfaces verbatim.
+ *
+ * Authoring shape lives on `UnitDef.passives`; `Unit.init()` copies the
+ * array onto the runtime unit, where the registry driver dispatches each
+ * entry to its handler every frame.
+ *
+ * Multi-instance note: modifier passives (self/aura) support multiple
+ * entries via distinct source tags (`aura:${id}:${stat}`). Timer/latch
+ * passives (heal_cast via `healTimer`, aura dead-cleanup via
+ * `_auraCleanedUp`) carry single-instance per-unit state — one entry of
+ * those kinds per unit. All current units are single-passive.
+ */
+export type PassiveDef =
+  | ({ kind: 'self_modifier' } & SelfModifierConfig)
+  | ({ kind: 'aura_modifier' } & AuraModifierConfig)
+  | ({ kind: 'heal_cast' } & PassiveHealConfig);
+
 export interface UnitDef {
   name: string;
   ico: string;
@@ -176,14 +209,12 @@ export interface UnitDef {
   /** Ability key queued on death via applyDeathTriggerPhase. */
   deathAbility?: string;
 
-  /** Self-modifier applied/removed by updatePassives based on a named predicate. */
-  selfModifier?: SelfModifierConfig;
-
-  /** Continuously-active aura applied to in-range same-side allies. */
-  auraModifier?: AuraModifierConfig;
-
-  /** Cooldown-gated passive heal cast. */
-  passiveHeal?: PassiveHealConfig;
+  /**
+   * Always-on passive behaviors (per-frame tick band). Discriminated by
+   * `kind`; dispatched by the PASSIVE_HANDLERS registry each frame. See
+   * `PassiveDef` for the scope fence (event-passives → pipeline phases).
+   */
+  passives?: PassiveDef[];
 
   /** Per-damage-type resistance tier. Omitted types default to 'normal'. */
   resistance?: Partial<Record<DamageType, ResistanceTier>>;
@@ -231,8 +262,13 @@ export interface RenderUnit {
   hp: number;
   maxHp: number;
   burrowed: boolean;
-  foreswingTimer: number;
-  backswingTimer: number;
+  // Normalized attack-swing progress — a semantic signal, NOT raw timers.
+  // `windup` ramps 0→1 across the foreswing (1 = the impact frame);
+  // `recover` falls 1→0 across the backswing; both 0 when idle. The
+  // simulation owns the normalization (`Unit.swingProgress`); draws / FX /
+  // sound apply visual easing via `getStrike` (units/renderUtils.ts).
+  windup: number;
+  recover: number;
   // Optional — Stormfly's draw reads resources.castCount for the
   // overcharge anticipation ring.
   resources?: Record<string, number>;
@@ -354,9 +390,7 @@ export interface IUnit extends WorldEntity {
    */
   _deathTriggerFired?: boolean;
   deathAbility?: string;
-  selfModifier?: SelfModifierConfig;
-  auraModifier?: AuraModifierConfig;
-  passiveHeal?: PassiveHealConfig;
+  passives?: PassiveDef[];
   /**
    * Aura death-cleanup re-entry latch. Flipped to true after
    * updatePassives runs its ONE-TIME cleanup pass removing the dead

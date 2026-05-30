@@ -183,7 +183,7 @@ export class BroodScene extends Phaser.Scene {
         facing: 1, bob: 0, state: 'march' as const,
         atkCd: 0, atkRate: def.atkRate,
         trait: def.trait, hp: def.hp, maxHp: def.hp,
-        burrowed: false, foreswingTimer: 0, backswingTimer: 0,
+        burrowed: false, windup: 0, recover: 0,
       };
       drawUnit(g, renderUnit, pw / 2, pad);
 

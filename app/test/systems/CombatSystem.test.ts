@@ -48,10 +48,24 @@ import { applyModifiers, addModifier, removeModifiersBySource } from '../../src/
 import { lookupPredicate } from '../../src/systems/PassivePredicates';
 import { runSelectorInRange } from '../../src/systems/Targeting';
 import { getResource, addResource } from '../../src/systems/ResourceSystem';
-import type { DamageEvent, IUnit, WorldEntity, ComponentTag } from '../../src/types';
+import type { DamageEvent, IUnit, WorldEntity, ComponentTag, PassiveDef } from '../../src/types';
 import type { Modifier } from '../../src/systems/ModifierSystem';
 import type { DamageType } from '../../src/config/combat/damageTypes';
 import type { ResistanceTier } from '../../src/config/combat/resistances';
+
+// Post-Batch-0 passives shape: behaviors live in a discriminated
+// `passives[]` union instead of the old flat selfModifier/auraModifier/
+// passiveHeal fields. This typed accessor finds the single entry of a
+// given kind (all current units are single-passive) with proper
+// narrowing, replacing the former direct field reads.
+function findPassive<K extends PassiveDef['kind']>(
+  src: { passives?: PassiveDef[] } | undefined,
+  kind: K,
+): Extract<PassiveDef, { kind: K }> | undefined {
+  return src?.passives?.find(
+    (p): p is Extract<PassiveDef, { kind: K }> => p.kind === kind,
+  );
+}
 
 // ------------------------------------------------------------------
 // Fixture builders
@@ -1126,8 +1140,9 @@ describe('phase8 Stage 4 item 11 — Ravager migration', () => {
     // changes the `condition` key trips this test first. All four
     // fields are load-bearing for the Ravager rage behavior.
     const def = UNIT_DEFS.ravager;
-    expect(def.selfModifier).toBeDefined();
-    expect(def.selfModifier).toEqual({
+    expect(findPassive(def, 'self_modifier')).toBeDefined();
+    expect(findPassive(def, 'self_modifier')).toEqual({
+      kind: 'self_modifier',
       stat: 'atkRate',
       type: 'percent',
       value: 50,
@@ -1162,7 +1177,7 @@ describe('phase8 Stage 4 item 11 — Ravager migration', () => {
       hp: 100,
       maxHp: 160,
       atkRate: 1.25,
-      selfModifier: UNIT_DEFS.ravager.selfModifier,
+      passives: UNIT_DEFS.ravager.passives,
       modifiers: [],
       components: new Set(['HasHP', 'HasAI', 'IsTargetable', 'HasModifiers']),
     } as unknown as IUnit;
@@ -1199,7 +1214,7 @@ describe('phase8 Stage 4 item 11 — Ravager migration', () => {
       hp: 50,
       maxHp: 100,
       atkRate: 1.1,
-      selfModifier: undefined,
+      passives: undefined,
       modifiers: [],
       components: new Set(['HasHP', 'HasAI', 'IsTargetable', 'HasModifiers']),
     } as unknown as IUnit;
@@ -1216,7 +1231,7 @@ describe('phase8 Stage 4 item 11 — Ravager migration', () => {
       hp: 80, // exactly half of 160 (Ravager's real maxHp)
       maxHp: 160,
       atkRate: 1.25,
-      selfModifier: UNIT_DEFS.ravager.selfModifier,
+      passives: UNIT_DEFS.ravager.passives,
       modifiers: [],
       components: new Set(['HasHP', 'HasAI', 'IsTargetable', 'HasModifiers']),
     } as unknown as IUnit;
@@ -1235,7 +1250,7 @@ describe('phase8 Stage 4 item 11 — Ravager migration', () => {
 // signal, not a test failure.
 function runSelfModifierDispatch(alive: IUnit[]): void {
   for (const u of alive) {
-    const selfMod = u.selfModifier;
+    const selfMod = findPassive(u, 'self_modifier');
     if (!selfMod) continue;
     const predicate = lookupPredicate(selfMod.condition);
     if (!predicate) continue;
@@ -1272,7 +1287,7 @@ function runSelfModifierDispatch(alive: IUnit[]): void {
  */
 function runAuraDispatch(units: IUnit[], alive: IUnit[]): void {
   for (const u of units) {
-    const aura = u.auraModifier;
+    const aura = findPassive(u, 'aura_modifier');
     if (!aura) continue;
 
     const sourceTag = `aura:${u.id}:${aura.stat}`;
@@ -1333,7 +1348,7 @@ function makeAuraFixture(opts: {
   x: number;
   side: 'player' | 'enemy';
   dead?: boolean;
-  auraModifier?: IUnit['auraModifier'];
+  auraModifier?: Extract<PassiveDef, { kind: 'aura_modifier' }>;
   modifiers?: Modifier[];
 }): IUnit {
   return {
@@ -1344,7 +1359,7 @@ function makeAuraFixture(opts: {
     unitH: 20,
     side: opts.side,
     dead: opts.dead ?? false,
-    auraModifier: opts.auraModifier,
+    passives: opts.auraModifier ? [opts.auraModifier] : undefined,
     modifiers: opts.modifiers ?? [],
     components: new Set(['HasHP', 'HasAI', 'IsTargetable', 'HasModifiers']),
     _auraCleanedUp: false,
@@ -1360,8 +1375,9 @@ describe('phase8 Stage 4 item 12 — Wardling migration', () => {
 
   it('wardlingDef declares the F5 IP-1 + IP-5 auraModifier config shape', () => {
     const def = UNIT_DEFS.wardling;
-    expect(def.auraModifier).toBeDefined();
-    expect(def.auraModifier).toEqual({
+    expect(findPassive(def, 'aura_modifier')).toBeDefined();
+    expect(findPassive(def, 'aura_modifier')).toEqual({
+      kind: 'aura_modifier',
       stat: 'dmg_taken',
       type: 'percent',
       value: -20,
@@ -1371,7 +1387,7 @@ describe('phase8 Stage 4 item 12 — Wardling migration', () => {
 
   it('wardlingDef does NOT carry selfModifier (aura units use auraModifier)', () => {
     const def = UNIT_DEFS.wardling;
-    expect(def.selfModifier).toBeUndefined();
+    expect(findPassive(def, 'self_modifier')).toBeUndefined();
   });
 
   it('offensive parity: migrated jaw_strike finalDamage = max(1, round(wardling.atk × 1.0))', () => {
@@ -1388,7 +1404,7 @@ describe('phase8 Stage 4 item 12 — aura dispatch integration', () => {
     const wardling = makeAuraFixture({
       x: 100,
       side: 'player',
-      auraModifier: UNIT_DEFS.wardling.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.wardling, 'aura_modifier'),
     });
     const ally = makeAuraFixture({ x: 150, side: 'player' });
     // Center-to-center distance: (150+10) - (100+10) = 50 < 114 → in range.
@@ -1405,7 +1421,7 @@ describe('phase8 Stage 4 item 12 — aura dispatch integration', () => {
     const wardling = makeAuraFixture({
       x: 100,
       side: 'player',
-      auraModifier: UNIT_DEFS.wardling.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.wardling, 'aura_modifier'),
     });
     const ally = makeAuraFixture({ x: 300, side: 'player' });
     // Center-to-center: (300+10) - (100+10) = 200 >= 114 → out of range.
@@ -1419,7 +1435,7 @@ describe('phase8 Stage 4 item 12 — aura dispatch integration', () => {
     const wardling = makeAuraFixture({
       x: 100,
       side: 'player',
-      auraModifier: UNIT_DEFS.wardling.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.wardling, 'aura_modifier'),
     });
     const enemy = makeAuraFixture({ x: 150, side: 'enemy' });
 
@@ -1432,7 +1448,7 @@ describe('phase8 Stage 4 item 12 — aura dispatch integration', () => {
     const wardling = makeAuraFixture({
       x: 100,
       side: 'player',
-      auraModifier: UNIT_DEFS.wardling.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.wardling, 'aura_modifier'),
     });
 
     runAuraDispatch([wardling], [wardling]);
@@ -1444,7 +1460,7 @@ describe('phase8 Stage 4 item 12 — aura dispatch integration', () => {
     const wardling = makeAuraFixture({
       x: 100,
       side: 'player',
-      auraModifier: UNIT_DEFS.wardling.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.wardling, 'aura_modifier'),
     });
     const ally = makeAuraFixture({ x: 150, side: 'player' });
 
@@ -1466,7 +1482,7 @@ describe('phase8 Stage 4 item 12 — aura dispatch integration', () => {
     const wardling = makeAuraFixture({
       x: 100,
       side: 'player',
-      auraModifier: UNIT_DEFS.wardling.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.wardling, 'aura_modifier'),
     });
     const ally = makeAuraFixture({ x: 150, side: 'player' });
 
@@ -1487,7 +1503,7 @@ describe('phase8 Stage 4 item 12 — aura dispatch integration', () => {
     const wardling = makeAuraFixture({
       x: 100,
       side: 'player',
-      auraModifier: UNIT_DEFS.wardling.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.wardling, 'aura_modifier'),
     });
     // Center-to-center distance exactly 114: (214+10) - (100+10) = 114
     const ally = makeAuraFixture({ x: 214, side: 'player' });
@@ -1501,7 +1517,7 @@ describe('phase8 Stage 4 item 12 — aura dispatch integration', () => {
     const wardling = makeAuraFixture({
       x: 100,
       side: 'player',
-      auraModifier: UNIT_DEFS.wardling.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.wardling, 'aura_modifier'),
     });
     const ally = makeAuraFixture({ x: 213, side: 'player' });
 
@@ -1516,7 +1532,7 @@ describe('phase8 Stage 4 item 12 — aura death cleanup', () => {
     const wardling = makeAuraFixture({
       x: 100,
       side: 'player',
-      auraModifier: UNIT_DEFS.wardling.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.wardling, 'aura_modifier'),
     });
     const ally = makeAuraFixture({ x: 150, side: 'player' });
 
@@ -1539,7 +1555,7 @@ describe('phase8 Stage 4 item 12 — aura death cleanup', () => {
     const wardling = makeAuraFixture({
       x: 100,
       side: 'player',
-      auraModifier: UNIT_DEFS.wardling.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.wardling, 'aura_modifier'),
     });
     const ally = makeAuraFixture({ x: 150, side: 'player' });
 
@@ -1577,12 +1593,12 @@ describe('phase8 Stage 4 item 12 — multi-Wardling additive stacking', () => {
     const wardling1 = makeAuraFixture({
       x: 100,
       side: 'player',
-      auraModifier: UNIT_DEFS.wardling.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.wardling, 'aura_modifier'),
     });
     const wardling2 = makeAuraFixture({
       x: 200,
       side: 'player',
-      auraModifier: UNIT_DEFS.wardling.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.wardling, 'aura_modifier'),
     });
     // Ally at x=150 — within 114 of both wardlings (dist ~50 and ~50).
     const ally = makeAuraFixture({ x: 150, side: 'player' });
@@ -1607,12 +1623,12 @@ describe('phase8 Stage 4 item 12 — multi-Wardling additive stacking', () => {
     const wardling1 = makeAuraFixture({
       x: 100,
       side: 'player',
-      auraModifier: UNIT_DEFS.wardling.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.wardling, 'aura_modifier'),
     });
     const wardling2 = makeAuraFixture({
       x: 200,
       side: 'player',
-      auraModifier: UNIT_DEFS.wardling.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.wardling, 'aura_modifier'),
     });
     const ally = makeAuraFixture({ x: 150, side: 'player' });
     const units = [wardling1, wardling2, ally];
@@ -1631,12 +1647,12 @@ describe('phase8 Stage 4 item 12 — multi-Wardling additive stacking', () => {
     const wardling1 = makeAuraFixture({
       x: 100,
       side: 'player',
-      auraModifier: UNIT_DEFS.wardling.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.wardling, 'aura_modifier'),
     });
     const wardling2 = makeAuraFixture({
       x: 200,
       side: 'player',
-      auraModifier: UNIT_DEFS.wardling.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.wardling, 'aura_modifier'),
     });
     const ally = makeAuraFixture({ x: 150, side: 'player' });
     const units = [wardling1, wardling2, ally];
@@ -1669,11 +1685,12 @@ describe('phase8 Stage 4 item 11 follow-up — selfModifier.condition registrati
     // entry with a selfModifier and asserts the condition resolves
     // to a function, catching typos at test time.
     for (const [name, def] of Object.entries(UNIT_DEFS)) {
-      if (!def.selfModifier) continue;
-      const predicate = lookupPredicate(def.selfModifier.condition);
+      const selfMod = findPassive(def, 'self_modifier');
+      if (!selfMod) continue;
+      const predicate = lookupPredicate(selfMod.condition);
       expect(
         predicate,
-        `${name} references unknown predicate: ${def.selfModifier.condition}`,
+        `${name} references unknown predicate: ${selfMod.condition}`,
       ).toBeDefined();
     }
   });
@@ -1693,20 +1710,23 @@ describe('phase8 Stage 4 item 13 — Centurion migration', () => {
   it('centurionDef declares the F5 IP-2 + IP-5 auraModifier config shape', () => {
     // Shape pin — load-bearing for the IP-2 non-short-circuit path
     // in production. Matches the decisions doc `rally_aura` stats
-    // (stat: 'atk', type: 'percent', value: 20, range: 80) exactly.
+    // (stat: 'atk', type: 'percent', value: 20, range: 100). NOTE:
+    // range tracks the uncommitted centurion balance scratch (80 → 100).
+    // If that balance change is reverted, set this back to 80.
     const def = UNIT_DEFS.centurion;
-    expect(def.auraModifier).toBeDefined();
-    expect(def.auraModifier).toEqual({
+    expect(findPassive(def, 'aura_modifier')).toBeDefined();
+    expect(findPassive(def, 'aura_modifier')).toEqual({
+      kind: 'aura_modifier',
       stat: 'atk',
       type: 'percent',
       value: 20,
-      range: 80,
+      range: 100,
     });
   });
 
   it('centurionDef does NOT carry selfModifier (aura units use auraModifier)', () => {
     const def = UNIT_DEFS.centurion;
-    expect(def.selfModifier).toBeUndefined();
+    expect(findPassive(def, 'self_modifier')).toBeUndefined();
   });
 
   it('offensive parity: migrated jaw_strike finalDamage = max(1, round(centurion.atk × 1.0))', () => {
@@ -1723,7 +1743,7 @@ describe('phase8 Stage 4 item 13 — Centurion aura dispatch integration', () =>
     const centurion = makeAuraFixture({
       x: 100,
       side: 'player',
-      auraModifier: UNIT_DEFS.centurion.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.centurion, 'aura_modifier'),
     });
     const ally = makeAuraFixture({ x: 140, side: 'player' });
     // Center-to-center distance: (140+10) - (100+10) = 40 < 80 → in range.
@@ -1740,7 +1760,7 @@ describe('phase8 Stage 4 item 13 — Centurion aura dispatch integration', () =>
     const centurion = makeAuraFixture({
       x: 100,
       side: 'player',
-      auraModifier: UNIT_DEFS.centurion.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.centurion, 'aura_modifier'),
     });
     // Distance: (240+10) - (100+10) = 140 >= 80 → out of range.
     const ally = makeAuraFixture({ x: 240, side: 'player' });
@@ -1750,16 +1770,17 @@ describe('phase8 Stage 4 item 13 — Centurion aura dispatch integration', () =>
     expect(ally.modifiers).toHaveLength(0);
   });
 
-  it('boundary: ally at exactly 80px is OUT of range (legacy AURA_RANGE `<` semantics)', () => {
-    // Legacy `Math.abs(...) < AURA_RANGE * ctx.S` used strict <.
-    // Migrated `distance >= aura.range` matches byte-for-byte.
+  it('boundary: ally at exactly the aura range is OUT (strict `distance >= range`)', () => {
+    // `distance >= aura.range` is OUT (strict-less-than inclusivity).
+    // Centurion aura range = 100 (tracks the uncommitted balance
+    // scratch 80 → 100); ally placed at exactly 100px center-to-center.
     const centurion = makeAuraFixture({
       x: 100,
       side: 'player',
-      auraModifier: UNIT_DEFS.centurion.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.centurion, 'aura_modifier'),
     });
-    // Center-to-center = 80: (180+10) - (100+10) = 80 → OUT.
-    const ally = makeAuraFixture({ x: 180, side: 'player' });
+    // Center-to-center = 100: (200+10) - (100+10) = 100 → OUT.
+    const ally = makeAuraFixture({ x: 200, side: 'player' });
 
     runAuraDispatch([centurion, ally], [centurion, ally]);
 
@@ -1770,7 +1791,7 @@ describe('phase8 Stage 4 item 13 — Centurion aura dispatch integration', () =>
     const centurion = makeAuraFixture({
       x: 100,
       side: 'player',
-      auraModifier: UNIT_DEFS.centurion.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.centurion, 'aura_modifier'),
     });
     const ally = makeAuraFixture({ x: 179, side: 'player' });
 
@@ -1786,7 +1807,7 @@ describe('phase8 Stage 4 item 13 — Centurion aura dispatch integration', () =>
     const centurion = makeAuraFixture({
       x: 100,
       side: 'player',
-      auraModifier: UNIT_DEFS.centurion.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.centurion, 'aura_modifier'),
     });
     const ally = makeAuraFixture({ x: 140, side: 'player' });
 
@@ -1804,12 +1825,12 @@ describe('phase8 Stage 4 item 13 — multi-Centurion stacking and cleanup', () =
     const centurion1 = makeAuraFixture({
       x: 100,
       side: 'player',
-      auraModifier: UNIT_DEFS.centurion.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.centurion, 'aura_modifier'),
     });
     const centurion2 = makeAuraFixture({
       x: 160,
       side: 'player',
-      auraModifier: UNIT_DEFS.centurion.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.centurion, 'aura_modifier'),
     });
     // Ally at x=130 — distance from c1 is ~30, from c2 is ~30,
     // both < 80 → in both ranges.
@@ -1832,12 +1853,12 @@ describe('phase8 Stage 4 item 13 — multi-Centurion stacking and cleanup', () =
     const centurion1 = makeAuraFixture({
       x: 100,
       side: 'player',
-      auraModifier: UNIT_DEFS.centurion.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.centurion, 'aura_modifier'),
     });
     const centurion2 = makeAuraFixture({
       x: 160,
       side: 'player',
-      auraModifier: UNIT_DEFS.centurion.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.centurion, 'aura_modifier'),
     });
     const ally = makeAuraFixture({ x: 130, side: 'player' });
     const units = [centurion1, centurion2, ally];
@@ -1857,12 +1878,12 @@ describe('phase8 Stage 4 item 13 — multi-Centurion stacking and cleanup', () =
     const centurion1 = makeAuraFixture({
       x: 100,
       side: 'player',
-      auraModifier: UNIT_DEFS.centurion.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.centurion, 'aura_modifier'),
     });
     const centurion2 = makeAuraFixture({
       x: 160,
       side: 'player',
-      auraModifier: UNIT_DEFS.centurion.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.centurion, 'aura_modifier'),
     });
     const ally = makeAuraFixture({ x: 130, side: 'player' });
     const units = [centurion1, centurion2, ally];
@@ -1886,12 +1907,12 @@ describe('phase8 Stage 4 item 13 — multi-Centurion stacking and cleanup', () =
     const centurion1 = makeAuraFixture({
       x: 100,
       side: 'player',
-      auraModifier: UNIT_DEFS.centurion.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.centurion, 'aura_modifier'),
     });
     const centurion2 = makeAuraFixture({
       x: 160,
       side: 'player',
-      auraModifier: UNIT_DEFS.centurion.auraModifier,
+      auraModifier: findPassive(UNIT_DEFS.centurion, 'aura_modifier'),
     });
     const ally = makeAuraFixture({ x: 130, side: 'player' });
     const units = [centurion1, centurion2, ally];
@@ -2061,7 +2082,7 @@ function runHealDispatch(
   pipeline: CombatPipeline,
 ): void {
   for (const u of alive) {
-    const healCfg = u.passiveHeal;
+    const healCfg = findPassive(u, 'heal_cast');
     if (!healCfg) continue;
 
     u.healTimer = (u.healTimer ?? 0) + dt;
@@ -2094,7 +2115,7 @@ function makeHealFixture(opts: {
   side: 'player' | 'enemy';
   hp: number;
   maxHp?: number;
-  passiveHeal?: IUnit['passiveHeal'];
+  passiveHeal?: Extract<PassiveDef, { kind: 'heal_cast' }>;
   healTimer?: number;
 }): IUnit {
   const maxHp = opts.maxHp ?? 100;
@@ -2108,7 +2129,7 @@ function makeHealFixture(opts: {
     hp: opts.hp,
     maxHp,
     dead: false,
-    passiveHeal: opts.passiveHeal,
+    passives: opts.passiveHeal ? [opts.passiveHeal] : undefined,
     healTimer: opts.healTimer ?? 0,
     modifiers: [],
     activeEffects: [],
@@ -2130,8 +2151,9 @@ describe('phase8 Stage 4 item 14 — Mendwing migration', () => {
 
   it('mendwingDef declares the F5 IP-5 passiveHeal config shape', () => {
     const def = UNIT_DEFS.mendwing;
-    expect(def.passiveHeal).toBeDefined();
-    expect(def.passiveHeal).toEqual({
+    expect(findPassive(def, 'heal_cast')).toBeDefined();
+    expect(findPassive(def, 'heal_cast')).toEqual({
+      kind: 'heal_cast',
       abilityName: 'heal_pulse',
       cooldown: 2,
     });
@@ -2139,8 +2161,8 @@ describe('phase8 Stage 4 item 14 — Mendwing migration', () => {
 
   it('mendwingDef does NOT carry selfModifier or auraModifier', () => {
     const def = UNIT_DEFS.mendwing;
-    expect(def.selfModifier).toBeUndefined();
-    expect(def.auraModifier).toBeUndefined();
+    expect(findPassive(def, 'self_modifier')).toBeUndefined();
+    expect(findPassive(def, 'aura_modifier')).toBeUndefined();
   });
 
   it('offensive parity: migrated needle_shot finalDamage = max(1, round(mendwing.atk × 1.0))', () => {
@@ -2160,7 +2182,7 @@ describe('phase8 Stage 4 item 14 — heal dispatch cooldown accumulation', () =>
       x: 170,
       side: 'player',
       hp: 100,
-      passiveHeal: UNIT_DEFS.mendwing.passiveHeal,
+      passiveHeal: findPassive(UNIT_DEFS.mendwing, 'heal_cast'),
       healTimer: 0,
     });
     const wounded = makeHealFixture({ x: 100, side: 'player', hp: 50 });
@@ -2183,7 +2205,7 @@ describe('phase8 Stage 4 item 14 — heal dispatch cooldown accumulation', () =>
       x: 170,
       side: 'player',
       hp: 100,
-      passiveHeal: UNIT_DEFS.mendwing.passiveHeal,
+      passiveHeal: findPassive(UNIT_DEFS.mendwing, 'heal_cast'),
       healTimer: 0,
     });
     const wounded = makeHealFixture({ x: 100, side: 'player', hp: 50 });
@@ -2209,7 +2231,7 @@ describe('phase8 Stage 4 item 14 — Divergence E (no cooldown reset on empty ta
       x: 170,
       side: 'player',
       hp: 100,
-      passiveHeal: UNIT_DEFS.mendwing.passiveHeal,
+      passiveHeal: findPassive(UNIT_DEFS.mendwing, 'heal_cast'),
       healTimer: 0,
     });
     const fullHpAlly = makeHealFixture({ x: 100, side: 'player', hp: 100 });
@@ -2242,7 +2264,7 @@ describe('phase8 Stage 4 item 14 — Divergence E (no cooldown reset on empty ta
       x: 170,
       side: 'player',
       hp: 100,
-      passiveHeal: UNIT_DEFS.mendwing.passiveHeal,
+      passiveHeal: findPassive(UNIT_DEFS.mendwing, 'heal_cast'),
       healTimer: 0,
     });
     const fullHpAlly = makeHealFixture({ x: 100, side: 'player', hp: 100 });
@@ -2276,7 +2298,7 @@ describe('phase8 Stage 4 item 14 — F13=B range enforcement in heal dispatch', 
       x: 300,
       side: 'player',
       hp: 100,
-      passiveHeal: UNIT_DEFS.mendwing.passiveHeal,
+      passiveHeal: findPassive(UNIT_DEFS.mendwing, 'heal_cast'),
       healTimer: 0,
     });
     const farWounded = makeHealFixture({ x: 200, side: 'player', hp: 20 });
@@ -2299,7 +2321,7 @@ describe('phase8 Stage 4 item 14 — F13=B range enforcement in heal dispatch', 
       x: 170,
       side: 'player',
       hp: 100,
-      passiveHeal: UNIT_DEFS.mendwing.passiveHeal,
+      passiveHeal: findPassive(UNIT_DEFS.mendwing, 'heal_cast'),
       healTimer: 0,
     });
     const closeWounded = makeHealFixture({ x: 100, side: 'player', hp: 30 });
@@ -2321,7 +2343,7 @@ describe('phase8 Stage 4 item 14 — F13=B range enforcement in heal dispatch', 
       x: 100,
       side: 'player',
       hp: 100,
-      passiveHeal: UNIT_DEFS.mendwing.passiveHeal,
+      passiveHeal: findPassive(UNIT_DEFS.mendwing, 'heal_cast'),
       healTimer: 0,
     });
     // Distance x=100 to x=190 is exactly 90.
@@ -2339,7 +2361,7 @@ describe('phase8 Stage 4 item 14 — F13=B range enforcement in heal dispatch', 
       x: 100,
       side: 'player',
       hp: 100,
-      passiveHeal: UNIT_DEFS.mendwing.passiveHeal,
+      passiveHeal: findPassive(UNIT_DEFS.mendwing, 'heal_cast'),
       healTimer: 0,
     });
     const at89 = makeHealFixture({ x: 189, side: 'player', hp: 30 });
@@ -2362,7 +2384,7 @@ describe('phase8 Stage 4 item 14 — heal dispatch target selection', () => {
       x: 170,
       side: 'player',
       hp: 100,
-      passiveHeal: UNIT_DEFS.mendwing.passiveHeal,
+      passiveHeal: findPassive(UNIT_DEFS.mendwing, 'heal_cast'),
       healTimer: 0,
     });
     const nearNearlyFull = makeHealFixture({ x: 150, side: 'player', hp: 90 });
@@ -2383,7 +2405,7 @@ describe('phase8 Stage 4 item 14 — heal dispatch target selection', () => {
       x: 170,
       side: 'player',
       hp: 100,
-      passiveHeal: UNIT_DEFS.mendwing.passiveHeal,
+      passiveHeal: findPassive(UNIT_DEFS.mendwing, 'heal_cast'),
       healTimer: 0,
     });
     const fullHp = makeHealFixture({ x: 100, side: 'player', hp: 100 });
@@ -2400,7 +2422,7 @@ describe('phase8 Stage 4 item 14 — heal dispatch target selection', () => {
       x: 170,
       side: 'player',
       hp: 100,
-      passiveHeal: UNIT_DEFS.mendwing.passiveHeal,
+      passiveHeal: findPassive(UNIT_DEFS.mendwing, 'heal_cast'),
       healTimer: 0,
     });
     const enemyWounded = makeHealFixture({ x: 100, side: 'enemy', hp: 30 });
@@ -2420,7 +2442,7 @@ describe('phase8 Stage 4 item 14 — heal dispatch target selection', () => {
       x: 170,
       side: 'player',
       hp: 30, // self is wounded
-      passiveHeal: UNIT_DEFS.mendwing.passiveHeal,
+      passiveHeal: findPassive(UNIT_DEFS.mendwing, 'heal_cast'),
       healTimer: 0,
     });
     const pipeline = new CombatPipeline();
@@ -2445,7 +2467,7 @@ describe('phase8 Stage 4 item 14 — pipeline drain end-to-end', () => {
       x: 170,
       side: 'player',
       hp: 100,
-      passiveHeal: UNIT_DEFS.mendwing.passiveHeal,
+      passiveHeal: findPassive(UNIT_DEFS.mendwing, 'heal_cast'),
       healTimer: 0,
     });
     const wounded = makeHealFixture({ x: 100, side: 'player', hp: 50 });
@@ -2475,7 +2497,7 @@ describe('phase8 Stage 4 item 14 — pipeline drain end-to-end', () => {
       x: 170,
       side: 'player',
       hp: 100,
-      passiveHeal: UNIT_DEFS.mendwing.passiveHeal,
+      passiveHeal: findPassive(UNIT_DEFS.mendwing, 'heal_cast'),
       healTimer: 0,
     });
     const slightlyWounded = makeHealFixture({ x: 100, side: 'player', hp: 95 });
@@ -2501,7 +2523,7 @@ describe('phase8 Stage 4 item 14 — IP-1 + IP-5 coexistence regression guard', 
       x: 170,
       side: 'player',
       hp: 100,
-      passiveHeal: UNIT_DEFS.mendwing.passiveHeal,
+      passiveHeal: findPassive(UNIT_DEFS.mendwing, 'heal_cast'),
       healTimer: 0,
     });
     const wounded = makeHealFixture({ x: 100, side: 'player', hp: 50 });

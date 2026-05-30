@@ -1,10 +1,16 @@
 # Hivyss — Claude Code Context
 
 ## Required Reading
-- `app/docs/DESIGN_PATTERNS.md` — All implemented and planned design patterns. Read before modifying architecture.
-- `app/docs/GAME_DESIGN.md` — Future game mechanics (castes, routes, evolution, mutation, roguelike structure). Read before designing new features.
-- `app/docs/UI_ARCHITECTURE.md` — Scene management, 4-layer rendering, canvas UI layout. Read before modifying scenes or UI.
+- `app/docs/reference/DESIGN_PATTERNS.md` — All implemented and planned design patterns. Read before modifying architecture.
+- `app/docs/reference/GAME_DESIGN.md` — Future game mechanics (castes, routes, evolution, mutation, roguelike structure). Read before designing new features.
+- `app/docs/reference/UI_ARCHITECTURE.md` — Scene management, 4-layer rendering, canvas UI layout. Read before modifying scenes or UI.
 - `app/src/units/CLAUDE.md` — Unit file structure, data-driven unit behavior fields, draw function conventions.
+
+## Docs Layout (`app/docs/`)
+- `reference/` — stable contracts read while working (DESIGN_PATTERNS, COMBAT_REFERENCE, TIER_CONTRACT, UI_ARCHITECTURE, SPRITE_STYLE, ABILITY_TEST_CASES, GAME_DESIGN)
+- `active/` — live program tracking (MECHANICS_ROADMAP, UNIT_LIFECYCLE_*, AI_PLAN, CAPACITY_DESIGN)
+- `process/` — orchestrator meta (ORCHESTRATOR_RESUME, ORCHESTRATOR_TEMPLATE)
+- `archive/` — completed programs, content historically accurate (COMBAT_REWRITE_*, SANDBOX_OVERHAUL_DESIGN, COMBAT_EXECUTOR_GUIDE)
 
 ## Tech Stack
 - Phaser 3.90, Canvas renderer (not WebGL)

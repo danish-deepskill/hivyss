@@ -2,7 +2,7 @@
 
 A lookup for executors working on the combat system. Goal: prevent reimplementation of existing primitives and keep extensions clean.
 
-**Not** a tutorial. **Not** a design-rationale doc. For the WHY behind the patterns, read [DESIGN_PATTERNS.md](DESIGN_PATTERNS.md) (especially section 12 "Combat System Architecture — 5 Layers"). This file is the HOW: what exists, what to call, when to stop and report.
+**Not** a tutorial. **Not** a design-rationale doc. For the WHY behind the patterns, read [DESIGN_PATTERNS.md](../reference/DESIGN_PATTERNS.md) (especially section 12 "Combat System Architecture — 5 Layers"). This file is the HOW: what exists, what to call, when to stop and report.
 
 ---
 
@@ -123,7 +123,7 @@ Read the actual type declarations for field detail. This is a pointer map.
 
 | Type | Where | What it drives |
 |---|---|---|
-| `UnitDef` | [types.ts](../src/types.ts) — grep `interface UnitDef` | Stats, visuals, `defaultAbility`, `deathAbility`, `auraModifier`, `selfModifier`, `passiveHeal`, `resistance`, `penetration`. **All unit behavior.** See [units/CLAUDE.md](../src/units/CLAUDE.md). |
+| `UnitDef` | [types.ts](../src/types.ts) — grep `interface UnitDef` | Stats, visuals, `defaultAbility`, `deathAbility`, `auraModifier`, `selfModifier`, `passiveHeal`, `resistance`, `penetration`. **All unit behavior.** See [units/CLAUDE.md](../../src/units/CLAUDE.md). |
 | `AbilityDef` | [types.ts:455](../src/types.ts#L455) | `category`, `dmgType`, `targeting`, `range`, `targetCount`, `tiers`, `appliesEffects`, `aoeRider`, `chainRange`, `overchargeEvery`, `targetFalloff`, `trigger`, `healAmount`, `auraMods`, `skipsResistance`. |
 | `EffectDef` | [effects/types.ts:63](../src/config/combat/effects/types.ts#L63) | `duration`, `stackable`, `maxStacks`, `prevents`, `onHostDeath`, `tiers` (per-tier stat bag), lifecycle hooks `onApply`/`onTick`/`onExpire`/`onStack`. |
 | `ActiveEffect` | [effects/types.ts:84](../src/config/combat/effects/types.ts#L84) | Runtime instance on a unit: `def`, `remaining`, `stacks`, `source`, `accumulator`, `appliedTier`. |
@@ -212,7 +212,7 @@ Each entry below is tied to a specific invariant in the codebase. Don't add to t
 | `new Unit()` in gameplay code | `unitPool.spawn(def, side, x)` | Pool recycling. `new Unit` leaks and bypasses lifecycle. `SandboxScene` is the only exception. |
 | `unit.destroy()` in gameplay code | `unit.kill()` or `unitPool.despawn(unit)` | Same reason. `kill()` calls `deactivate()` which returns to pool. |
 | `scene.events.emit('gameEvent', ...)` | Typed `EventBus` ([systems/EventBus.ts](../src/systems/EventBus.ts)) | Phaser's `scene.events` is untyped. Game-logic events must be typed through `GameEvents` interface. Phaser scene events are for scene transitions / input only. |
-| Class inheritance or `CombatHooks` on a new unit | Data fields on `UnitDef` — `defaultAbility`, `deathAbility`, `auraModifier`, `selfModifier`, `passiveHeal` | `CombatHooks` is RETIRED (2026-04-17, Phase 9 Batch 3). All behavior is data-driven. See [DESIGN_PATTERNS.md section 3](DESIGN_PATTERNS.md). |
+| Class inheritance or `CombatHooks` on a new unit | Data fields on `UnitDef` — `defaultAbility`, `deathAbility`, `auraModifier`, `selfModifier`, `passiveHeal` | `CombatHooks` is RETIRED (2026-04-17, Phase 9 Batch 3). All behavior is data-driven. See [DESIGN_PATTERNS.md section 3](../reference/DESIGN_PATTERNS.md). |
 | Inlining tier-shift math | `shiftTier(tier, delta)` from [resistances.ts:45](../src/config/combat/resistances.ts#L45) | One source of truth for the ladder, including the clamp at both ends. |
 | Inlining selector logic | Add a named selector to `SELECTORS` in [Targeting.ts:161](../src/systems/Targeting.ts#L161); reference by string from `AbilityDef.targeting` | Selectors are data-addressable so ability defs stay pure data. |
 | Pushing directly to `unit.activeEffects[]` | `applyEffect(target, name, opts)` | The helper handles `prevents`, non-stackable refresh, stack cap, `onApply` fire, dead-target guard. Direct push skips all of that. |
@@ -229,12 +229,12 @@ Each entry below is tied to a specific invariant in the codebase. Don't add to t
 
 Rather than duplicating existing content, point at it:
 
-- **Add a new unit** → [units/CLAUDE.md](../src/units/CLAUDE.md) "Unit File Template" + "Registry" sections.
-- **Add a new damage ability** → [units/CLAUDE.md](../src/units/CLAUDE.md) "Unit Behavior — Data-Driven" + existing ability files in [config/combat/abilities/](../src/config/combat/abilities/) for the dmgType.
-- **Add a new status effect** → [DESIGN_PATTERNS.md section 12, Layer 4](DESIGN_PATTERNS.md) for the shape; [config/combat/effects/dot.ts](../src/config/combat/effects/dot.ts) for a worked onTick example.
-- **Add a passive behavior** → [units/CLAUDE.md](../src/units/CLAUDE.md) "Passive behaviors" bullet; `auraModifier`/`selfModifier`/`passiveHeal` fields on `UnitDef`.
+- **Add a new unit** → [units/CLAUDE.md](../../src/units/CLAUDE.md) "Unit File Template" + "Registry" sections.
+- **Add a new damage ability** → [units/CLAUDE.md](../../src/units/CLAUDE.md) "Unit Behavior — Data-Driven" + existing ability files in [config/combat/abilities/](../src/config/combat/abilities/) for the dmgType.
+- **Add a new status effect** → [DESIGN_PATTERNS.md section 12, Layer 4](../reference/DESIGN_PATTERNS.md) for the shape; [config/combat/effects/dot.ts](../src/config/combat/effects/dot.ts) for a worked onTick example.
+- **Add a passive behavior** → [units/CLAUDE.md](../../src/units/CLAUDE.md) "Passive behaviors" bullet; `auraModifier`/`selfModifier`/`passiveHeal` fields on `UnitDef`.
 - **Add a complex ability feature** — chain (`chainRange`), AOE spread (`aoeRider`), overcharge (`overchargeEvery`), per-target falloff (`targetFalloff`), death trigger (`deathAbility`): look at the existing ability that uses each. Stormfly for chains, Cinderfly for aoeRider, Bombardier for death_bomb. Grep for the field name and read the def.
-- **Event-driven decoupling** → [DESIGN_PATTERNS.md section 4](DESIGN_PATTERNS.md) "Event Bus" (current events table).
+- **Event-driven decoupling** → [DESIGN_PATTERNS.md section 4](../reference/DESIGN_PATTERNS.md) "Event Bus" (current events table).
 
 If a recipe doesn't exist where you'd expect, STOP AND REPORT — don't draft one inline in a feature batch.
 

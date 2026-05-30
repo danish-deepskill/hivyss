@@ -166,12 +166,13 @@ const ravagerDef = alphaDef({
   incubation: 6,
   caste: "soldier",
   defaultAbility: "jaw_strike",
-  selfModifier: {
+  passives: [{
+    kind: "self_modifier",
     stat: "atkRate",
     type: "percent",
     value: 50,
     condition: "hp_below_half",
-  },
+  }],
 });
 
 // Centurion's rally aura adds +20% atk to in-range same-side allies
@@ -200,12 +201,13 @@ const centurionDef = alphaDef({
   incubation: 8,
   caste: "soldier",
   defaultAbility: "jaw_strike",
-  auraModifier: {
+  passives: [{
+    kind: "aura_modifier",
     stat: "atk",
     type: "percent",
     value: 20,
-    range: 80,
-  },
+    range: 100,
+  }],
 });
 
 export const units: Record<string, UnitModule> = {

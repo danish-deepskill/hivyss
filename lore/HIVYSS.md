@@ -16,7 +16,7 @@ Hivyss is a **roguelike lane autobattler with a Caves-of-Qud-deep strategic laye
 - `lore/data/schema.ts` — TypeScript types for the map data model
 - `lore/tools/generate.mjs` — generator script for all maps
 - `lore/README.md` — workflow for editing maps via JSON + regenerating
-- `app/docs/MECHANICS_ROADMAP.md` — current build status and active program tracking
+- `app/docs/active/MECHANICS_ROADMAP.md` — current build status and active program tracking
 - `app/src/units/` — actual built unit code (Normal × 11, Alpha × 7)
 
 ## 0.2 How to read this document
@@ -62,7 +62,7 @@ This document is forward-looking — most of what's described is planned. Here's
 **Total units in code:** 18.
 **Active priority:** Combat Rewrite Phase 9 (legacy cleanup), then battle mechanics v1.
 
-See `app/docs/MECHANICS_ROADMAP.md` for the live program tracking.
+See `app/docs/active/MECHANICS_ROADMAP.md` for the live program tracking.
 
 ## 0.4 Glossary (quick reference)
 
@@ -315,7 +315,7 @@ Tier is also a **code budget discipline**. Higher tier = more elaborate mechanic
 - **T9:** ability that redefines what a battle IS
 - **T10:** the creature and the ability are the same thing
 
-See `app/docs/TIER_CONTRACT.md` for the full authoring contract (ability examples per tier, visual signature rules, code complexity budget).
+See `app/docs/reference/TIER_CONTRACT.md` for the full authoring contract (ability examples per tier, visual signature rules, code complexity budget).
 
 ### Realm tier ranges
 
@@ -1282,7 +1282,7 @@ Mid-battle unit transformation via **Mutagen Scout** workers. The most dramatic 
 | **Quality** | ±20% stats/abilities + mutation chance | On larva spawn | Until mutation |
 | **Mutation** | Transforms unit into new form mid-battle | Mid-battle via scout | For the battle |
 
-**Implementation note:** uses the AbilityParams pattern (see `app/docs/DESIGN_PATTERNS.md`). Quality multiplier applied once at spawn to both stats and abilityParams.
+**Implementation note:** uses the AbilityParams pattern (see `app/docs/reference/DESIGN_PATTERNS.md`). Quality multiplier applied once at spawn to both stats and abilityParams.
 
 ### Evolution
 
