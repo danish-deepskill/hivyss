@@ -4,7 +4,8 @@ import { EventBus } from '../systems/EventBus';
 import { deleteUserPreset, loadUserPresets } from '../systems/SandboxPresets';
 import { createUnitCard } from '../ui/UnitCard';
 import { TRAIT_DESC } from '../config/TraitDesc';
-import type { GeneLine } from '../types';
+import { PHEROMONE_DEFS, PHEROMONE_ORDER } from '../config/PheromoneDefs';
+import type { GeneLine, PheromoneKind } from '../types';
 
 /**
  * HUD sibling for SandboxScene. All UI is DOM — mirrors MenuUIScene's
@@ -31,9 +32,20 @@ export class SandboxHUDScene extends Phaser.Scene {
   private resultLabel!: HTMLDivElement;
   private statsLabel!: HTMLDivElement;
   private rosterRow!: HTMLDivElement;
+  private rosterArrowL!: HTMLButtonElement;
+  private rosterArrowR!: HTMLButtonElement;
   private tooltip!: HTMLDivElement;
   private tabRefs: Map<GeneLine, HTMLButtonElement> = new Map();
   private cardRefs: Map<string, HTMLDivElement> = new Map();
+  private pheromoneBtns: Map<PheromoneKind, HTMLButtonElement> = new Map();
+
+  // Elite-signature slots — one per player Elite, built lazily to match the
+  // pushed slot array (= MAX_ELITES_PER_SIDE). `eliteSlots` mirrors the last
+  // pushed state so a click knows which unit id (if any) to fire.
+  private eliteSlotContainer!: HTMLElement;
+  private eliteSlotBtns: HTMLButtonElement[] = [];
+  private eliteSlots: Array<{ id: number; name: string; ready: boolean; cdFrac: number; firable: boolean; inRange: boolean } | null> = [];
+  private activePheromone: PheromoneKind | null = null;
 
   // Data-URL cache for preview textures — built once at scene create,
   // reused across tab rebuilds. Matches MenuUIScene's `previews`
@@ -144,19 +156,40 @@ export class SandboxHUDScene extends Phaser.Scene {
     this.updateCountLabel(0, 0);
 
     headerLeft.append(this.selectedLabel, this.countLabel);
-    header.append(headerLeft, this.buildPresetDropdown());
+    header.append(headerLeft, this.buildPheromoneRow(), this.buildBiomeDropdown(), this.buildPresetDropdown());
 
     // Tabs row.
     const tabs = document.createElement('div');
     tabs.className = 'sb-hud__tabs';
     this.buildTabs(tabs);
 
-    // Roster row.
+    // Roster strip — a single horizontal row that scrolls (the roster grows
+    // well past one screen as genelines are added). Three ways to scroll it:
+    // the ‹ › arrow buttons, the mouse wheel (vertical → horizontal, since few
+    // users have a horizontal wheel), and click-drag / the native thin bar.
     this.rosterRow = document.createElement('div');
     this.rosterRow.className = 'sb-hud__roster';
+    this.rosterRow.addEventListener(
+      'wheel',
+      (e) => {
+        if (e.deltaY === 0) return;
+        e.preventDefault();
+        this.rosterRow.scrollLeft += e.deltaY;
+      },
+      { passive: false },
+    );
+    this.rosterRow.addEventListener('scroll', () => this.updateRosterArrows());
+
+    this.rosterArrowL = this.makeRosterArrow('‹', -1); // ‹
+    this.rosterArrowR = this.makeRosterArrow('›', 1); //  ›
+
+    const rosterWrap = document.createElement('div');
+    rosterWrap.className = 'sb-hud__roster-wrap';
+    rosterWrap.append(this.rosterArrowL, this.rosterRow, this.rosterArrowR);
+
     this.buildRoster();
 
-    panel.append(header, tabs, this.rosterRow);
+    panel.append(header, tabs, rosterWrap);
     this.updateSelectedLabel();
 
     // Tooltip lives at panel level so it renders on top of cards;
@@ -166,6 +199,30 @@ export class SandboxHUDScene extends Phaser.Scene {
     panel.appendChild(this.tooltip);
 
     return panel;
+  }
+
+  private buildBiomeDropdown(): HTMLElement {
+    const wrap = document.createElement('div');
+    wrap.className = 'sb-hud__presets sb-hud__mutator';
+
+    const lbl = document.createElement('span');
+    lbl.className = 'sb-hud__presets-label';
+    lbl.textContent = 'BIOME:';
+
+    const select = document.createElement('select');
+    select.className = 'sb-hud__preset-select';
+    ([['wild', 'Wild'], ['sunCarapace', 'Sun Carapace']] as const).forEach(([val, text]) => {
+      const opt = document.createElement('option');
+      opt.value = val;
+      opt.textContent = text;
+      select.appendChild(opt);
+    });
+    select.addEventListener('change', () => {
+      this.eventBus.emit('sandboxSelectBiome', { biome: select.value as 'wild' | 'sunCarapace' });
+    });
+
+    wrap.append(lbl, select);
+    return wrap;
   }
 
   private buildPresetDropdown(): HTMLElement {
@@ -218,6 +275,123 @@ export class SandboxHUDScene extends Phaser.Scene {
 
     wrap.append(lbl, this.presetSelect);
     return wrap;
+  }
+
+  /**
+   * Pheromone command button row — Rally / Charge / Retreat. Clicking
+   * toggles the active kind (mirrors keyboard 1/2/3 in SandboxScene).
+   * Buttons stay live during a fight (zones are painted mid-battle).
+   * Active state is reflected via the `sandboxSelectPheromoneActive`
+   * echo so keyboard + button selection stay in sync.
+   */
+  private buildPheromoneRow(): HTMLElement {
+    const row = document.createElement('div');
+    row.className = 'sb-hud__pheromones';
+    row.style.cssText =
+      'display:flex;gap:6px;align-items:center;pointer-events:auto;';
+
+    const lbl = document.createElement('span');
+    lbl.textContent = 'CMD:';
+    lbl.style.cssText = 'font-size:10px;color:#aaa;margin-right:2px;';
+    row.appendChild(lbl);
+
+    PHEROMONE_ORDER.forEach((kind, i) => {
+      const def = PHEROMONE_DEFS[kind];
+      const hex = '#' + def.color.toString(16).padStart(6, '0');
+      const btn = document.createElement('button');
+      btn.className = 'sb-hud__phero-btn';
+      btn.textContent = `${i + 1} ${def.name}`;
+      btn.style.cssText =
+        `font-size:10px;padding:3px 7px;cursor:pointer;border:1px solid ${hex};` +
+        `border-radius:3px;background:#16161e;color:${hex};pointer-events:auto;`;
+      btn.addEventListener('click', () => this.onPheromoneClick(kind));
+      this.pheromoneBtns.set(kind, btn);
+      row.appendChild(btn);
+    });
+
+    // Elite-signature SLOTS — one per player Elite (built lazily to match
+    // the pushed array = MAX_ELITES_PER_SIDE). Each slot fires THAT Elite's
+    // own signature; greyed while on cooldown, dim when empty/preview. The E
+    // hotkey still fires all ready. Amber accent marks the Elite-active row.
+    const sigLbl = document.createElement('span');
+    sigLbl.textContent = 'ELITE:';
+    sigLbl.style.cssText = 'font-size:10px;color:#e0a020;margin:0 2px 0 10px;';
+    this.eliteSlotContainer = document.createElement('span');
+    this.eliteSlotContainer.style.cssText = 'display:flex;gap:4px;align-items:center;';
+    row.append(sigLbl, this.eliteSlotContainer);
+    // Seed the empty-slot display (= MAX_ELITES_PER_SIDE) so the row is
+    // visible from the start; state pushes correct it.
+    this.updateEliteSlots([null, null, null]);
+
+    return row;
+  }
+
+  private onEliteSlotClick(i: number): void {
+    const s = this.eliteSlots[i];
+    // empty / preview / on-cooldown / no enemy in range → not firable
+    if (!s || !s.firable || !s.ready || !s.inRange) return;
+    this.eventBus.emit('sandboxTriggerSignature', { unitId: s.id });
+  }
+
+  /** Render the pushed Elite-slot state into the slot buttons. */
+  private updateEliteSlots(
+    slots: Array<{ id: number; name: string; ready: boolean; cdFrac: number; firable: boolean; inRange: boolean } | null>,
+  ): void {
+    this.eliteSlots = slots;
+    if (this.eliteSlotBtns.length !== slots.length) {
+      this.eliteSlotContainer.replaceChildren();
+      this.eliteSlotBtns = slots.map((_, i) => {
+        const b = document.createElement('button');
+        b.className = 'sb-hud__elite-slot';
+        b.addEventListener('click', () => this.onEliteSlotClick(i));
+        this.eliteSlotContainer.appendChild(b);
+        return b;
+      });
+    }
+    const base = 'font-size:10px;padding:3px 7px;border-radius:3px;pointer-events:auto;min-width:50px;text-align:center;';
+    slots.forEach((s, i) => {
+      const b = this.eliteSlotBtns[i];
+      if (!s) {
+        b.textContent = '—';
+        b.style.cssText = base + 'border:1px dashed #444;background:#101015;color:#555;cursor:default;';
+      } else if (!s.firable) {
+        // Pre-fight preview — named but not yet firable.
+        b.textContent = s.name;
+        b.style.cssText = base + 'border:1px solid #6a5a30;background:#16161e;color:#9a8a55;cursor:default;';
+      } else if (s.ready && s.inRange) {
+        // Ready AND an enemy is in range — lit, clickable.
+        b.textContent = '⚡ ' + s.name;
+        b.style.cssText = base + 'border:1px solid #e0a020;background:#2a2010;color:#ffcf50;cursor:pointer;font-weight:bold;';
+      } else if (s.ready) {
+        // Off cooldown but NO enemy in range — disabled ("can't reach").
+        b.textContent = s.name;
+        b.style.cssText = base + 'border:1px solid #44443a;background:#16161e;color:#666;cursor:not-allowed;';
+      } else {
+        // On cooldown — a left-to-right fill shows recovery progress.
+        const pct = Math.round((1 - s.cdFrac) * 100);
+        b.textContent = s.name;
+        b.style.cssText = base + 'border:1px solid #6a5a30;color:#888;cursor:default;' +
+          `background:linear-gradient(90deg,#2a2316 ${pct}%,#16161e ${pct}%);`;
+      }
+    });
+  }
+
+  private onPheromoneClick(kind: PheromoneKind): void {
+    const next = this.activePheromone === kind ? null : kind;
+    // SandboxScene owns the real selection; it echoes back via
+    // sandboxSelectPheromoneActive, which refreshes the button styles.
+    this.eventBus.emit('sandboxSelectPheromone', { kind: next });
+  }
+
+  private refreshPheromoneButtons(): void {
+    this.pheromoneBtns.forEach((btn, kind) => {
+      const def = PHEROMONE_DEFS[kind];
+      const hex = '#' + def.color.toString(16).padStart(6, '0');
+      const active = this.activePheromone === kind;
+      btn.style.background = active ? hex : '#16161e';
+      btn.style.color = active ? '#000' : hex;
+      btn.style.fontWeight = active ? 'bold' : 'normal';
+    });
   }
 
   private rebuildPresetOptions(): void {
@@ -277,6 +451,31 @@ export class SandboxHUDScene extends Phaser.Scene {
     return GENELINE_DEFS[g]?.symbol ?? g;
   }
 
+  /** A ‹ / › roster-scroll button that nudges the strip ~3 cards per click. */
+  private makeRosterArrow(glyph: string, dir: -1 | 1): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.className = 'sb-hud__roster-arrow';
+    btn.textContent = glyph;
+    btn.addEventListener('click', () => {
+      this.rosterRow.scrollBy({ left: dir * 288, behavior: 'smooth' });
+    });
+    return btn;
+  }
+
+  /**
+   * Hide the arrow at whichever end the strip is already against (and hide
+   * both when there's nothing to scroll). Layout-dependent, so callers defer
+   * to a frame after a rebuild via requestAnimationFrame.
+   */
+  private updateRosterArrows(): void {
+    const el = this.rosterRow;
+    if (!el || !this.rosterArrowL) return;
+    const atStart = el.scrollLeft <= 1;
+    const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
+    this.rosterArrowL.classList.toggle('is-hidden', atStart);
+    this.rosterArrowR.classList.toggle('is-hidden', atEnd);
+  }
+
   private buildRoster(): void {
     this.rosterRow.innerHTML = '';
     this.cardRefs.clear();
@@ -296,6 +495,8 @@ export class SandboxHUDScene extends Phaser.Scene {
       this.rosterRow.appendChild(card);
       this.cardRefs.set(key, card);
     }
+    // Arrow visibility depends on the laid-out scroll width — defer a frame.
+    requestAnimationFrame(() => this.updateRosterArrows());
   }
 
   // ---------------------------------------------------------------
@@ -392,12 +593,23 @@ export class SandboxHUDScene extends Phaser.Scene {
     const onCount = (evt: { player: number; enemy: number }) => {
       this.updateCountLabel(evt.player, evt.enemy);
     };
+    const onPheromoneActive = (evt: { kind: PheromoneKind | null }) => {
+      this.activePheromone = evt.kind;
+      this.refreshPheromoneButtons();
+    };
+    const onEliteSlots = (evt: {
+      slots: Array<{ id: number; name: string; ready: boolean; cdFrac: number; firable: boolean; inRange: boolean } | null>;
+    }) => {
+      this.updateEliteSlots(evt.slots);
+    };
 
+    this.eventBus.on('sandboxEliteSlots', onEliteSlots);
     this.eventBus.on('sandboxSelectUnit', onSelect);
     this.eventBus.on('sandboxRunningState', onRunning);
     this.eventBus.on('sandboxFightResult', onResult);
     this.eventBus.on('sandboxPresetsChanged', onPresetsChanged);
     this.eventBus.on('sandboxPlacementCount', onCount);
+    this.eventBus.on('sandboxSelectPheromoneActive', onPheromoneActive);
 
     this.events.once('shutdown', () => {
       this.eventBus.off('sandboxSelectUnit', onSelect);
@@ -405,6 +617,7 @@ export class SandboxHUDScene extends Phaser.Scene {
       this.eventBus.off('sandboxFightResult', onResult);
       this.eventBus.off('sandboxPresetsChanged', onPresetsChanged);
       this.eventBus.off('sandboxPlacementCount', onCount);
+      this.eventBus.off('sandboxSelectPheromoneActive', onPheromoneActive);
       this.input.keyboard?.off('keydown-ESC', escHandler);
     });
   }

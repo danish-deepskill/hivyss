@@ -1,6 +1,6 @@
 import type { IUnit, PassiveDef, PassiveKind } from '../types';
 import type { CombatPipeline } from './CombatPipeline';
-import { addModifier, removeModifiersBySource } from './ModifierSystem';
+import { addModifier, removeModifiersBySource, applyModifiers } from './ModifierSystem';
 import { lookupPredicate } from './PassivePredicates';
 import { runSelectorInRange } from './Targeting';
 import { lookupAbility } from '../config/combat/abilities';
@@ -172,13 +172,62 @@ const healCastHandler: PassiveHandler = {
 };
 
 /**
- * Registration order reproduces the original `updatePassives` sweep
- * order: self-modifier, then aura, then heal-cast. The driver calls
- * `pipeline.resolveFrame()` once after all handlers run, so queued heals
- * land before the same-frame attack pass.
+ * Pack Cohesion (α Primal): the herd grows stronger the tighter it packs.
+ * Each frame, count same-geneline same-side allies within `radius` and
+ * apply a self-modifier scaled by that count (capped at `maxAllies`).
+ * Recomputed each frame (remove-then-add) since the value is dynamic.
+ *
+ * This is the registry's FIRST new consumer beyond the migrated three —
+ * adding a brand-new geneline hook = one handler + one union variant,
+ * exactly as the registry was designed for.
+ */
+const cohesionHandler: PassiveHandler = {
+  kind: 'cohesion',
+  sweep: 'alive',
+  tick(u, passive, env) {
+    if (passive.kind !== 'cohesion') return;
+
+    // Read radius + perAlly through the modifier stack so an *amplifier*
+    // aura (e.g. Goliath's, which adds a `cohesion_perAlly` modifier to
+    // nearby allies) can boost a unit's cohesion. With no amplifier present
+    // applyModifiers returns the base value untouched — zero-cost seam.
+    const radius = applyModifiers(u, passive.radius, 'cohesion_radius');
+    const perAlly = applyModifiers(u, passive.perAlly, 'cohesion_perAlly');
+
+    const ux = u.x + u.unitW / 2;
+    let count = 0;
+    for (const ally of env.alive) {
+      if (ally === u) continue;
+      if (ally.side !== u.side) continue;
+      // Same-lane pack-mates only — cohesion is per-front.
+      if (ally.lane !== u.lane) continue;
+      if (ally.geneline !== u.geneline) continue;
+      const ax = ally.x + ally.unitW / 2;
+      if (Math.abs(ax - ux) < radius) count++;
+    }
+
+    const effective = Math.min(count, passive.maxAllies) * perAlly;
+    const sourceTag = `cohesion:${u.id}:${passive.stat}`;
+    removeModifiersBySource(u, sourceTag);
+    if (effective > 0) {
+      addModifier(u, {
+        stat: passive.stat,
+        type: passive.type,
+        value: effective,
+        source: sourceTag,
+      });
+    }
+  },
+};
+
+/**
+ * Registration order: self-modifier → cohesion → aura → heal-cast. The
+ * driver calls `pipeline.resolveFrame()` once after all handlers run, so
+ * queued heals land before the same-frame attack pass.
  */
 export const PASSIVE_HANDLERS: readonly PassiveHandler[] = [
   selfModifierHandler,
+  cohesionHandler,
   auraModifierHandler,
   healCastHandler,
 ];

@@ -13,12 +13,14 @@ import type {
 import { drawBasicBody } from "./renderUtils";
 
 import { units as starterUnits } from "./normal";
-import { units as alphaUnits } from "./alpha";
+import { units as alphaUnits } from "./alpha"; // α Primal — the canonical alpha
+import { units as archiveUnits } from "./archive"; // retired legacy "military alpha"
 
 // All unit modules keyed by unit ID
 const UNITS: Record<string, UnitModule> = {
   ...starterUnits,
   ...alphaUnits,
+  ...archiveUnits,
 };
 
 // Tier display definitions
@@ -46,6 +48,7 @@ export const TIER_DEFS: Record<TierKey, TierDef> = {
 export const GENELINE_DEFS: Partial<Record<GeneLine, GeneLineDef>> = {
   alpha: { symbol: 'α', name: 'Alpha', color: '#c03030' },
   normal: { symbol: '\u2014', name: 'Normal', color: '#888888' },
+  archive: { symbol: '\u2298', name: 'Archive', color: '#777777' },
 };
 
 // Build UNIT_DEFS from all unit modules

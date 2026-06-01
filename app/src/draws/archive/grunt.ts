@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { DrawFunction, RenderUnit } from '../../types';
-import { hexToInt, getStrike } from '../../units/renderUtils';
+import { hexToInt, getStrike, drawImpactSpark } from '../../units/renderUtils';
 
 const draw: DrawFunction = (g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, uy: number): void => {
   const primary = hexToInt(u.primary);
@@ -75,21 +75,7 @@ const draw: DrawFunction = (g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: n
   g.lineBetween(tipx, jy + h * 0.02 + gape, tipx + f * w * 0.04, jy);
 
   // --- Impact burst at the bite point (only at contact) ---
-  if (s.impact > 0.01) {
-    const a = s.impact;
-    const bx = jx + f * (w * 0.2 + thrust);
-    const by = jy;
-    g.fillStyle(0xffffff, a * 0.85);
-    g.fillCircle(bx, by, w * 0.03 + w * 0.08 * a);
-    g.lineStyle(w * 0.03, 0xffe9b0, a);
-    for (let i = 0; i < 4; i++) {
-      const ang = (i / 4) * Math.PI * 2 + 0.4;
-      const r1 = w * 0.05;
-      const r2 = w * (0.13 + 0.12 * a);
-      g.lineBetween(bx + Math.cos(ang) * r1, by + Math.sin(ang) * r1,
-                    bx + Math.cos(ang) * r2, by + Math.sin(ang) * r2);
-    }
-  }
+  if (s.impact > 0.01) drawImpactSpark(g, jx + f * (w * 0.2 + thrust), jy, w, s.impact);
 
   // --- Antennae (flick back on the lunge) ---
   g.lineStyle(w * 0.03, secondary);

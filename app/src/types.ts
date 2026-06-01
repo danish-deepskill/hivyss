@@ -10,6 +10,7 @@ import type { ResistanceTier } from './config/combat/resistances';
 // ActiveEffect from the effects types barrel.
 import type { Modifier } from './systems/ModifierSystem';
 import type { ActiveEffect } from './config/combat/effects/types';
+import type { Motion } from './units/motions';
 
 // --- ECS-lite components (Combat Rewrite Decision 1) ---
 // Component tags are declared here so any type in this file (e.g. IUnit,
@@ -49,7 +50,7 @@ export interface WorldEntity {
 // --- Tier System ---
 
 export type TierKey = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
-export type CasteKey = 'soldier' | 'elite' | 'royal';
+export type CasteKey = 'soldier' | 'elite' | 'royal' | 'worker';
 // Full 24-letter Greek alphabet + 'normal' as the untagged baseline.
 // Only a few are populated in UNIT_DEFS today (alpha + normal); the
 // rest are declared up front so future content additions typecheck
@@ -59,7 +60,10 @@ export type GeneLine =
   | 'zeta' | 'eta' | 'theta' | 'iota' | 'kappa'
   | 'lambda' | 'mu' | 'nu' | 'xi' | 'omicron'
   | 'pi' | 'rho' | 'sigma' | 'tau' | 'upsilon'
-  | 'phi' | 'chi' | 'psi' | 'omega' | 'normal';
+  | 'phi' | 'chi' | 'psi' | 'omega' | 'normal'
+  // Not a real geneline — a parking bucket for retired/legacy units (the old
+  // "military alpha" roster) kept registered for combat tests. See units/archive.ts.
+  | 'archive';
 export type Route = 'air' | 'land' | 'tunnel';
 export type AttackRange = 'melee' | 'ranged';
 export type UnitRole = 'tank' | 'dps' | 'support' | 'ranged';
@@ -153,7 +157,24 @@ export interface PassiveHealConfig {
  * belong in PIPELINE PHASES, not here. Terrain/structures belong in the
  * WorldEntity layer. T6+ apex behaviors are bespoke subsystems.
  */
-export type PassiveKind = 'self_modifier' | 'aura_modifier' | 'heal_cast';
+/**
+ * Pack Cohesion (α Primal) — a self-modifier whose magnitude scales with
+ * the number of same-geneline allies massed within `radius`. The herd
+ * gets stronger the tighter it packs. See `app/docs/active/GENELINE_ALPHA.md`.
+ */
+export interface CohesionConfig {
+  /** Stat boosted per nearby pack-ally (e.g. 'atk'). */
+  stat: string;
+  type: 'flat' | 'percent' | 'override';
+  /** Bonus per ally inside the herd radius. */
+  perAlly: number;
+  /** Herd radius in px (center-to-center). */
+  radius: number;
+  /** Max allies counted — caps the bonus. */
+  maxAllies: number;
+}
+
+export type PassiveKind = 'self_modifier' | 'aura_modifier' | 'heal_cast' | 'cohesion';
 
 /**
  * A single always-on passive behavior, discriminated by `kind`. Variant
@@ -172,7 +193,8 @@ export type PassiveKind = 'self_modifier' | 'aura_modifier' | 'heal_cast';
 export type PassiveDef =
   | ({ kind: 'self_modifier' } & SelfModifierConfig)
   | ({ kind: 'aura_modifier' } & AuraModifierConfig)
-  | ({ kind: 'heal_cast' } & PassiveHealConfig);
+  | ({ kind: 'heal_cast' } & PassiveHealConfig)
+  | ({ kind: 'cohesion' } & CohesionConfig);
 
 export interface UnitDef {
   name: string;
@@ -210,6 +232,27 @@ export interface UnitDef {
   deathAbility?: string;
 
   /**
+   * Player-triggered signature ability (the Elite/Royal "active"). Unlike
+   * `defaultAbility` (auto on attack) and `deathAbility` (auto on death),
+   * this fires only when the player triggers it, gated by `sigCd`. Routed
+   * through the pipeline like any other ability. Only meaningful on
+   * caste 'elite'/'royal'; the trigger system ignores it otherwise.
+   */
+  signatureAbility?: string;
+  /** Cooldown (seconds) between signature casts. Defaults to 8 in init(). */
+  signatureCooldown?: number;
+  /**
+   * Body animation for the signature (UNIT_ANIMATION_SYSTEM.md) — a composed
+   * motion primitive, e.g. `charge({ rear: 0.3, lunge: 0.6 })`. When present,
+   * triggering the signature plays a windup→active→recover telegraph and the
+   * ability's damage + FX fire at the windup→active boundary (the lunge peak)
+   * instead of instantly. Omit → the signature fires immediately (no telegraph).
+   */
+  signatureAnim?: Motion;
+  /** Phase durations (seconds) for the signature animation. */
+  signatureAnimPhases?: { windup: number; active: number; recover: number };
+
+  /**
    * Always-on passive behaviors (per-frame tick band). Discriminated by
    * `kind`; dispatched by the PASSIVE_HANDLERS registry each frame. See
    * `PassiveDef` for the scope fence (event-passives → pipeline phases).
@@ -233,6 +276,28 @@ export type HitFlavor = 'melee' | 'ranged' | 'aoe' | 'poison' | 'burn' | 'heal' 
 export type HitSoundType = 'melee' | 'ranged' | 'aoe' | 'heal';
 export type UnitState = 'march' | 'attack';
 export type Side = 'player' | 'enemy';
+
+// --- Pheromone Command ---
+// Lane/movement commands the player paints onto the field (HIVYSS.md §8).
+// Own-side units inside a zone change BEHAVIOR (movement), not stats:
+//   rally   → mass toward the zone center (cohesion spikes)
+//   charge  → advance forward at boosted speed (attacks AND pushes)
+//   retreat → fall back (scatter to dodge incoming AOE)
+export type PheromoneKind = 'rally' | 'charge' | 'retreat';
+
+export interface PheromoneZone {
+  kind: PheromoneKind;
+  /** World-space center x of the zone. */
+  x: number;
+  /** Influence radius in px (1D center-x distance, side-scoped). */
+  radius: number;
+  /** Only own-side units obey. */
+  side: Side;
+  /** Lane the zone applies to (0 = upper, 1 = lower). Same-lane scoped. */
+  lane: number;
+  /** Seconds of life left; decremented in GameManager.tick, NOT in resolve. */
+  remaining: number;
+}
 
 export interface CombatContext {
   particles: IParticleManager | null;
@@ -337,6 +402,13 @@ export interface UnitPersistent {
 export interface IUnit extends WorldEntity {
   key: string;
   side: Side;
+  /**
+   * Battle lane (0 = upper, 1 = lower). Identity set by the spawner each
+   * spawn (NOT persistent — recycled units are re-laned in init()). Units
+   * only fight same-lane enemies and render at a lane-offset ground Y.
+   */
+  lane: number;
+  geneline: GeneLine;
   hp: number;
   maxHp: number;
   atk: number;
@@ -390,6 +462,14 @@ export interface IUnit extends WorldEntity {
    */
   _deathTriggerFired?: boolean;
   deathAbility?: string;
+  /** Player-triggered signature ability key (Elite/Royal active). */
+  signatureAbility?: string;
+  /** Signature cooldown length (seconds). */
+  signatureCooldown: number;
+  /** Live signature cooldown timer; counts down in update(). 0 = ready. */
+  sigCd: number;
+  /** Signature body animation (UNIT_ANIMATION_SYSTEM.md); undefined = no telegraph. */
+  signatureAnim?: Motion;
   passives?: PassiveDef[];
   /**
    * Aura death-cleanup re-entry latch. Flipped to true after
@@ -413,6 +493,16 @@ export interface IUnit extends WorldEntity {
   march(dt: number): void;
   startAttack(): void;
   canAttack(): boolean;
+  /** True when this unit has a signature ability off cooldown and is alive. */
+  canSignature(): boolean;
+  /** Pack-cohesion level (0..1 frac) — drives FX magnitude. Optional: not all
+   *  IUnit implementers (test fixtures) carry it. */
+  cohesionLevel?(): { stacks: number; frac: number };
+  /** Begin the signature body animation (windup→active→recover). Optional. */
+  startSignatureAnim?(): void;
+  /** True the first frame the signature animation reaches the active phase
+   *  (the lunge peak) — the sim fires damage + FX then. One-shot latch. */
+  signatureImpactReady?(): boolean;
   takeDamage(dmg: number): void;
   heal(amount: number): number;
   getEffectiveAtk(): number;
@@ -536,6 +626,13 @@ export interface AbilityDef {
   auraMods?: Partial<Record<'atkMult' | 'dmgTakenMult', number>>;
   /** Fast-path: calculate phase uses baseDamageOverride instead of tier lookup. */
   skipsResistance?: boolean;
+  /**
+   * Presentation-only FX descriptor (see `app/docs/active/FX_SYSTEM.md`).
+   * `undefined` → the dmgType's default FX; set to override per-ability
+   * (signatures like Stampede). NEVER read by the simulation — the impact
+   * dispatcher consumes it. Same 3-state convention as `appliesEffects`.
+   */
+  fx?: { kind: string };
 }
 
 // DamageEvent — envelope flowing through the 7-phase pipeline. Any

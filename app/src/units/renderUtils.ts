@@ -17,6 +17,26 @@ export function lerpColor(a: number, b: number, t: number): number {
 }
 
 
+/* ── Shaded body segment (fake volume, light from top-left) ── */
+
+/**
+ * A body segment with fake volume — light from the top-left. Three
+ * stacked offset ellipses (shadow / base / highlight) turn a flat blob
+ * into form. Use this for every abdomen/thorax/head instead of a bare
+ * fillEllipse. See `app/docs/reference/DRAW_STYLE.md`.
+ */
+export function shadedBlob(
+  g: Phaser.GameObjects.Graphics,
+  cx: number, cy: number, w: number, h: number,
+  color: number,
+): void {
+  const shadow = lerpColor(color, 0x000000, 0.42);
+  const light = lerpColor(color, 0xffffff, 0.34);
+  g.fillStyle(shadow); g.fillEllipse(cx + w * 0.05, cy + h * 0.07, w * 1.06, h * 1.06); // rim/shadow
+  g.fillStyle(color);  g.fillEllipse(cx, cy, w, h);                                     // base
+  g.fillStyle(light);  g.fillEllipse(cx - w * 0.13, cy - h * 0.15, w * 0.48, h * 0.42); // highlight
+}
+
 /* ── Attack swing animation ──────────────────────────── */
 
 /**
@@ -51,6 +71,30 @@ export function getStrike(u: RenderUnit): Strike {
     return { coil, lunge: 0, reach: -0.45 * coil, impact: 0 };
   }
   return { coil: 0, lunge: 0, reach: 0, impact: 0 };
+}
+
+/**
+ * White flash + 4-ray radial spark at a melee impact point. `intensity`
+ * is the strike's impact value (0..1). Shared by every unit's strike
+ * draw so the hit-FX stays consistent.
+ */
+export function drawImpactSpark(
+  g: Phaser.GameObjects.Graphics,
+  bx: number, by: number, w: number, intensity: number,
+): void {
+  const a = intensity;
+  g.fillStyle(0xffffff, a * 0.82);
+  g.fillCircle(bx, by, w * 0.03 + w * 0.075 * a);
+  g.lineStyle(w * 0.03, 0xffe9b0, a);
+  for (let i = 0; i < 4; i++) {
+    const ang = (i / 4) * Math.PI * 2 + 0.4;
+    const r1 = w * 0.05;
+    const r2 = w * (0.12 + 0.11 * a);
+    g.lineBetween(
+      bx + Math.cos(ang) * r1, by + Math.sin(ang) * r1,
+      bx + Math.cos(ang) * r2, by + Math.sin(ang) * r2,
+    );
+  }
 }
 
 /* ── Rotation helpers (for tilted body poses) ────────── */

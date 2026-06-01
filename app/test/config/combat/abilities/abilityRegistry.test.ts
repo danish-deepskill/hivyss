@@ -188,10 +188,16 @@ describe('AbilityDef structural invariants', () => {
     // running through the pipeline in Phase 4 produce identical numbers
     // (no silent buffs from the rewrite). Phase 10 can revisit.
     // skipsResistance wrappers are exempt — they use baseDamageOverride.
+    //
+    // INTENTIONALLY off-calibration (Elite signatures, balance-by-design):
+    //   stampede   ×0.5 — AOE herd-trample, low per-target by design.
+    //   ram_charge ×2.0 — single-target heavy hit, the trade for no AOE.
+    // These are deliberate, not "silent rewrite buffs"; pin them explicitly.
+    const RESCALED: Record<string, number> = { stampede: 0.5, ram_charge: 2.0 };
     for (const [key, a] of all) {
       if (a.category !== 'damage') continue;
       if (a.skipsResistance) continue;
-      expect(a.tiers?.normal?.dmgMult, key).toBe(1.0);
+      expect(a.tiers?.normal?.dmgMult, key).toBe(RESCALED[key] ?? 1.0);
     }
   });
 

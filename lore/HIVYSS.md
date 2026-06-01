@@ -401,7 +401,7 @@ The dark side of the main map. Each Greek geneline has a **Phoenician counterpar
 
 | Greek | Phoenician shadow | How dark version is twisted |
 |---|---|---|
-| α Alpha (red military) | ℵ Aleph (blood-black ritual) | Aura damages disobedient allies |
+| α Alpha (red primal herd) | ℵ Aleph (blood-black ritual) | Blood-cohesion — the pack feeds on spilled blood and cannot be called off |
 | β Beta (green swarm) | ב Beth (rot-black swarm) | Units don't die — liquefy and re-spawn |
 | γ Gamma (stone fortress) | ג Gimel (obsidian fortress) | Armor self-repairs by cannibalism |
 | ε Epsilon (signalers) | ה He (signal-jammers) | Pheromone-hijack your own units |
@@ -520,7 +520,7 @@ If two genelines end up asking the same question, one of them is redundant.
 
 Show a player ONE unit from the geneline in isolation. They should guess the geneline within 2 seconds.
 
-- See a Centurion → "Alpha. Commander. Buffs nearby allies." ✅
+- See a Centurion → "Delta. Disciplined military — commander, buffs nearby allies." ✅
 - See a hypothetical Beta unit → should read "swarm. Fragile. Cheap. Dies to do damage."
 
 ### Phoenician root grounding (for Greek genelines)
@@ -529,7 +529,7 @@ Each Greek letter has a **Phoenician primal ancestor** with a real-world meaning
 
 | Greek | Phoenician root | Primal meaning | Greek theme |
 |---|---|---|---|
-| α | Aleph | ox | herd, primal strength → military discipline |
+| α | Aleph | ox | herd, primal strength → aggressive rush (offense) |
 | β | Beth | house | shelter, nest → swarm (nests that walk) |
 | γ | Gamma | camel / staff | endurance / projection → armor |
 | ε | Epsilon | He / window | sight, opening → signalers ✓ |
@@ -555,8 +555,8 @@ Each geneline deviates on some number of axes from the default battle loop. Dist
 
 | Tier | Axes deviated | Examples | Count target |
 |---|---|---|---|
-| **Classic** | 0-1 | α Disciplined, γ Enduring | ~10 |
-| **Distinct** | 2 | β Multitudes, θ Feeders, ζ Symbionts | ~10 |
+| **Classic** | 0-1 | α Primal, γ Fortress | ~10 |
+| **Distinct** | 2 | β Swarm, θ Feeders, ζ Symbionts | ~10 |
 | **Alien** | 3-4 | ν Beacons (no combat units), ω Whole | ~4 |
 
 You can't have 24 wildly-unique genelines — players need a baseline. Most genelines are subtle; a few are radical.
@@ -572,7 +572,7 @@ You can't have 24 wildly-unique genelines — players need a baseline. Most gene
 | Geneline | Status | Units | Notes |
 |---|---|---|---|
 | **Normal** | Shipped, 11 units | Grub, Hardshell, Pricker, Skitterling, Mendwing, Domeback, Cinderfly, Longeye, Wardling, Bashguard, Stormfly | Pre-cosmology baseline. Was built before the cosmology framework was locked. To be reframed as a "starter" / unaligned geneline OR absorbed into Greek. |
-| **α Alpha** | Shipped, 7 units | Grunt, Mandible, Needler, Bombardier, Ravager, Legionnaire, Centurion | First "real" geneline using the cosmology framework. Military theme. Centurion provides aura buff to nearby allies. |
+| **α Alpha** | Shipped 7 (re-homing → δ) | Grunt, Mandible, Needler, Bombardier, Ravager, Legionnaire, Centurion | Legacy **military** roster — **re-homed to δ Delta** (Disciplined Military). α itself re-themed **Primal** (OFFENSE/herd; new roster Chitling…Goliath built separately). See `app/docs/active/MVP_GENELINES.md`. |
 
 **18 units total in code.** 56 more to author across the cosmology (2 + 22 Greek remaining + 22 Phoenician + 7 Archaic + 5 Coptic).
 
@@ -582,10 +582,10 @@ You can't have 24 wildly-unique genelines — players need a baseline. Most gene
 
 | Letter | Theme (proposed) | Layer | Mechanical hook |
 |---|---|---|---|
-| α Alpha | **Primal** (herd, raw strength, foundational) | Skin | Pack cohesion, presence buffs |
-| β Beta | Multitudes (swarm) | Skin | Cheap units, death effects |
-| γ Gamma | Enduring (fortress) | Skin | Armor degradation |
-| δ Delta | **Disciplined Military** (rank, vanguard) | Veins | Rank coordination, formation scaling |
+| α Alpha | **Primal** (aggressive herd — the **OFFENSE/rush**; medium pack) | Skin | Pack cohesion = charge-synergy (commit as one), presence buffs |
+| β Beta | Swarm (the **NUMBERS**) | Skin | Many cheap expendable units, death effects |
+| γ Gamma | Fortress (the **DEFENSE**) | Skin | Armor / armor-degradation, walls |
+| δ Delta | **Disciplined Military** (rank, vanguard — **CONTROL/range**) | Veins | Rank coordination, formation scaling, ranged/artillery |
 | ε Epsilon | Signalers (pheromone) | Veins | Buffs flow through killable relays |
 | ζ Zeta | Symbionts (paired) | Veins | Bond synergy, partner-rage |
 | η Eta | Resonant (sonic) — Mid-Core boss | Organs | Resonance grid, shared cooldowns |
@@ -645,9 +645,9 @@ Each faction has **three expressions** across the realms: preserved past (Coptic
 | Faction | Primordial (Archaic) | Aspect | Greek members (sketch) | Coptic (Husk) | Phoenician shadows |
 |---|---|---|---|---|---|
 | **Moving** | ϝ Digamma | Motion | μ Migrants, λ Mirrors, χ Unmakers | Ϸ Sho (Frozen Caravan) | 3 shadows of above |
-| **Numbered** | ϟ Koppa | Number | β Multitudes, τ Revenants, π Dominators | Ϧ Khai (Counted) | 3 shadows of above |
+| **Numbered** | ϟ Koppa | Number | β Swarm, τ Revenants, π Dominators | Ϧ Khai (Counted) | 3 shadows of above |
 | **Voiced** | ϡ Sampi | Voice | ε Signalers, ν Beacons, σ Scavengers | ϯ Ti (Silenced) | 3 shadows of above |
-| **Gradient** | Ϻ San | Gradience | γ Enduring, ι Molters, ζ Symbionts | ϭ Cima (Arrested) | 3 shadows of above |
+| **Gradient** | Ϻ San | Gradience | γ Fortress, ι Molters, ζ Symbionts | ϭ Cima (Arrested) | 3 shadows of above |
 | **Breathing** | Ͱ Heta | Breath | ξ Regenerators, η Resonant, φ Hosts | ϫ Janja (Held Breath) | 3 shadows of above |
 | **Territorial** | ϛ Stigma | Territory | α Primal, ο Territorials, κ Weavers | Ϩ Hori (Marked) | 3 shadows of above |
 | **Seeking** | ϙ Qoppa | Wonder | δ Military, θ Feeders, υ Hollowers, ρ Pure | ϥ Fai (Patient) | 4 shadows of above |
@@ -777,7 +777,7 @@ When a Royal is docked at a hive, she applies that geneline's **style package** 
 
 | Facet | What differs per geneline (examples) |
 |---|---|
-| **Visual architecture** | α hives = military bunkers with ranked chambers; β = writhing warrens with spawning pits; γ = fortress walls of fused carapace; θ = mounds of slowly-digesting corpses; κ = hanging webworks |
+| **Visual architecture** | α hives = primal beast-dens of horn, hide and bone, with trampled charging-runs; β = writhing warrens with spawning pits; γ = fortress walls of fused carapace; θ = mounds of slowly-digesting corpses; κ = hanging webworks |
 | **Passive hive aura** | α: garrisons gain +discipline buff; β: spawns 1 free swarmling every 30s; γ: walls auto-repair; θ: defeated raider corpses feed garrison stats |
 | **Unit production** | Hive's recruitment/production pool = that geneline's roster only. An α hive produces α units; a β hive produces β units. |
 | **Pheromone signature** | Hive's ambient pheromone is geneline-specific (visible as color/particle on the strategic map) |
@@ -789,8 +789,9 @@ Each geneline defines how its Elites coordinate on the battlefield. This is the 
 
 | Geneline | Elite tactical doctrine |
 |---|---|
-| α Disciplined | **Rank formation** — Elites maintain line, protect Royal, call signature actives in sync with Soldier advance |
-| β Multitudes | **Wave leadership** — Elites trigger swarm pushes, sacrifice themselves when it creates more swarmlings |
+| α Primal | **Herd charge** — Elites anchor the pack's core (cohesion peaks at center) and time the committed Stampede when the herd is massed |
+| δ Disciplined Military | **Rank formation** — Elites hold the line, coordinate ranged/artillery volleys, call command actives (Rally) in sync with the advance |
+| β Swarm | **Wave leadership** — Elites trigger swarm pushes, sacrifice themselves when it creates more swarmlings |
 | θ Feeders | **Corpse farming** — Elites kill weak enemies first (for corpses), save actives for dense-enemy moments |
 | κ Weavers | **Wall architecture** — Elites reposition to optimal wall-raise spots, pre-place traps before engagement |
 | τ Revenants | **Death management** — Elites accept deaths strategically (will rise), coordinate timing of "Call to Rise" active |
@@ -804,7 +805,7 @@ Your moment-to-moment actions in battle span 5 categories, each with a different
 |---|---|---|
 | **Deploy units** | Steady cadence | Spend nectar, pick type from roster, queue into chamber |
 | **Pheromone placement** | Positional, semi-permanent | Direct Worker scouts to place Rally/Charge/Retreat zones |
-| **Elite signatures** | Tactical bursts (per-Elite cooldowns) | Click α Centurion's Rally button to burst all lane allies |
+| **Elite signatures** | Tactical bursts (per-Elite cooldowns) | Click δ Centurion's Rally button to burst all lane allies |
 | **Royal direct control** | Continuous (when Royal in battle) + ultimate moment | WASD move Royal, click-target, cast Royal Special when bar fills |
 | **Hive abilities** | Global, high-impact, limited charges | Cast slotted abilities (nuke/wall/slow/repair or geneline-specific) |
 
@@ -1034,9 +1035,9 @@ Garrison *composition* is flexible — **garrisons can be mixed** from any units
 - **Royal traveling:** hive is in dormant mode (garrison defends, style suspended until she returns)
 
 Garrison *doctrine* becomes part of geneline identity via the Royal's passive hive aura:
-- α Disciplined: garrison gains +discipline (rank coherence, stance buffs)
-- β Multitudes: hive passively spawns 1 free swarmling every 30s — garrison auto-swells
-- γ Enduring: garrison walls auto-repair, making the hive turtle-strong
+- α Primal: garrison gains +cohesion (pack presence, charge-readiness)
+- β Swarm: hive passively spawns 1 free swarmling every 30s — garrison auto-swells
+- γ Fortress: garrison walls auto-repair, making the hive turtle-strong
 - θ Feeders: defeated raider corpses feed the garrison (permanent stat gains from surviving raids)
 - κ Weavers: hive itself is heavily fortified (webs, walls) — terrain does defensive work
 - τ Revenants: fallen garrison broods rise mid-raid (self-repairing defense)
@@ -1506,11 +1507,13 @@ This is the cosmology's only concession to existential horror. It is never state
 
 ---
 
-*Document version: 1.4*
+*Document version: 1.6*
 *Captured from design conversations through 2026-04-19.*
 *Update as design decisions evolve. Mark superseded sections rather than deleting (lore archaeology).*
 
 ### Changelog
+- **v1.6 (2026-06-01)**: **Geneline-name consistency pass.** Renamed two MVP genelines to concrete collective nouns so the four-name set reads cleanly to players: **β Multitudes → β Swarm** (the literary "Multitudes" wasn't familiar; "Swarm" is instantly legible — accepted the minor name==archetype overlap since β is the canonical swarm and the other swarm-leaning genelines carry their own names) and **γ Enduring → γ Fortress** (concrete imagery over the adjective). **α Primal** and **δ Military** unchanged (δ kept broad — "Legion" was rejected as too narrow; the re-homed Roman-flavored δ roster should later de-Romanize to read Military-broad). Updated §6 deviation-tier + §7 roster rows, §6 Phoenician-shadow tables, §8 Elite-doctrine, §9 garrison doctrine. Active MVP source of truth: `app/docs/active/MVP_GENELINES.md`.
+- **v1.5 (2026-05-31)**: **Completed the α→Primal / δ→Military re-home** begun in v1.4 — across sections that still carried stale "α military/Disciplined" language: §4 dark-mirror pairing, §6 legibility + Phoenician-root + deviation-tier rows, §7 shipped-status, §8 Elite-doctrine (+ added a δ "Rank formation" row) + control-surface example, §9 garrison doctrine + visual-architecture. Added the **role-triad** framing to §7 (α **OFFENSE**/rush · β **NUMBERS**/swarm · γ **DEFENSE**/turtle · δ **CONTROL**/range) and re-framed α's Pack Cohesion as *charge-synergy* (a medium aggressive pack, **not** a swarm). Active MVP design source of truth: `app/docs/active/MVP_GENELINES.md`.
 - **v1.4 (2026-04-19)**: **Cosmology pivot — 7 primordials.** Archaic Greek (7 letters) promoted to Primordials at T10 (was Coptic, 5); Coptic (7 letters) demoted to Husk-preserved at T5-7 (was Archaic, 7). This honors real linguistic genealogy (Archaic Greek is older than Coptic) and resolves the 5-vs-7 tension (7 Archaic letters = 7 primordials = 7 Coptic Husk variants, all 1:1 aligned). Primordial aspects rewritten from abstract 5 (Being/Form/Hunger/Echo/Turning) to concrete 7 (Motion/Number/Voice/Gradience/Breath/Territory/Wonder). Faction count 5 → 7 (one per primordial). Reputation tiers 9 → 7 (Favorable + Suspicious collapsed into adjacent tiers). α Alpha retheme from Disciplined Military to Primal/Foundational; δ Delta retheme from Hunters to Disciplined Military (cultural + Phoenician-root fit). σ-χ "Dark Realm bleed candidates" framing removed (those are Greek, Dark Realm is strictly Phoenician). Geneline count 58 → 60 (Husk grows from 5 Coptic to 7 Coptic). §17 The Unchosen dramatically simplified (only Ϣ Shai unused as redundant-Sho variant). Heptagonal Primordials map (was pentagonal). §4 Husk becomes Coptic-flavored monastic preservation; §7 Primordial mechanical theses rewritten for 7 new aspects.
 - **v1.3 (2026-04-19)**: Gene/Royal/Caste design batch. §0.4 glossary expanded with gene terminology (gene, gene library, gene-imprint, chamber tuning, vyss-egg, specimen, roster, Royal unified, hive style, generic outpost). §1 added Royal-as-Core-microcosm paragraph. §6 added 10th axis (Elite tactical doctrine). §8 major revision: caste table rewritten (Caste × Tier orthogonal), Royal unified as Queen+Avatar+Hero with 4 modes (docked / traveling / in battle / dead), Geneline style 5-facet package, Elite tactical doctrine per geneline, Player control surface 5 categories. §9 garrison refinement (mixed garrisons allowed, style via Royal not composition, generic outposts without Royal, 4 conquest loot types). §11 restructured: Unit identity tiers (Generic/Individual), Roster expansion 9 paths, Lore of reproduction 7 steps, Memory Vault upgrade, Corruption drift interaction. §14 added terminology discipline table. §16 added open questions 11-14.
 - **v1.2 (2026-04-19)**: Extended §3 with Civilization lore per tier (human-analog civilizational stage descriptions for T0-T10). §10 added run-length target (long-form tiered roguelike in CoQ/DCSS tradition: Casual 2-4h / Main 8-15h / True 20-30h / Beyond 40-60h). §9 expanded "Captured territory persistence" into full "Territory & garrison system" — non-linear node capture, expedition/garrison split, hostile raid events, allied faction quests, enemy offensive behavior. §16 added open questions 8-10 (save architecture, death cost, content density per layer).

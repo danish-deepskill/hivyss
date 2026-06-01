@@ -2,7 +2,11 @@ import Phaser from 'phaser';
 import { DEFAULT_WORLD_W, H } from '../config/Constants';
 import { BG_THEMES } from '../config/BackgroundDefs';
 import { LANE } from '../config/Layout';
-const GND = LANE.land.groundY;
+import { getGroundY } from '../config/RouteMatrix';
+// Ground-field top = the UPPER lane's ground, so the filled ground spans
+// BOTH lanes (lane 0 stands on the top edge, lane 1 on the field below).
+// LANE.land.groundY is now the gap *between* the two lanes (the divider).
+const GND = getGroundY('land', 0);
 import { ABILITY_DEFS } from '../config/AbilityDefs';
 import { GameManager } from '../systems/GameManager';
 import { capUsed, MAX_CAPACITY } from '../systems/Capacity';
@@ -219,6 +223,13 @@ export class WorldScene extends Phaser.Scene {
       bg.moveTo(i, GND + 2);
       bg.lineTo(i + 7, GND + 6);
       bg.strokePath();
+    }
+
+    // Lane divider — faint dashed line between the upper and lower lanes
+    const laneDivY = LANE.land.groundY;
+    bg.lineStyle(1, 0xffffff, 0.05);
+    for (let x = 0; x < ww; x += 28) {
+      bg.lineBetween(x, laneDivY, x + 14, laneDivY);
     }
 
     // Air lane indicator — faint dashed line in the sky

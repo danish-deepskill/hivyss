@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { UnitDef, Side, UnitState, RenderUnit, Route, AttackRange, GenePalette, ComponentTag, UnitPersistent, PassiveDef } from '../types';
+import type { UnitDef, Side, UnitState, RenderUnit, Route, AttackRange, GenePalette, ComponentTag, UnitPersistent, PassiveDef, GeneLine } from '../types';
 import { hasActiveEffect } from '../systems/EffectSystem';
 import type { DamageType } from '../config/combat/damageTypes';
 import type { ResistanceTier } from '../config/combat/resistances';
@@ -7,19 +7,38 @@ import type { Modifier } from '../systems/ModifierSystem';
 import type { ActiveEffect } from '../config/combat/effects/types';
 import { resolveColors } from '../config/Palettes';
 import { SPD_MULT } from '../config/Constants';
-import { getGroundY } from '../config/RouteMatrix';
+import { getGroundY, laneDepth } from '../config/RouteMatrix';
 import { drawUnit } from '../units/registry';
+import { NEUTRAL, type Motion, type MotionTransform, type AnimPhase } from '../units/motions';
 import { UNIT_COMPONENTS } from '../systems/EntityComponents';
 
 let _uid = 0;
 function uid(): number { return ++_uid; }
 export function resetUid(): void { _uid = 0; }
 
+// --- Pack-cohesion aura (presentation knobs) ---
+// A warm halo beneath a cohered unit that intensifies as its herd packs
+// tight. Generic + data-driven: drawn for ANY unit carrying a `cohesion`
+// passive, tinted by the unit's own primary colour (α Primal = red heat).
+// When a pack masses, the overlapping halos read as one blazing cluster —
+// the felt "the herd is powered up" signal. Tune freely; presentation-only,
+// never read by the simulation.
+const COHESION_GLOW_ALPHA = 0.42; // peak inner-glow opacity at frac = 1
+const COHESION_GLOW_GROW = 0.7;   // halo radius growth across frac 0→1
+const COHESION_GLOW_PULSE = 0.18; // ± breathing amplitude (keeps it alive)
+
 export class Unit extends Phaser.GameObjects.Container {
   // Identity
   id: number;
   key: string;
   side: Side;
+  /**
+   * Battle lane (0 = upper, 1 = lower). Identity set by the spawner each
+   * spawn via init(); units only fight same-lane enemies and render at a
+   * lane-offset ground Y. NOT persistent — re-laned on pool recycle.
+   */
+  lane: number;
+  geneline: GeneLine;
 
   // Stats
   hp: number;
@@ -56,6 +75,21 @@ export class Unit extends Phaser.GameObjects.Container {
   defaultAbility?: string;
   deathAbility?: string;
   passives?: PassiveDef[];
+
+  // Player-triggered signature ability (Elite/Royal active) + its cooldown.
+  signatureAbility?: string;
+  signatureCooldown: number;
+  sigCd: number;
+
+  // Signature body animation (UNIT_ANIMATION_SYSTEM.md). sigAnimTimer counts
+  // down across windup→active→recover; the impact (damage + FX) fires once at
+  // the windup→active boundary via signatureImpactReady().
+  signatureAnim?: Motion;
+  sigAnimTimer: number;
+  sigAnimWindup: number;
+  sigAnimActive: number;
+  sigAnimTotal: number;
+  private _sigImpactFired: boolean;
 
   // Direct properties (hot-path / rendering)
   burrowed: boolean;
@@ -101,13 +135,15 @@ export class Unit extends Phaser.GameObjects.Container {
   hpBar: Phaser.GameObjects.Graphics;
 
   /** Pool-friendly constructor. If def is provided, initializes immediately. Otherwise, call init() later. */
-  constructor(scene: Phaser.Scene, def?: UnitDef, side?: Side, x?: number) {
+  constructor(scene: Phaser.Scene, def?: UnitDef, side?: Side, x?: number, lane = 0) {
     super(scene, 0, 0);
 
     // Defaults for all fields (satisfy TS — will be set properly in init())
     this.id = 0;
     this.key = '';
     this.side = 'player';
+    this.lane = 0;
+    this.geneline = 'normal';
     this.hp = 0;
     this.maxHp = 0;
     this.atk = 0;
@@ -145,6 +181,15 @@ export class Unit extends Phaser.GameObjects.Container {
     this.backswingTimer = 0;
     this.poiseAccum = 0;
     this.healTimer = 0;
+    this.signatureAbility = undefined;
+    this.signatureCooldown = 0;
+    this.sigCd = 0;
+    this.signatureAnim = undefined;
+    this.sigAnimTimer = 0;
+    this.sigAnimWindup = 0;
+    this.sigAnimActive = 0;
+    this.sigAnimTotal = 0;
+    this._sigImpactFired = false;
     this.components = new Set();
     this.baseResistance = {};
     this.resistance = {};
@@ -166,16 +211,18 @@ export class Unit extends Phaser.GameObjects.Container {
     scene.add.existing(this);
 
     if (def && side !== undefined && x !== undefined) {
-      this.init(def, side, x);
+      this.init(def, side, x, lane);
     }
   }
 
   /** (Re)initialize this unit with new stats. Used by pool to recycle units. */
-  init(def: UnitDef, side: Side, x: number): void {
+  init(def: UnitDef, side: Side, x: number, lane = 0): void {
     const isPlayer = side === 'player';
     this.id = uid();
     this.key = def._key!;
     this.side = side;
+    this.lane = lane;
+    this.geneline = def.geneline;
 
     this.hp = def.hp;
     this.maxHp = def.hp;
@@ -201,6 +248,16 @@ export class Unit extends Phaser.GameObjects.Container {
     this.attackRange = def.attackRange ?? 'melee';
     this.defaultAbility = def.defaultAbility;
     this.deathAbility = def.deathAbility;
+    this.signatureAbility = def.signatureAbility;
+    this.signatureCooldown = def.signatureCooldown ?? 8;
+    this.sigCd = 0;
+    this.signatureAnim = def.signatureAnim;
+    const ph = def.signatureAnimPhases;
+    this.sigAnimWindup = ph?.windup ?? 0;
+    this.sigAnimActive = ph?.active ?? 0;
+    this.sigAnimTotal = ph ? ph.windup + ph.active + ph.recover : 0;
+    this.sigAnimTimer = 0;
+    this._sigImpactFired = false;
     this.passives = def.passives;
 
     this.state = 'march';
@@ -252,7 +309,13 @@ export class Unit extends Phaser.GameObjects.Container {
     this._deathTriggerFired = false;
     this._auraCleanedUp = false;
 
-    this.setPosition(Math.round(x), Math.round(getGroundY(this.currentRoute) - def.h));
+    // Lane depth — the far (North) lane draws smaller + dimmer. Scale is
+    // presentation-only (combat reads logical x / unitW). Re-anchor Y by
+    // the SCALED height so the scaled feet still rest on the ground line.
+    const depth = laneDepth(this.lane);
+    this.setScale(depth.scale);
+    this.setAlpha(depth.alpha);
+    this.setPosition(Math.round(x), Math.round(getGroundY(this.currentRoute, this.lane) - def.h * depth.scale));
     this.setActive(true);
     this.setVisible(true);
     this.gfx.clear();
@@ -282,6 +345,8 @@ export class Unit extends Phaser.GameObjects.Container {
     // Tick all effect timers
     if (this.dmgFlash > 0) this.dmgFlash = Math.max(0, this.dmgFlash - dt * 4);
     if (this.atkCd > 0) this.atkCd = Math.max(0, this.atkCd - dt);
+    if (this.sigCd > 0) this.sigCd = Math.max(0, this.sigCd - dt);
+    if (this.sigAnimTimer > 0) this.sigAnimTimer = Math.max(0, this.sigAnimTimer - dt);
     if (this.foreswingTimer > 0) this.foreswingTimer = Math.max(0, this.foreswingTimer - dt);
     if (this.backswingTimer > 0) this.backswingTimer = Math.max(0, this.backswingTimer - dt);
     if (this.poiseAccum > 0) this.poiseAccum = Math.max(0, this.poiseAccum - 10 * dt); // recover 10/s out of 100
@@ -312,6 +377,63 @@ export class Unit extends Phaser.GameObjects.Container {
 
   canAttack(): boolean {
     return this.atkCd <= 0;
+  }
+
+  /**
+   * Player-triggered signature gate (Elite/Royal active). True when the
+   * unit carries a signatureAbility, its cooldown has elapsed, and it's
+   * alive. The trigger system (CombatSystem.requestSignatures) checks this
+   * before queueing the ability and resetting `sigCd`.
+   */
+  canSignature(): boolean {
+    return !this.dead && !!this.signatureAbility && this.sigCd <= 0;
+  }
+
+  /** Begin the signature body animation (windup→active→recover). */
+  startSignatureAnim(): void {
+    if (this.sigAnimTotal <= 0) return;
+    this.sigAnimTimer = this.sigAnimTotal;
+    this._sigImpactFired = false;
+  }
+
+  /**
+   * True exactly once — the first frame the signature animation reaches the
+   * active phase (the lunge peak). The sim fires the signature's damage + FX
+   * then, so the hit lands *with* the lunge, not at the trigger. Latched.
+   */
+  signatureImpactReady(): boolean {
+    if (this._sigImpactFired || this.sigAnimTimer <= 0) return false;
+    const elapsed = this.sigAnimTotal - this.sigAnimTimer;
+    if (elapsed >= this.sigAnimWindup) {
+      this._sigImpactFired = true;
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * The current signature-animation body transform (NEUTRAL when none is
+   * playing) — evaluates the unit's composed motion at the live phase. The
+   * presentation layer (redraw) applies it; the sim never reads it.
+   */
+  currentMotion(): MotionTransform {
+    if (this.sigAnimTimer <= 0 || !this.signatureAnim) return NEUTRAL;
+    const elapsed = this.sigAnimTotal - this.sigAnimTimer;
+    let phase: AnimPhase;
+    let phaseT: number;
+    if (elapsed < this.sigAnimWindup) {
+      phase = 'windup';
+      phaseT = this.sigAnimWindup > 0 ? elapsed / this.sigAnimWindup : 1;
+    } else if (elapsed < this.sigAnimWindup + this.sigAnimActive) {
+      phase = 'active';
+      phaseT = this.sigAnimActive > 0 ? (elapsed - this.sigAnimWindup) / this.sigAnimActive : 1;
+    } else {
+      const recDur = this.sigAnimTotal - this.sigAnimWindup - this.sigAnimActive;
+      phase = 'recover';
+      phaseT = recDur > 0 ? (elapsed - this.sigAnimWindup - this.sigAnimActive) / recDur : 1;
+    }
+    const t = this.sigAnimTotal > 0 ? elapsed / this.sigAnimTotal : 1;
+    return this.signatureAnim({ t, phase, phaseT });
   }
 
   takeDamage(dmg: number): void {
@@ -356,6 +478,25 @@ export class Unit extends Phaser.GameObjects.Container {
     return { windup: 0, recover: 0 };
   }
 
+  /**
+   * Pack-cohesion intensity for the presentation layer — a semantic signal,
+   * NOT raw modifier internals (mirrors `swingProgress`). Reads the live
+   * cohesion modifier the sim re-writes each frame (source
+   * `cohesion:<id>:<stat>`) and normalizes it against this unit's own
+   * cohesion `PassiveDef`. `stacks` = effective packed-ally count
+   * (0..maxAllies); `frac` = stacks/maxAllies (0..1). Both 0 when the unit
+   * carries no cohesion passive or stands alone. The sim owns the count;
+   * draws/FX consume `frac` and never touch modifiers or radii.
+   */
+  cohesionLevel(): { stacks: number; frac: number } {
+    const p = this.passives?.find((x) => x.kind === 'cohesion');
+    if (!p || p.kind !== 'cohesion' || p.perAlly <= 0) return { stacks: 0, frac: 0 };
+    const mod = this.modifiers.find((m) => m.source === `cohesion:${this.id}:${p.stat}`);
+    if (!mod) return { stacks: 0, frac: 0 };
+    const stacks = mod.value / p.perAlly;
+    return { stacks, frac: p.maxAllies > 0 ? Math.min(1, stacks / p.maxAllies) : 0 };
+  }
+
   redraw(): void {
     const g = this.gfx;
     g.clear();
@@ -375,10 +516,32 @@ export class Unit extends Phaser.GameObjects.Container {
       primary = (((ar + t * (br - ar)) | 0) << 16) | (((ag + t * (bg - ag)) | 0) << 8) | ((ab2 + t * (bb - ab2)) | 0);
     }
 
-    // Shadow (skip for tunnel units — they're underground)
+    // Shadow (skip for tunnel units — they're underground). Divide the
+    // ground distance by scaleY so the shadow lands ON the ground line
+    // even when the container is depth-scaled (else it sits at scale²).
     if (this.currentRoute !== 'tunnel') {
+      const groundLocalY = (getGroundY('land', this.lane) - this.y) / (this.scaleY || 1);
       g.fillStyle(0x000000, 0.25);
-      g.fillEllipse(this.unitW / 2, getGroundY('land') - this.y + 1, this.unitW / 2 + 2, 3);
+      g.fillEllipse(this.unitW / 2, groundLocalY + 1, this.unitW / 2 + 2, 3);
+    }
+
+    // Pack-cohesion aura — the herd visibly "heats up" as it packs tight.
+    // Two stacked ellipses (soft outer + brighter inner) tinted by the
+    // unit's own colour; radius + opacity scale with cohesion frac plus a
+    // gentle breathing pulse. Drawn behind the body so massed packs read as
+    // one glowing cluster. Data-driven: any cohesion carrier lights up.
+    const coh = this.cohesionLevel();
+    if (coh.frac > 0) {
+      const pulse = 1 + COHESION_GLOW_PULSE * Math.sin(this.bob * 1.5);
+      const peak = COHESION_GLOW_ALPHA * coh.frac * pulse;
+      const gx = this.unitW / 2;
+      const gyA = uy + this.unitH * 0.5;
+      const rw = this.unitW * (1.1 + COHESION_GLOW_GROW * coh.frac);
+      const rh = rw * 0.55;
+      g.fillStyle(this.primary, peak * 0.45);
+      g.fillEllipse(gx, gyA, rw, rh);
+      g.fillStyle(this.primary, peak);
+      g.fillEllipse(gx, gyA, rw * 0.62, rh * 0.62);
     }
 
     if (slowed) g.setAlpha(0.85);
@@ -393,7 +556,24 @@ export class Unit extends Phaser.GameObjects.Container {
       burrowed: this.burrowed,
       ...this.swingProgress(),
     };
-    drawUnit(g, renderUnit, this.unitW / 2, uy);
+    // Signature body motion (rear/lunge/squash/lean) — offsets + transforms the
+    // BODY only (shadow + glow stay put on the ground). NEUTRAL when idle, so
+    // this is a no-op for the 99% of frames with no signature playing.
+    const m = this.currentMotion();
+    const bodyCx = this.unitW / 2 + this.facing * m.dx * this.unitW;
+    const bodyUy = uy + m.dy * this.unitH;
+    const transformed = m.lean !== 0 || m.squash !== 1;
+    if (transformed) {
+      const pivotX = this.unitW / 2;
+      const pivotY = uy + this.unitH; // pivot at the feet
+      g.save();
+      g.translateCanvas(pivotX, pivotY);
+      g.rotateCanvas(this.facing * m.lean);
+      g.scaleCanvas(1, m.squash);
+      g.translateCanvas(-pivotX, -pivotY);
+    }
+    drawUnit(g, renderUnit, bodyCx, bodyUy);
+    if (transformed) g.restore();
 
     // Damage flash overlay
     if (this.dmgFlash > 0) {

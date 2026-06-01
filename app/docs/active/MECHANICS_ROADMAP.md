@@ -350,10 +350,12 @@ Adding new units mid-rewrite means double-touching every unit. Adding new geneli
 
 ### Scope
 
+> **SUPERSEDED (2026-06-01):** the live MVP geneline set is now **α Primal · β Swarm · γ Fortress · δ Military** (role-triad), locked in `app/docs/active/MVP_GENELINES.md`. The selection below is the *original* roadmap proposal (a Classic/Distinct/Alien/Core/dark-mirror spread) — kept for design archaeology, not the shipping set.
+
 Lock a 5-6 geneline set spanning the cosmology's full design language:
 
-- **1 Classic-tier geneline** — α Alpha (already shipped — the disciplined military baseline)
-- **2 Distinct-tier genelines** — β Multitudes (swarm) + θ Feeders (biomass consume-to-upgrade)
+- **1 Classic-tier geneline** — α Primal (already shipped — the aggressive-herd baseline; Pack Cohesion + basic melee. *Was* framed as the disciplined-military baseline before the α→Primal / military→δ re-home.)
+- **2 Distinct-tier genelines** — β Swarm (cheap expendable + death effects) + θ Feeders (biomass consume-to-upgrade)
 - **1 Alien-tier geneline** — pick the cheapest Alien to prototype (ν Beacons OR λ Mirrors; ν is cheaper as a prototype)
 - **1 Core-boss geneline** — ω Whole (the Core's answer; contains all 5 primordial aspects at a conceptual level)
 - **1 Phoenician dark-mirror** — ℵ Aleph as the shadow of α (proves the dark-mirror system works)

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import type { UnitDef, WaveDef, Side, PlayerAbilityKey, RenderUnit, IWaveController, HiveProfile } from '../types';
+import type { UnitDef, WaveDef, Side, PlayerAbilityKey, RenderUnit, IWaveController, HiveProfile, PheromoneZone, PheromoneKind } from '../types';
+import { PHEROMONE_DEFS } from '../config/PheromoneDefs';
 import { resolveColors } from '../config/Palettes';
 import { W, DEFAULT_WORLD_W, SBW as SBW_CONST } from '../config/Constants';
 import type { RunBuff } from './RunState';
@@ -62,6 +63,15 @@ export class GameManager {
   deckKeys: string[];
   SBW: number;
   worldW: number;
+
+  // Active pheromone command zones. Decayed each tick; passed to
+  // combat.resolve so own-side units obey the painted lane commands.
+  pheromoneZones: PheromoneZone[] = [];
+
+  // Round-robin lane assignment for AI/wave enemy spawns so both lanes
+  // populate. Player hatches default to lane 0 until a battle lane-UI
+  // exists (out of scope here).
+  private _enemyLaneCursor = 0;
 
   // Game state
   running: boolean;
@@ -252,13 +262,21 @@ export class GameManager {
     // Update wall shield visual
     this.playerHive.base.shielded = this.abilities.wallActive > 0;
 
+    // Pheromone zones — decay then drop expired BEFORE resolve reads
+    // them. resolve() only READS zones; lifetime lives here.
+    if (this.pheromoneZones.length > 0) {
+      for (const z of this.pheromoneZones) z.remaining -= dt;
+      this.pheromoneZones = this.pheromoneZones.filter(z => z.remaining > 0);
+    }
+
     // Combat resolution
     this.combat.resolve(
       this.units, dt,
       this.playerHive.base, this.enemyHive.base,
       this.particles,
       this.abilities.wallActive,
-      this.audio
+      this.audio,
+      this.pheromoneZones
     );
 
     // Re-sort live units in the spatial index after combat moved them.
@@ -361,14 +379,35 @@ export class GameManager {
       scaledDef = { ...def, hp: Math.ceil(def.hp * scale), atk: Math.ceil(def.atk * scale) };
     }
 
-    this.createUnit(key, 'enemy', scaledDef, this.worldW - this.SBW - def.w - 2);
+    // Round-robin enemies across both lanes so the front splits.
+    const lane = this._enemyLaneCursor;
+    this._enemyLaneCursor ^= 1;
+    this.createUnit(key, 'enemy', scaledDef, this.worldW - this.SBW - def.w - 2, lane);
   }
 
-  createUnit(key: string, side: Side, def: UnitDef, x: number): void {
+  createUnit(key: string, side: Side, def: UnitDef, x: number, lane = 0): void {
     const unitDef = { ...def, _key: key };
-    const unit = this.unitPool.spawn(unitDef, side, x);
+    const unit = this.unitPool.spawn(unitDef, side, x, lane);
     this.units.push(unit);
     this.spatialIndex.add(unit);
+  }
+
+  /**
+   * Paint a pheromone command zone at world-x `x` on `side` in `lane`.
+   * The zone lives for `PHEROMONE_DEFS[kind].duration` seconds (decayed
+   * in tick) and commands own-side, same-lane units' movement while
+   * active.
+   */
+  addPheromoneZone(kind: PheromoneKind, x: number, side: Side, lane = 0): void {
+    const def = PHEROMONE_DEFS[kind];
+    this.pheromoneZones.push({
+      kind,
+      x,
+      radius: def.radius,
+      side,
+      lane,
+      remaining: def.duration,
+    });
   }
 
   castAbility(key: PlayerAbilityKey): { success: boolean; message: string } {

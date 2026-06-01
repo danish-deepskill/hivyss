@@ -28,13 +28,13 @@ export class UnitPool {
   }
 
   /** Get an inactive unit from the pool, initialize it with the given def. */
-  spawn(def: UnitDef, side: Side, x: number): Unit {
+  spawn(def: UnitDef, side: Side, x: number, lane = 0): Unit {
     let unit = this.pool.find(u => !u.active);
     if (!unit) {
       this.grow(GROW_SIZE);
       unit = this.pool.find(u => !u.active)!;
     }
-    unit.init(def, side, x);
+    unit.init(def, side, x, lane);
     return unit;
   }
 

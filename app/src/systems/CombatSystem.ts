@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { HitFlavor, DamageColorMap, CombatContext, IUnit, IParticleManager, DamageEvent, HitSoundType } from '../types';
+import type { HitFlavor, DamageColorMap, CombatContext, IUnit, IParticleManager, DamageEvent, HitSoundType, PheromoneZone, PheromoneKind, AbilityDef } from '../types';
 import { DEFAULT_WORLD_W, SBW } from '../config/Constants';
 import { LANE } from '../config/Layout';
 import { canAttack } from '../config/RouteMatrix';
@@ -101,6 +101,45 @@ let _healFxDispatcher: HealFxDispatcher = () => {};
 
 export function setHealFxDispatcher(fn: HealFxDispatcher): void {
   _healFxDispatcher = fn;
+}
+
+/**
+ * Ability impact FX seam (the FX_SYSTEM.md toehold). Fired once per damage
+ * event at the impact phase with the ability's `fx` descriptor + hit center +
+ * a `magnitude` scalar (e.g. damage; later cohesion for signatures). Default
+ * NO-OP keeps the sim deterministic (FX off in tests) — the scene installs the
+ * real FxDirector. This is the integration point, NOT the renderer.
+ */
+export interface ImpactFxSignal {
+  ability: AbilityDef;
+  x: number;
+  y: number;
+  magnitude: number;
+}
+export type ImpactFxDispatcher = (signal: ImpactFxSignal) => void;
+let _impactFxDispatcher: ImpactFxDispatcher = () => {};
+
+export function setImpactFxDispatcher(fn: ImpactFxDispatcher): void {
+  _impactFxDispatcher = fn;
+}
+
+/**
+ * CAST FX seam — fired ONCE per ability cast at the caster (vs the per-hit
+ * impact dispatcher). This is where caster-anchored signatures live: Goliath's
+ * Stampede shockwave, etc. `magnitude` carries cohesion (0..1) so the visual
+ * scales with the herd. No-op default → presentation-only, deterministic.
+ */
+export interface CastFxSignal {
+  ability: AbilityDef;
+  x: number;
+  y: number;
+  magnitude: number;
+}
+export type CastFxDispatcher = (signal: CastFxSignal) => void;
+let _castFxDispatcher: CastFxDispatcher = () => {};
+
+export function setCastFxDispatcher(fn: CastFxDispatcher): void {
+  _castFxDispatcher = fn;
 }
 
 export function dispatchHealFx(target: IUnit, amount: number): void {
@@ -205,6 +244,8 @@ export function applyAoeRiderPhase(event: DamageEvent): void {
     .filter(e => {
       if (rider.excludePrimary && e === primary) return false;
       if (e.side === (event.attacker as IUnit).side) return false;
+      // Same-lane only — AOE spreads within the primary's lane.
+      if (e.lane !== primary.lane) return false;
       if (e.dead || e.burrowed) return false;
       // Center-to-center distance.
       const dist = Math.abs(
@@ -309,6 +350,22 @@ export class CombatSystem {
   private _currentCtx: CombatContext | null = null;
 
   /**
+   * Sides with a pending Elite/Royal signature trigger. A player input
+   * (sandbox key / HUD button) calls requestSignatures(side), which adds
+   * the side here; resolve() drains it right after updatePassives so the
+   * signature fires WITH fresh cohesion/aura modifiers in scope and inside
+   * the established _currentCtx. Cleared every frame after draining.
+   */
+  private _pendingSignatureSides = new Set<'player' | 'enemy'>();
+
+  /**
+   * Specific unit ids with a pending signature trigger (a per-Elite slot
+   * click). Drained alongside _pendingSignatureSides — a unit fires if its
+   * side OR its id is pending. Lets the HUD fire one Elite, not all.
+   */
+  private _pendingSignatureUnits = new Set<number>();
+
+  /**
    * Base entity wrappers, set once by GameManager. Optional so the
    * sandbox (dummy bases without wrappers) keeps working; _findTarget
    * skips base targeting when unset.
@@ -409,12 +466,14 @@ export class CombatSystem {
 
       const ability = lookupAbility(deathAbilityName);
       const allAlive = ctx.allAlive ?? [];
+      // Same-lane only — a death-bomb hits the dying unit's lane, never
+      // across the front.
       const targets = runSelectorInRange(
         ability.targeting!,
         dyingUnit,
         ability,
         allAlive,
-      );
+      ).filter(t => (t as IUnit).lane === dyingUnit.lane);
       for (const t of targets) {
         this.pipeline.queueAbility(dyingUnit, t as IUnit, deathAbilityName, {
           baseDamageOverride: 65,
@@ -456,7 +515,45 @@ export class CombatSystem {
     this.enemyBaseEntity = enemy;
   }
 
-  resolve(units: IUnit[], dt: number, playerBase: BaseStructure, enemyBase: BaseStructure, particles: IParticleManager | null, wallActive: number, audio: AudioManager | null): void {
+  /**
+   * Queue a player-triggered Elite/Royal signature for every ready unit of
+   * `side`. Non-blocking: it only records the request; the actual cast
+   * happens at the top of the next resolve() (after passives, inside ctx).
+   * Idempotent within a frame — a side already pending stays pending.
+   */
+  requestSignatures(side: 'player' | 'enemy'): void {
+    this._pendingSignatureSides.add(side);
+  }
+
+  /** Queue one specific unit's signature (per-Elite slot trigger). */
+  requestSignature(unitId: number): void {
+    this._pendingSignatureUnits.add(unitId);
+  }
+
+  /**
+   * Land a signature's effect: queue its ability against in-range targets and
+   * emit its cast-FX at the caster (cohesion-scaled). Called either instantly
+   * (no animation) or at the lunge peak (telegraphed). Caller resolves the frame.
+   */
+  private fireSignatureImpact(u: IUnit, ctx: CombatContext, alive: IUnit[]): void {
+    if (!u.signatureAbility) return;
+    const ability = lookupAbility(u.signatureAbility);
+    const targets = runSelectorInRange(ability.targeting, u, ability, alive);
+    ctx.sourceUnit = u;
+    for (const t of targets) {
+      this.pipeline.queueAbility(u, t as IUnit, u.signatureAbility, {});
+    }
+    if (ability.fx) {
+      _castFxDispatcher({
+        ability,
+        x: u.x + u.unitW / 2,
+        y: u.y + u.unitH / 2,
+        magnitude: u.cohesionLevel?.().frac ?? 0,
+      });
+    }
+  }
+
+  resolve(units: IUnit[], dt: number, playerBase: BaseStructure, enemyBase: BaseStructure, particles: IParticleManager | null, wallActive: number, audio: AudioManager | null, zones: PheromoneZone[] = []): void {
     const alive = units.filter(u => !u.dead);
     this.audio = audio;
 
@@ -480,6 +577,44 @@ export class CombatSystem {
     // Passes both `units` (includes dead — aura death-cleanup walks
     // them) and `alive` (self-modifier branch reads only alive).
     this.updatePassives(units, alive, dt);
+
+    // Drain pending Elite/Royal signature triggers (player input). Runs
+    // AFTER passives so cohesion/aura modifiers are current, BEFORE the
+    // attack pass. Each ready signature queues its ability through the
+    // pipeline (the same path heal_cast uses) and resets the caster's
+    // cooldown. One resolveFrame drains all queued signature events.
+    // TRIGGER pass: a signature WITH a body animation starts its windup here;
+    // its damage + FX fire later at the lunge peak (impact pass below). A
+    // signature with no animation fires immediately. Cooldown starts on trigger.
+    if (this._pendingSignatureSides.size > 0 || this._pendingSignatureUnits.size > 0) {
+      let firedNow = false;
+      for (const u of alive) {
+        const requested = this._pendingSignatureSides.has(u.side) || this._pendingSignatureUnits.has(u.id);
+        if (!requested) continue;
+        if (!u.canSignature()) continue;
+        u.sigCd = u.signatureCooldown;
+        if (u.signatureAnim && u.startSignatureAnim) {
+          u.startSignatureAnim(); // telegraph → impact fires at the windup peak
+        } else {
+          this.fireSignatureImpact(u, ctx, alive); // no anim → instant
+          firedNow = true;
+        }
+      }
+      if (firedNow) this.pipeline.resolveFrame();
+      this._pendingSignatureSides.clear();
+      this._pendingSignatureUnits.clear();
+    }
+
+    // IMPACT pass: telegraphed signatures whose windup just completed fire their
+    // damage + cast-FX NOW (synced to the body's lunge), not at the trigger.
+    let firedImpact = false;
+    for (const u of alive) {
+      if (u.signatureImpactReady?.()) {
+        this.fireSignatureImpact(u, ctx, alive);
+        firedImpact = true;
+      }
+    }
+    if (firedImpact) this.pipeline.resolveFrame();
 
     alive.forEach(u => {
       ctx.sourceUnit = u;
@@ -508,11 +643,23 @@ export class CombatSystem {
         return;
       }
 
-      // Find foe in attack range
-      const foes = alive.filter(e => e.side !== u.side && !e.dead);
+      // Find foe in attack range. Same-lane only — bilateral lanes
+      // (0 = upper, 1 = lower) fight independent fronts; cross-lane
+      // targeting is impossible.
+      const foes = alive.filter(e => e.side !== u.side && !e.dead && e.lane === u.lane);
       const { target, dist } = this._findTarget(u, foes);
 
-      if (target) {
+      // Pheromone command — FIRST own-side zone whose 1D center-x band
+      // covers this unit's center. Rally/Retreat are MOVEMENT overrides
+      // that must FORCE the march branch (a unit with a target never
+      // marches), so they null the effective target. Charge keeps its
+      // target (attacks AND pushes); its boost lives in the march
+      // override so it only applies when there's nothing in range.
+      const zone = this._activeCommand(u, zones);
+      const cmd = zone ? zone.kind : null;
+      const effTarget = (cmd === 'rally' || cmd === 'retreat') ? null : target;
+
+      if (effTarget) {
         u.startAttack();
 
         if (u.foreswingTimer > 0) {
@@ -521,26 +668,26 @@ export class CombatSystem {
           // Foreswing just completed — DEAL DAMAGE
           u._swinging = false;
 
-          if (target instanceof BaseEntity) {
+          if (effTarget instanceof BaseEntity) {
             // In-range base attack — ranged units only (melee units
             // can't enter this branch via _findTarget). Fires from
             // the unit's current position; wallActive blocks only
             // player-base damage.
             const dmg = Math.max(1, u.atk);
 
-            if (target.side === 'player') {
+            if (effTarget.side === 'player') {
               const actualDmg = wallActive > 0 ? 0 : dmg;
-              target.takeDamage(actualDmg);
+              effTarget.takeDamage(actualDmg);
               if (wallActive > 0) {
                 if (particles) particles.float(SBW / 2, GND - 40, 'BLOCKED!', DMG_COLORS.blocked);
               } else {
-                target.structure.flash(0.2);
+                effTarget.structure.flash(0.2);
                 if (particles) particles.float(SBW / 2, GND - 40, `-${dmg}`, DMG_COLORS.base);
               }
               if (particles) particles.burst(SBW - 2, GND - 20, u.primary, 4);
             } else {
-              target.takeDamage(dmg);
-              target.structure.flash(0.2);
+              effTarget.takeDamage(dmg);
+              effTarget.structure.flash(0.2);
               if (particles) particles.float(this.worldW - SBW / 2, GND - 40, `-${dmg}`, DMG_COLORS.base);
               if (particles) particles.burst(this.worldW - SBW + 2, GND - 20, u.primary, 4);
             }
@@ -572,11 +719,12 @@ export class CombatSystem {
                 let secondaries: IUnit[];
                 if (ability.chainRange != null) {
                   const cr = ability.chainRange;
-                  const primary = target as IUnit;
+                  const primary = effTarget as IUnit;
                   secondaries = (ctx.allAlive as IUnit[])
                     .filter(e =>
                       e !== primary &&
                       e.side !== u.side &&
+                      e.lane === u.lane &&
                       !e.dead &&
                       !e.burrowed &&
                       Math.abs(e.x - primary.x) <= cr,
@@ -592,11 +740,14 @@ export class CombatSystem {
                     ability,
                     ctx.allAlive,
                   );
+                  // Same-lane only — the selector ranges over the whole
+                  // roster, so re-filter to the attacker's lane to keep
+                  // multi-hit from leaking across the front.
                   secondaries = selectorResults
-                    .filter(e => e !== target)
+                    .filter(e => e !== effTarget && (e as IUnit).lane === u.lane)
                     .slice(0, tc - 1) as IUnit[];
                 }
-                const targets = [target as IUnit, ...secondaries];
+                const targets = [effTarget as IUnit, ...secondaries];
 
                 // Every-Nth-cast damage doubling via ResourceSystem
                 // castCount. Gated on ability.overchargeEvery.
@@ -644,7 +795,7 @@ export class CombatSystem {
               } else {
                 this.pipeline.queueAbility(
                   u,
-                  target,
+                  effTarget,
                   abilityName,
                   { legacyHitFlavor: hitType },
                 );
@@ -669,7 +820,36 @@ export class CombatSystem {
         // March
         u.state = 'march';
         const spd = u.getSpeed();
-        u.x += u.facing * spd * 60 * dt;
+
+        // Pheromone movement override. `cmd` is the own-side zone
+        // covering this unit (rally/charge/retreat) or null. Each
+        // command reshapes the march velocity; `facing` is IMMUTABLE,
+        // so retreat moves backward via a NEGATIVE velocity — never a
+        // facing flip.
+        if (cmd === 'rally') {
+          // Mass toward the zone center; HOLD within ~8px so the herd
+          // settles instead of jittering across the center line.
+          const center = zone ? zone.x : null;
+          if (center !== null) {
+            const unitCx = u.x + u.unitW / 2;
+            const delta = center - unitCx;
+            if (Math.abs(delta) > 8) {
+              u.x += Math.sign(delta) * spd * 60 * dt;
+            }
+            // else HOLD — no movement.
+          }
+        } else if (cmd === 'charge') {
+          // Advance forward at boosted speed.
+          u.x += u.facing * spd * 1.5 * 60 * dt;
+        } else if (cmd === 'retreat') {
+          // Fall back — negative velocity (NOT a facing flip).
+          u.x -= u.facing * spd * 1.2 * 60 * dt;
+          // Don't retreat off the field — clamp to the back line.
+          u.x = Math.max(SBW, Math.min(this.worldW - SBW - u.unitW, u.x));
+        } else {
+          // Normal march.
+          u.x += u.facing * spd * 60 * dt;
+        }
 
         // Player unit reaches enemy base — attack it
         if (u.side === 'player' && u.x + u.unitW >= this.worldW - SBW) {
@@ -740,6 +920,30 @@ export class CombatSystem {
     // End of frame — release the ctx reference so stale state can't
     // leak into the next frame via phase subscribers.
     this._currentCtx = null;
+  }
+
+  // --- Pheromone command resolution ---
+  //
+  // Zone membership is 1D center-x distance, side-scoped: only own-side
+  // units obey, and the band is `|unit.center.x - zone.x| < zone.radius`.
+  // First matching zone wins (placement order = priority). resolve()
+  // only READS zones; lifetime/decay happens in GameManager.tick.
+
+  /** The kind of the FIRST own-side zone covering `u`, or null. */
+  /**
+   * The first own-side pheromone zone covering `u` (1D center-x distance,
+   * strict-less-than = IN range), or null. Caller reads `.kind` for the
+   * command and `.x` for the rally center.
+   */
+  private _activeCommand(u: IUnit, zones: PheromoneZone[]): PheromoneZone | null {
+    if (zones.length === 0) return null;
+    const unitCx = u.x + u.unitW / 2;
+    for (const z of zones) {
+      if (u.side !== z.side) continue;
+      if (u.lane !== z.lane) continue;
+      if (Math.abs(unitCx - z.x) < z.radius) return z;
+    }
+    return null;
   }
 
   // --- Target finding ---
@@ -813,6 +1017,16 @@ export class CombatSystem {
       ctx.particles.float(u.x + u.unitW / 2, u.y - 6, `-${dmg}`, col);
       ctx.particles.burst(u.x + u.unitW / 2, u.y + u.unitH / 2, col, 4);
     }
+
+    // FX_SYSTEM.md seam — impact FX (no-op until the scene installs a real
+    // FxDirector). Reads the ability's `fx` descriptor + hit center; magnitude
+    // = damage for now (signatures will pass cohesion). Presentation-only.
+    _impactFxDispatcher({
+      ability: event.ability,
+      x: u.x + u.unitW / 2,
+      y: u.y + u.unitH / 2,
+      magnitude: dmg,
+    });
   }
 
   /**
