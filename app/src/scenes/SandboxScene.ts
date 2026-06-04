@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { H, SBW, DEFAULT_WORLD_W } from '../config/Constants';
 import { LANE } from '../config/Layout';
 import { getGroundY, laneDepth } from '../config/RouteMatrix';
+import { drawPheromoneTrail } from './PheromoneTrail';
 const GND = LANE.land.groundY;
 // Lane midline — the single-lane land ground. Clicks above this Y go to
 // lane 0 (upper), below to lane 1 (lower). Also where the divider draws.
@@ -616,16 +617,8 @@ export class SandboxScene extends Phaser.Scene {
 
   /** Rebuild the persistent zone layer from `pheromoneZones`. */
   private drawPheromoneZones(): void {
-    const g = this.pheromoneLayer;
-    g.clear();
-    for (const z of this.pheromoneZones) {
-      const def = PHEROMONE_DEFS[z.kind];
-      const zy = getGroundY('land', z.lane);
-      g.fillStyle(def.color, 0.18);
-      g.fillCircle(z.x, zy, z.radius);
-      g.lineStyle(2, def.color, 0.7);
-      g.strokeCircle(z.x, zy, z.radius);
-    }
+    this.pheromoneLayer.clear();
+    drawPheromoneTrail(this.pheromoneLayer, this.pheromoneZones);
   }
 
   private emitPlacementCount(): void {

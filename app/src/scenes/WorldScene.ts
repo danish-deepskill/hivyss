@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { DEFAULT_WORLD_W } from '../config/Constants';
 import { drawBiomeBackground } from './BiomeBackground';
+import { drawPheromoneTrail } from './PheromoneTrail';
 import { ABILITY_DEFS } from '../config/AbilityDefs';
 import { GameManager } from '../systems/GameManager';
 import { capUsed, MAX_CAPACITY } from '../systems/Capacity';
@@ -22,6 +23,7 @@ export class WorldScene extends Phaser.Scene {
   gm!: GameManager;
   private worldW: number = DEFAULT_WORLD_W;
   private viewport!: ViewportController;
+  private pheromoneLayer!: Phaser.GameObjects.Graphics;
 
   constructor() {
     super('WorldScene');
@@ -31,6 +33,11 @@ export class WorldScene extends Phaser.Scene {
     this.worldW = data.worldW ?? DEFAULT_WORLD_W;
 
     this.drawBackground();
+
+    // Scent-trail layer — drawn above the biome, under units (matches the
+    // sandbox's pheromone depth so both render the deposit-fade identically).
+    this.pheromoneLayer = this.add.graphics();
+    this.pheromoneLayer.setDepth(50);
 
     // Create game manager (owns all systems, entities, and game state)
     this.gm = new GameManager(this, data.deck, data.startWave, this.worldW, data.customWaves, data.runBuffs, data.hiveProfile, data.hiveSeed);
@@ -164,6 +171,10 @@ export class WorldScene extends Phaser.Scene {
       this.registry.set('wave.stage', this.gm.waves.stage);
       this.registry.set('game.running', this.gm.running);
       this.registry.set('elite.slots', this.gm.getEliteSlots());
+
+      // Repaint the scent-trail from the live zones (deposited + decayed in tick).
+      this.pheromoneLayer.clear();
+      drawPheromoneTrail(this.pheromoneLayer, this.gm.pheromoneZones);
     }
 
     if (!this.gm.running) return;
