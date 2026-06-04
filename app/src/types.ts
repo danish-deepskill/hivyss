@@ -160,7 +160,7 @@ export interface PassiveHealConfig {
 /**
  * Pack Cohesion (α Primal) — a self-modifier whose magnitude scales with
  * the number of same-geneline allies massed within `radius`. The herd
- * gets stronger the tighter it packs. See `app/docs/active/GENELINE_ALPHA.md`.
+ * gets stronger the tighter it packs. See `app/docs/mvp/ALPHA.md`.
  */
 export interface CohesionConfig {
   /** Stat boosted per nearby pack-ally (e.g. 'atk'). */
@@ -217,6 +217,14 @@ export interface UnitDef {
   tier: TierKey;
   incubation: number;      // [sec] seconds to hatch in Larva Mound (0 = instant, for enemies)
   caste?: CasteKey;
+  /** Elite "phase-2" trigger — HP fraction (0..1) at/below which the unit
+   *  enrages. Drives the `in_phase_2` predicate, the HP-bar divider, and the
+   *  enrage tint. Configurable per Elite; omit = no phase-2 (most units). */
+  phaseThreshold?: number;
+  /** Per-unit fitted attack SOUND — overrides the default-ability's `sfx` so
+   *  units that share an attack (the whole herd line is on jaw_strike) can still
+   *  have distinct voices. Presentation-only; omit = use the ability's recipe. */
+  sfx?: SfxKey;
   geneline: GeneLine;
   unlock?: string;
   foreswing?: number;      // [sec] wind-up time before damage lands (default: 30% of 1/atkRate)
@@ -274,6 +282,13 @@ export interface UnitDef {
 // config/combat/damageTypes.ts.
 export type HitFlavor = 'melee' | 'ranged' | 'aoe' | 'poison' | 'burn' | 'heal' | 'nectar' | 'blocked' | 'base';
 export type HitSoundType = 'melee' | 'ranged' | 'aoe' | 'heal';
+
+// SfxKey — names a *fitted* synth recipe (AudioManager.playSfx), one per
+// distinct attack/ability verb (a jaw bite, a spine shot, a head ram, a
+// stampede shockwave). Presentation-only; the sim never reads it. The same
+// recipe serves every caster — per-unit timbre is layered on at play time via
+// pitch (body size), so there's no per-unit sound entry to maintain.
+export type SfxKey = 'jaw' | 'gore' | 'clack' | 'needle' | 'ram' | 'stampede';
 export type UnitState = 'march' | 'attack';
 export type Side = 'player' | 'enemy';
 
@@ -297,6 +312,13 @@ export interface PheromoneZone {
   lane: number;
   /** Seconds of life left; decremented in GameManager.tick, NOT in resolve. */
   remaining: number;
+  /**
+   * If set, this is a MOBILE command zone emitted by a worker (Scout): each
+   * frame its `x`/`lane` track the owning unit, and the zone is removed when
+   * that unit dies. Static (click-placed) zones leave this undefined and decay
+   * by `remaining` instead.
+   */
+  ownerUnitId?: number;
 }
 
 export interface CombatContext {
@@ -462,6 +484,18 @@ export interface IUnit extends WorldEntity {
    */
   _deathTriggerFired?: boolean;
   deathAbility?: string;
+  /** Caste tag (copied from the def). Combat reads it to keep `worker` units
+   *  non-combatant — they advance + emit their pheromone but never attack. */
+  caste?: CasteKey;
+  /** Elite phase-2 HP-fraction trigger (copied from the def). Read by the
+   *  `in_phase_2` predicate + the HP-bar divider + the enrage tint. */
+  phaseThreshold?: number;
+  /** Per-unit fitted attack sound (copied from the def); overrides the
+   *  default-ability's `sfx`. */
+  sfx?: SfxKey;
+  /** Foe captured at foreswing-start so the hit commits to it (windup-drift fix);
+   *  null/undefined = re-find nearest at impact. */
+  lockedTarget?: IUnit | null;
   /** Player-triggered signature ability key (Elite/Royal active). */
   signatureAbility?: string;
   /** Signature cooldown length (seconds). */
@@ -539,6 +573,8 @@ export interface IAudioManager {
   uiClick(): void;
   defeat(): void;
   toggleMute(): void;
+  /** Fitted per-ability sound (pitch = body size, intensity = signature magnitude). */
+  playSfx(key: SfxKey, opts?: { pitch?: number; intensity?: number }): void;
 }
 
 // Player Command Abilities — UI-triggered spells (nuke, wall, slow,
@@ -633,6 +669,13 @@ export interface AbilityDef {
    * dispatcher consumes it. Same 3-state convention as `appliesEffects`.
    */
   fx?: { kind: string };
+  /**
+   * Presentation-only FITTED SOUND key (AudioManager.playSfx) — parallel to
+   * `fx`. The impact/cast path plays it; the simulation NEVER reads it. Absent
+   * → the category fallback (melee/ranged/aoe). Per-unit timbre is applied at
+   * play time via pitch-by-body-size, so one key fits every caster.
+   */
+  sfx?: SfxKey;
 }
 
 // DamageEvent — envelope flowing through the 7-phase pipeline. Any

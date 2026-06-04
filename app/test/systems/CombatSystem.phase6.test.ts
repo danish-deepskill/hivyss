@@ -17,7 +17,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { CombatPipeline } from '../../src/systems/CombatPipeline';
-import { applyVarianceAndCritModify } from '../../src/systems/CombatSystem';
+import { applyVarianceAndCritModify } from '../../src/systems/CombatPhases';
 import { UNIT_DEFS } from '../../src/units/registry';
 import type {
   AbilityDef,

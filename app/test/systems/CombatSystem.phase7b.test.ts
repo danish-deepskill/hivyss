@@ -15,7 +15,7 @@ import {
   applyHealPhase,
   applyEffectsPhase,
   applyVarianceAndCritModify,
-} from '../../src/systems/CombatSystem';
+} from '../../src/systems/CombatPhases';
 import {
   applyEffect,
   updateEffects,

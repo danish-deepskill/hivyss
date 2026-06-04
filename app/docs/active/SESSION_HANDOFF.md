@@ -7,7 +7,7 @@
 
 ## 0.5 LATEST SESSION (through 2026-06-02) — start here, this is where we actually are
 
-**LATEST (2026-06-02) — α roster restructured + 2nd Elite signature + signature UI/feel.** α is now an **8-unit 2/3/2/1 pyramid**: T3 **Matriarch** (NEW Royal unit — `draws/alpha/matriarch.ts`, a grander herd-queen; her ultimate + the Royal control/trigger system are NOT built), T2 **Goliath + Maulhorn** (Elites), soldiers below (see `MVP_GENELINES.md §2`, now synced). **Maulhorn's Ram Charge is built** — a *distinct* `ram` motion (crouch → flat thrust → **recoil bounce**, vs Goliath's `charge` forward-settle) + **single-target ×2 dmg + knockback 100 + NO shockwave** (Goliath keeps the AOE shockwave but ×0.5/4-target/no-knockback). The 3 Elite **slots** show the 2 Elites and are **gated on cooldown AND enemy-in-range** (`signatureHasTarget` in `SandboxScene` → slot `inRange` state → button greys/disables when no target in the signature's range). **The E hotkey was REMOVED** — signatures fire ONLY via the slot buttons. **644 tests green, tsc clean.**
+**LATEST (2026-06-02) — α roster restructured + 2nd Elite signature + signature UI/feel.** α is now an **8-unit 2/3/2/1 pyramid**: T3 **Matriarch** (NEW Royal unit — `draws/alpha/matriarch.ts`, a grander herd-queen; her ultimate + the Royal control/trigger system are NOT built), T2 **Goliath + Maulhorn** (Elites), soldiers below (see `GENELINES.md §2`, now synced). **Maulhorn's Ram Charge is built** — a *distinct* `ram` motion (crouch → flat thrust → **recoil bounce**, vs Goliath's `charge` forward-settle) + **single-target ×2 dmg + knockback 100 + NO shockwave** (Goliath keeps the AOE shockwave but ×0.5/4-target/no-knockback). The 3 Elite **slots** show the 2 Elites and are **gated on cooldown AND enemy-in-range** (`signatureHasTarget` in `SandboxScene` → slot `inRange` state → button greys/disables when no target in the signature's range). **The E hotkey was REMOVED** — signatures fire ONLY via the slot buttons. **644 tests green, tsc clean.**
 - **Knockback gotcha (important):** blunt knockback is an **EFFECT** (`DEFAULT_EFFECTS['blunt']='knockback'`), NOT a raw stat — so `appliesEffects:[]` on a blunt ability *silently kills its knockback*. Goliath Stampede uses `[]` for no-knockback; Maulhorn keeps the default. Also `linearDamageTiersWithKnockForce(base, scale)` **couples knockForce to the damage scale** (knockForce = base × dmgMult) — a papercut when you want "×N damage, same knockback".
 - **α passives now BUILT (2026-06-02):** Goretusk = **tight-wedge cohesion** (sharper payoff, tighter radius — a flat-speed "momentum" was tried then **cut** as a non-decision; speed only matters on the approach, and per TIER_CONTRACT a T1 should be a pure-data twist); **Carapex → Quillback** = α's **ranged anti-air** (land route + `attackRange:'ranged'` reaches the air lane); the cohesion-**amplifier** folded onto **Goliath** (an `aura_modifier` on `cohesion_perAlly`; the cohesion handler now reads its params through `applyModifiers` — the reusable amplify/disrupt seam). **644 tests green.**
 - **FILE REORG (2026-06-02):** α Primal is now the **canonical `units/alpha.ts`** (+ `draws/alpha/`); the old legacy "military alpha" roster (Grunt→Centurion) moved to **`units/archive.ts`** (+ `draws/archive/`) under a new **`archive` geneline** (its own sandbox tab, symbol ⊘). Kept registered so the ~600 combat tests still run; slated to re-home into δ Military later.
@@ -32,12 +32,11 @@
 
 ## 1. Read order
 1. **This file.**
-2. **`app/docs/active/MVP_GENELINES.md`** ← the consolidated MVP design (genelines, roles, biomes, factions, map). The source of truth.
-3. `app/docs/active/MVP_REQUIREMENTS.md`, `MECHANICS_INVENTORY.md`, `GENELINE_ALPHA.md`, `PHASE0_BUILD.md`
-4. `app/docs/reference/TIER_CONTRACT.md`, `DRAW_STYLE.md`
-5. `lore/HIVYSS.md` (now **v1.6**; skim §3 tier, §4 realms/layers, §6-7 genelines, §8). **FROZEN for MVP.**
-6. `app/docs/active/FX_SYSTEM.md` ← the FX/animation architecture contract (the next build).
-7. Memory: `MEMORY.md` + `project_mvp.md` + `reference_playwright_eyes.md`.
+2. **`app/docs/mvp/`** ← all MVP design + scope, ONE folder. **Start at its `README.md`** (the index): `VISION.md` is **authoritative** (vision · scope · loop · build order), then `GENELINES.md` (genelines/biome/map content), `REQUIREMENTS.md` (budget/constraints), `ALPHA.md`, `MECHANICS_INVENTORY.md`, `PHASE0_BUILD.md`. *(The MVP is now a thin slice of the whole loop — hive-build + Royal + maturation + run — not bare combat.)*
+3. `app/docs/reference/TIER_CONTRACT.md`, `DRAW_STYLE.md`
+4. `lore/HIVYSS.md` (now **v1.6**; skim §3 tier, §4 realms/layers, §6-7 genelines, §8). **FROZEN for MVP.**
+5. `app/docs/active/FX_SYSTEM.md` ← the FX/animation architecture contract.
+6. Memory: `MEMORY.md` + `project_mvp.md` + `reference_playwright_eyes.md`.
 
 ## 2. The user + how to work with them
 - Solo dev. **Pushes back HARD; wants brutally HONEST verdicts, not cheerleading.** Hates tech debt. Architecture-first. Thinks like an implementer. Wants **control** (hand them the tunable "knobs," not just results).
@@ -45,7 +44,7 @@
 - They will rabbit-hole on visual/UX tuning for many rounds — engage, but **be the honest voice that re-anchors to the #1 risk** (is combat fun).
 - Normally an orchestrator role for them; this stretch they've directed hands-on implementation.
 
-## 3. The MVP design (LOCKED this session — `MVP_GENELINES.md` has it all)
+## 3. The MVP design (LOCKED this session — `GENELINES.md` has it all)
 
 **4 genelines, differentiated by ROLE (not size, not rigid RPS):**
 | Geneline | Role | Hook | Layer→tier |
@@ -56,7 +55,7 @@
 | **δ Military** | **CONTROL/range** | formation + command + ranged/artillery; the **colonial-dictator BOSS** | **Veins → T0-4** |
 
 - **Counter-lean (emergent, not engineered): β→α→γ→β.** A *lean*, never a hard counter. Archetype-distinctness scales to 24 genelines; RPS doesn't.
-- **Tiers = shared sophistication ladder** (higher usually wins ~9/10 via elaborateness). Genelines = *horizontal* variety at a shared band; **depth/layers = the vertical power axis**. Greek caps at T6, T10 reserved for the 7 Primordials. (This was a big point of confusion the user worked through — see `MVP_GENELINES.md §1`.)
+- **Tiers = shared sophistication ladder** (higher usually wins ~9/10 via elaborateness). Genelines = *horizontal* variety at a shared band; **depth/layers = the vertical power axis**. Greek caps at T6, T10 reserved for the 7 Primordials. (This was a big point of confusion the user worked through — see `GENELINES.md §1`.)
 - **α is capped at T3** (Goliath = **T3 Elite**, not T4 — α is the shallow starter; Elite is a *caste*, legal at T3). α distribution **1/2/2/2** (Goretusk moved to T2).
 
 **Biome = Zone = the lore term for "environment"** (palette + environmental rule + owner geneline). A **Layer** (Skin/Veins) holds **many biomes**. MVP biomes: **Sun Carapace** (α, open warm sandstone/chitin — NOT forest), **Fetid Pool** (β, swamp), **Chitin Ridge** (γ, shell-rock), **Arterial March** (δ, Veins/organic). Plus the **Wild** biome = Normal/neutral untamed woodland (the unclaimed substrate between territories).
@@ -78,7 +77,7 @@
 - **Sandbox background = a switchable BIOME system** (`scenes/SandboxScene.ts`): `drawBackground()` → `drawWildSurface()` / `drawCarapaceSurface()` + shared `drawUnderground()`; biome **dropdown in the HUD** (`SandboxHUDScene.buildBiomeDropdown` → `sandboxSelectBiome` event). Redrawable (bgObjects tracked; bg at depth −100 so bases/units survive a biome switch). 2.5D cross-section: sky/forest → grass/sandstone surface → depth-ordered ant-nest tunnel galleries (North sits *behind* the South tunnel's opacity). **All colour knobs are inline hex in those methods.**
 
 ## 6. THE NEXT STEP (where the conversation ended)
-Per `MVP_GENELINES.md §8` build order — **prove the fight is fun, then deepen it:**
+Per `GENELINES.md §8` build order — **prove the fight is fun, then deepen it:**
 1. **Build cohesion visual feedback** (cheap, ~30 min) — a glow/scale/number that grows as the herd packs, so massing *visibly* powers up. Testing an invisible mechanic is guesswork; this makes the playtest answerable. **← recommended immediate task.**
 2. **Run the PLAYTEST** (the #1 risk): mass an α herd, FIGHT, command with Rally/Charge/Retreat, judge if it's fun. The user is your eyes on the canvas; you interpret.
 3. **Then** α per-unit signatures: Maulhorn knockback (uses existing engine effect) → Goliath **Stampede** (the T3 Elite signature system).

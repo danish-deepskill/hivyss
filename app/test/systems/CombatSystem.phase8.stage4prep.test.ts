@@ -43,7 +43,7 @@ import {
   applyAuraDamageModify,
   applyFinalDamageFloor,
   registerPhase8ModifyHandlers,
-} from '../../src/systems/CombatSystem';
+} from '../../src/systems/CombatPhases';
 import { applyModifiers } from '../../src/systems/ModifierSystem';
 import type { DamageEvent, WorldEntity, ComponentTag } from '../../src/types';
 import type { Modifier } from '../../src/systems/ModifierSystem';

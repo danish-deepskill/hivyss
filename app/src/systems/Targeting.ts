@@ -18,7 +18,7 @@
 // Future selectors MUST apply a filter — an unfiltered selector is a
 // latent bug waiting for projectiles to land.
 
-import type { WorldEntity, Side, ComponentTag, AbilityDef } from '../types';
+import type { WorldEntity, Side, ComponentTag, AbilityDef, IUnit } from '../types';
 import { hasAllComponents } from './EntityComponents';
 
 /** Structural contract every selector needs from an entity. */
@@ -203,4 +203,32 @@ export function runSelectorInRange(
   const count = ability.targetCount ?? 1;
   const params: SelectorParams = { count };
   return selector(caster, params, candidates).slice(0, count);
+}
+
+// ------------------------------------------------------------------
+// Attack-resolution queries — "which foe does this swing/signature act
+// on?". Pure, so they unit-test without Phaser; CombatSystem calls them.
+// ------------------------------------------------------------------
+
+/**
+ * Windup-drift resolution — which foe a completed swing actually hits. Prefers
+ * the target LOCKED at swing-start (so the hit commits to the lunge animation),
+ * falling back to the current nearest when the locked foe died / burrowed / left
+ * the lane / changed sides.
+ */
+export function resolveImpactTarget(locked: IUnit | null | undefined, nearest: IUnit, attacker: IUnit): IUnit {
+  if (locked && !locked.dead && !locked.burrowed && locked.side !== attacker.side && locked.lane === attacker.lane) {
+    return locked;
+  }
+  return nearest;
+}
+
+/**
+ * Whiff guard — true when a DAMAGE signature has no foe in range, so firing it
+ * should NOT consume the cooldown (it stays ready instead of misfiring into
+ * empty air). Utility/buff signatures aren't enemy-gated → never reported here.
+ */
+export function signatureWouldWhiff(ability: AbilityDef, caster: IUnit, alive: IUnit[]): boolean {
+  return ability.category === 'damage'
+    && runSelectorInRange(ability.targeting, caster, ability, alive).length === 0;
 }

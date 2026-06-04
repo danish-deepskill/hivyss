@@ -1,6 +1,6 @@
 # α Primal — Geneline Design Spec (MVP Phase-0 showcase)
 
-> **Status:** DRAFT 2026-05-31. The **Phase-0 showcase geneline** — the one we make *genuinely fun* before any breadth (`MVP_REQUIREMENTS.md` §3). Designed through the **locked mechanic frame** (`MECHANICS_INVENTORY.md`): deploy + nectar/capacity + routes + 4 hive abilities + **worker (scout+gatherer)** + **pheromones via scouts** + **2-lane (sequenced)** + **1 Elite signature**.
+> **Status:** DRAFT 2026-05-31. The **Phase-0 showcase geneline** — the one we make *genuinely fun* before any breadth (`REQUIREMENTS.md` §3). Designed through the **locked mechanic frame** (`MECHANICS_INVENTORY.md`): deploy + nectar/capacity + routes + 4 hive abilities + **worker (scout+gatherer)** + **pheromones via scouts** + **2-lane (sequenced)** + **1 Elite signature**.
 >
 > **This locks identity, roles, the hook, and interdependence. It does NOT set stats** — those come from balance playtest. It's the *what & why*, not the *how much*.
 

@@ -5,6 +5,8 @@
 > **Pairs with:** `lore/HIVYSS.md` (cosmology + map distribution), `app/docs/reference/TIER_CONTRACT.md` (tier budget), `app/docs/reference/GAME_DESIGN.md`, `UNIT_LIFECYCLE_ROADMAP.md` (now subordinate to this).
 >
 > **Status:** DRAFT 2026-05-31 — captured from the MVP scoping discussion. **Open decisions in §8 must be resolved before geneline design.**
+>
+> **⚠ SCOPE EXPANDED 2026-06-03 — `VISION.md` is now the newest authoritative design; where it differs, it wins.** The MVP now includes the **hive-build loadout loop + a thin controllable Royal + maturation phases** as core (this doc originally deferred them — see §7). Only the *full* 4-mode Royal + 5-facet styling remain deferred. The **combat-first gate (§3 Phase 0) is unchanged** — prove the α fight is fun first; the hive-build loop is the co-core built right after.
 
 ---
 
@@ -48,9 +50,9 @@ Product scope ≠ build order. Build the riskiest thing first; everything else s
 | Layers | **2** (Skin, Veins) | 6 |
 | Nodes | **~10–14** (trimmed; ~1 anchor biome per layer) | 51 |
 | Designed genelines | **4** enemy/acquirable **+ 1** generic starter (Normal) | 60 |
-| Tier ceiling | **T3 common + 1 T4 Elite per geneline** | T10 |
-| Units per geneline | **~5–6 (T0–T3) + 1 T4 Elite ≈ 6–7** | varies |
-| Total designed units | **~24–28** + Normal starter | 200+ |
+| Tier ceiling | **α/β/γ → T3** (Royal T3, Elites T2) · **δ → T4** (Centurion = the only T4, & the boss) | T10 |
+| Units per geneline | **1 Royal + 2 Elites + ~4 soldiers ≈ 7** *(base skeleton; soldier & Elite counts flex by playstyle — see `GENELINES §2`)* | varies |
+| Total designed units | **~28–32** + Normal starter | 200+ |
 | Bosses | **1** (Veins climax) | many |
 
 ---

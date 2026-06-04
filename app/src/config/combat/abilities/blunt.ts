@@ -41,6 +41,7 @@ export const bluntAbilities: Record<string, AbilityDef> = {
     appliesEffects: [],
     tiers: linearDamageTiers(0.5),
     fx: { kind: 'shockwave' },
+    sfx: 'stampede',
   },
 
   // Maulhorn's Elite signature — a focused SINGLE-TARGET ram: slams the nearest
@@ -59,5 +60,6 @@ export const bluntAbilities: Record<string, AbilityDef> = {
     // damage scale (knockForce = base × dmgMult), so base 50 × ×2 scale = 100.
     tiers: linearDamageTiersWithKnockForce(50, 2),
     // no fx — focused single-target ram, not an AOE shockwave
+    sfx: 'ram',
   },
 };

@@ -2,7 +2,7 @@ import type { PheromoneKind } from '../types';
 
 /**
  * Pheromone command definitions — the player-painted lane/movement zones
- * (Rally / Charge / Retreat). See `app/docs/active/GENELINE_ALPHA.md` §2
+ * (Rally / Charge / Retreat). See `app/docs/mvp/ALPHA.md` §2
  * for the design intent (tight-vs-spread tension drives α's Pack Cohesion).
  *
  * `radius` here is the authoring default copied onto each placed

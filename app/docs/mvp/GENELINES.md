@@ -2,7 +2,7 @@
 
 > **Status:** DRAFT, captured 2026-05-31. The consolidated MVP design: the 4 genelines, their rosters, biomes, the node/territory map, procedural generation, and the static faction layer.
 >
-> **Pairs with:** `MVP_REQUIREMENTS.md` (scope/budget) · `GENELINE_ALPHA.md` (α detail) · `reference/TIER_CONTRACT.md` (tier authoring) · `lore/HIVYSS.md` §3-8 (cosmology, grounded here).
+> **Pairs with:** `REQUIREMENTS.md` (scope/budget) · `ALPHA.md` (α detail) · `reference/TIER_CONTRACT.md` (tier authoring) · `lore/HIVYSS.md` §3-8 (cosmology, grounded here).
 >
 > **Reading the markers:** **[LOCKED]** = decided, build to it. **[PROPOSED]** = first-pass, tune at the playtest. **[OPEN]** = unresolved.
 >
@@ -44,56 +44,101 @@ Do **not** engineer rock-paper-scissors. Counters **emerge from the archetypes**
 
 ## 2. Rosters
 
-Funnel shape per geneline: ~7 units, T0→ceiling. α is **built**; δ's units **exist** (re-home from the legacy "alpha" military); β + γ are **fresh**.
+**Roster contract (every geneline).** **Base skeleton = 1 Royal + 2 Elites + 4 soldiers (7 units)** — the default anchor; fielded via the bounded **loadout** (`VISION §2`: + 2 hive abilities + 2 pheromones + 2 buildings). **The Royal is always 1; the rest ADAPT to the army-model** (the SC2-commander lesson — *don't force a uniform count*): **soldier count flexes most** — α the skeleton (4), β a wide cheap base + a *spawned* mass, γ **few-but-durable**, δ premium specialists; **Elite count flexes too** (1–3+, mostly a future-geneline lever — a hero-squad = mostly Elites, little fodder). **Target ≈ 28–32 units across the MVP-4.** Two dimensions govern each unit:
+
+- **Tier = complexity** (per `reference/TIER_CONTRACT.md`, the default base): **T0** = a verb · **T1** = a twist (one specialized ability, *no custom logic*) · **T2** = a consequence (two systems) · **T3** = reads context (stateful) · **T4** = helps allies (system-level). The **Elite** caste adds a *player-triggered signature* (+ a passive **phase-2 enrage** at its `phaseThreshold`); the **Royal** is the queen capstone (controllable hero). **Skin genelines (α/β/γ) cap at T3** with the Royal at T3 + Elites at T2; **δ (Veins) ramps to T4** — its Royal/boss is the run-end capstone (`REQUIREMENTS §4-5`).
+  - **The self-vs-ally rule (load-bearing for tiering).** **Soldiers (T0-3) are SELF-affecting** — attack, death-effect, stance, reading context to buff *themselves*. **Generative / ally-affecting power** (spawn units, heal/buff *others*) is **T4+** on the ladder, so it lives in an **Elite signature/aura** or the **Royal** — *never a soldier slot.* (An Elite earns ally-affecting power by being premium — e.g. Goliath's amplifier aura at T2; a soldier does not. A spawner therefore can't be a T1 soldier — spawning is custom generative logic.)
+- **Identity = a distinct corner of the `VISION §6` framework** — *army model · economy · death-stance · verb*. **Two genelines may share an axis, never all four.** Each roster is an **ecosystem** of interdependent roles serving the hook (`REQUIREMENTS §5`), not a hook + reskins.
+- **Kit = the geneline's expression of the shared systems** — its **hook** (the geneline-wide passive), a **signature pheromone** (`VISION §5`), **geneline-specific hive abilities** (`VISION §7`), **buildings** (`VISION §9`), and its **economy + capacity character** (how it fills the shared hard cap — β a cheap *tide*, γ a *few big* bodies). Listed per geneline below as **Kit:**.
+
+α is **built**; δ's units **exist** (re-home from `units/archive.ts`); β + γ are **fresh**. β/γ/δ below are **[PROPOSED]** — coherent to the framework now, tuned/named (§14) when built, *after α's fun is proven*.
+
+### Identity & Kit at a glance
+
+**Identity** — each geneline owns a *distinct corner* (no two share all four axes):
+
+| | α Primal | β Swarm | γ Fortress | δ Military |
+|---|---|---|---|---|
+| **Army** | massed herd | expendable swarm | few durable walls | ranked formation |
+| **Economy** | incubation | free-spawn / corpse | incubation | incubation |
+| **Death** | alive-to-strike | cheap-and-dying | never-die | disciplined |
+| **Verb** | **commit** | **sacrifice** | **hold / degrade** | **position + range** |
+| **Size** | medium | high — a *tide* | low — *few big* | medium — premium |
+| **Tier range** | T0–3 | T0–3 | T0–3 | **T1–4** *(Veins — runs hotter)* |
+| **Killed by** | AOE + displace | AOE clear + sustain | armor-pen + flank | break the line + flank |
+
+**Kit** — its expression of the shared systems (`VISION §5/§7/§9`):
+
+| | α Primal | β Swarm | γ Fortress | δ Military |
+|---|---|---|---|---|
+| **Hook** *(passive)* | Pack Cohesion | productive death | armor (degrades) | formation rank |
+| **Pheromone** | Frenzy Musk | Death-bloom | Bastion-scent | Volley-mark |
+| **Hive ability** | Tremor | Spore Storm | Fortify | Artillery Strike |
+| **Building** | Spawning Mound | Brood Pit | Wall + Spire | Bunker |
+
+*Pheromone glosses — **Frenzy Musk:** cash cohesion → charge surge · **Death-bloom:** deaths inside spill extra spawns · **Bastion-scent:** root + armor/regen · **Volley-mark:** δ units focus-fire the spot. (α concrete; β/γ/δ **[PROPOSED]**.)*
 
 ### α Primal — *Pack Cohesion* — **[LARGELY BUILT]** (`units/alpha.ts`) — updated 2026-06-02
+
 | T | Unit | Caste | Role / signature | Status |
 |--|--|--|--|--|
 |0|Chitling|soldier|fodder — cheap mass|✅ stat |
 |0|Goreling|soldier|fast charger|✅ stat |
 |1|Hornshell|soldier|wall tank (soaks front)|✅ stat |
-|1|Goretusk|soldier|**tight-wedge cohesion** — sharper payoff (+15%/ally), tighter radius (45)|✅ |
 |1|Quillback|soldier|**ranged anti-air** (spits spines) — α's only ranged unit|✅ (was Carapex) |
 |2|**Goliath**|**Elite**|**Stampede** (cohesion-scaled AOE, ≤4×0.5, no kb, shockwave, `charge`) + **cohesion-amplifier aura**|✅ full |
 |2|**Maulhorn**|**Elite**|**Ram Charge** — single-target ×2, knockback 100, no FX, `ram` anim (recoil)|✅ full |
 |3|**Matriarch**|**Royal**|herd-queen capstone; ultimate TBD|🟡 unit built, ultimate blocked on Royal system |
 
-Pyramid **2/3/2/1** (T0/T1/T2/T3) — *restructured 2026-06-02*: a single **Royal** (Matriarch, new unit) at T3, **2 Elites** at T2 (Goliath, Maulhorn), soldiers below. **BUILT:** Pack Cohesion (+ the herd heat-glow), both Elite signatures — each with a *distinct* body animation (Goliath `charge`/forward-settle vs Maulhorn `ram`/recoil-bounce), *distinct* FX (AOE shockwave vs none), and damage shape (AOE-chip vs single-nuke); Goretusk's **tight-wedge cohesion**; **Quillback** (ranged anti-air, was Carapex); Goliath's **cohesion-amplifier aura** (the amplifier folded onto the anchor). **TO BUILD:** just the Matriarch's Royal ultimate (needs the Royal control/trigger system). *(A flat-speed "momentum" for Goretusk was tried and cut — speed only matters on the approach, so it was a non-decision; per TIER_CONTRACT a T1 should be a pure-data twist, which the tight-wedge cohesion is.)* The low-cohesion-cap re-frame below has been **applied** (cap 4).
+Pyramid **2/2/2/1** (T0/T1/T2/T3) = **the base skeleton** (1 Royal + 2 Elites + **4 soldiers** = 7) — *trimmed 2026-06-03* from 5 soldiers: **Goretusk cut** (its tight-wedge cohesion overlapped the baseline cohesion + Goliath's amplifier — redundant role; cutting it lands α on the skeleton and honors the "fewer, medium units, not swarm-spam" re-frame). **BUILT:** Pack Cohesion (+ the herd heat-glow), both Elite signatures — each with a *distinct* body animation (Goliath `charge`/forward-settle vs Maulhorn `ram`/recoil-bounce), *distinct* FX (AOE shockwave vs none), and damage shape (AOE-chip vs single-nuke); **Quillback** (ranged anti-air, was Carapex); Goliath's **cohesion-amplifier aura** (the amplifier folded onto the anchor). **TO BUILD:** just the Matriarch's Royal ultimate (needs the Royal control/trigger system). The low-cohesion-cap re-frame below has been **applied** (cap 4).
 
 **Re-frame (2026-05-31):** α is the **OFFENSE/rush** — a *medium aggressive pack*, **not a swarm**. The current build (cheap **Chitling** fodder + cohesion cap **5**) leans swarm-ish and collides with β. Re-tune toward **fewer, medium-statured aggressive units + a LOW cohesion cap (~3-4)** so cohesion rewards *committing a strike force as one*, not spamming bodies. Framing: *"the charge hits hardest when the herd commits together."* (β owns NUMBERS; γ owns big-durable — α must own neither.)
 
 ### β Swarm — *cheap + productive death* — **[PROPOSED]**
-| T | Unit | Role / signature |
-|--|--|--|
-|0|Maggotling|ultra-cheap fodder; **death → spore cloud**|
-|1|Burster|suicide runner; **explodes on death**|
-|1|Brooder|slow; **spawns free swarmlings** while alive|
-|2|Hivespitter|cheap ranged; **death leaves acid pool**|
-|2|Carrionling|gains atk **when a swarm-ally dies nearby**|
-|3|Broodmother|support; spawns swarmlings + swarm buff|
-|3 Elite|Swarmlord|**Tide** — sacrifice nearby swarmlings for a burst surge|
+
+| T | Unit | Caste | Role / signature |
+|--|--|--|--|
+|0|Swarmling|soldier|free / ultra-cheap body; plain attack — the mass (also the spawn output) |
+|1|Maggotling|soldier|cheap; **death → spore cloud** (self death-trigger) |
+|1|Burster|soldier|suicide runner; **explodes on death** (self death-trigger) |
+|2|Hivespitter|soldier|cheap ranged; **death → lingering acid pool** (ranged + death-effect) |
+|3|Carrionling|soldier|**gains atk when a swarm-ally dies nearby** (reads death-context → buffs *self*) |
+|2|**Swarmlord**|**Elite**|**Tide** — sacrifice nearby Swarmlings for a burst surge |
+|2|**Broodlord**|**Elite**|**Spawn-wave** — birth a swarm on demand (generative → an *Elite*, not a soldier) |
+|3|**Broodmother**|**Royal**|the queen — passively spawns Swarmlings + a swarm buff; ultimate = a brood surge |
+
+*The "many" is **spawned**, not deployed: Broodmother (passive) + Broodlord (on-demand) birth free Swarmlings, Stukov-style. **No soldier is a spawner** — that's T4+ generative logic (the original "Brooder T1 spawner" was the mis-tier).*
 
 ### γ Fortress — *armor as a degrading resource / walls* — **[PROPOSED]**
-| T | Unit | Role / signature |
-|--|--|--|
-|0|Pebbling|cheap armored crawler|
-|1|Shieldbug|frontline; **armor degrades as it soaks**|
-|1|Burrower|plant → immobile, huge armor|
-|2|Rampart|**deploys a wall segment** (blocks the lane)|
-|2|Thornback|**reflects** a % of damage taken (pipeline behavior)|
-|3|Bulwark|support; **repairs nearby allies' armor**|
-|3 Elite|Aegis|**Bastion** — plant a fortress: line-wide armor + regen|
 
-### δ Military — *formation + command + ranged* — **[RE-HOME existing units]**
-| T | Unit | Role / signature |
-|--|--|--|
-|0|Grunt|basic soldier|
-|1|Mandible|melee specialist|
-|1|Needler|**ranged**|
-|2|Bombardier|**AOE artillery**|
-|2|Ravager|berserk dps|
-|3|Legionnaire|heavy; **formation/rank bonus**|
-|4 Elite|Centurion|**command aura + Rally** — the **MVP boss capstone**|
+| T | Unit | Caste | Role / signature |
+|--|--|--|--|
+|0|Pebbling|soldier|cheap armored crawler (durable fodder) |
+|1|Burrower|soldier|**plant → immobile, huge armor** (a stance — `TIER_CONTRACT` T1 "Burrow") |
+|2|Shieldbug|soldier|frontline; **armor degrades as it soaks** (armor + degradation, two systems) |
+|2|Thornback|soldier|**reflects a % of damage taken** (self-defensive pipeline behavior) |
+|3|Calcifier|soldier|at low HP, **hardens (immobile + huge armor) then shatters for AOE** (self-context — `TIER_CONTRACT` "Deathcalcify") |
+|2|**Rampart**|**Elite**|**Wall** — deploy a lane-blocking segment (generative → an *Elite*) |
+|2|**Aegis**|**Elite**|**Bastion** — plant a fortress: line-wide armor + regen |
+|3|**Regina** *(name TBD)*|**Royal**|the citadel-queen — fortress aura + **repairs allies' armor**; ultimate = total fortification |
+
+*Repair lives in the **Royal** (ally-affecting = T4+), not a soldier — the old "Bulwark repairs allies' armor" soldier was the same mis-tier as β's spawner.*
+
+### δ Military — *formation + command + ranged* — **[PROPOSED — re-home + tier-up `units/archive.ts`]**
+*The **Veins boss geneline**, designed **up** from the trio: **no T0 fodder** (a professional army), soldiers **T1–T3**, **Elites at T3** (vs the trio's T2), and the only **T4** — Centurion, δ's Royal *and* the run-end boss. Fitting archived units re-home here **retiered to Veins depth**; the berserk **Ravager** doesn't fit δ's *disciplined* framework → it stays archived / re-homes elsewhere.*
+
+| T | Unit | Caste | Role / signature |
+|--|--|--|--|
+|1|Trooper|soldier|disciplined ranged line infantry — δ's baseline (*no T0 fodder*) |
+|1|Mandible|soldier|melee specialist; screens + anchors the ranged line |
+|2|Marksman|soldier|precision ranged; **pierces armor** (ranged + pierce) |
+|2|Bombardier|soldier|arcing **AOE artillery** (ranged + AOE) |
+|3|Legionnaire|soldier|heavy; **gains a rank bonus in formation** (reads the line → buffs *self*; `TIER_CONTRACT` "Phalanx") |
+|**3**|**Siegewright**|**Elite**|**Barrage** — a devastating targeted artillery strike |
+|**3**|**Longeye**|**Elite**|**Execute** — a precision kill-shot on the enemy's highest-value unit |
+|**4**|**Centurion**|**Royal / BOSS**|**command aura + Rally** (army-wide formation buff); the **run-end boss** |
+
+*Re-homes the archived legacy "military alpha" (`units/archive.ts`). δ alone ramps to **T4** (Veins depth) — Centurion is the **only T4 in the MVP**, and it doubles as δ's Royal *and* the final boss.*
 
 ---
 

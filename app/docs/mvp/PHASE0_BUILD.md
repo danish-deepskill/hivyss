@@ -2,7 +2,7 @@
 
 > **Status:** 2026-05-31. The **build half** of MVP Phase 0. **Goal: prove the #1 risk — is α's combat fun.**
 >
-> **Read first:** `GENELINE_ALPHA.md` (α design), `MECHANICS_INVENTORY.md` (locked mechanic frame), `MVP_REQUIREMENTS.md` (scope/budget).
+> **Read first:** `ALPHA.md` (α design), `MECHANICS_INVENTORY.md` (locked mechanic frame), `REQUIREMENTS.md` (scope/budget).
 >
 > **Roles:** fresh build sessions implement one step at a time; orchestrator reviews at each 🎮 gate. Stats are placeholders until the gate playtests tune them.
 
@@ -37,7 +37,7 @@ Build incrementally with **playtest gates** so "is it fun" is de-risked *cheaply
 
 ## Step 1 — α units (current task)
 
-Author α Primal's 7-unit roster (`GENELINE_ALPHA.md` §3) as data + draws, get them spawnable and fighting in the sandbox with **placeholder basic attacks**. The special mechanics (cohesion, knockback, momentum, Stampede) are **later steps** — Step 1 just puts the bodies on the field.
+Author α Primal's 7-unit roster (`ALPHA.md` §3) as data + draws, get them spawnable and fighting in the sandbox with **placeholder basic attacks**. The special mechanics (cohesion, knockback, momentum, Stampede) are **later steps** — Step 1 just puts the bodies on the field.
 
 **Structure note:** the existing `units/alpha.ts` roster (Grunt/Centurion/Legionnaire/…) is the *military* set → it becomes **δ**, out of MVP scope. Don't delete it; it doesn't collide (new α-Primal unit keys are different). Author α-Primal as new units. If a `units/<geneline>/` restructure feels needed, **stop and report** — don't do it mid-Step-1.
 
@@ -45,7 +45,7 @@ Author α Primal's 7-unit roster (`GENELINE_ALPHA.md` §3) as data + draws, get 
 
 **Task: Build α Primal's roster (Phase 0, Step 1) — data + draws only, basic attacks.**
 
-Read `app/docs/active/GENELINE_ALPHA.md` (the design) and `app/src/units/CLAUDE.md` (file structure + draw conventions) first.
+Read `app/docs/mvp/ALPHA.md` (the design) and `app/src/units/CLAUDE.md` (file structure + draw conventions) first.
 
 Author these **7 new units** (UnitDef + draw function + register in `registry.ts`):
 

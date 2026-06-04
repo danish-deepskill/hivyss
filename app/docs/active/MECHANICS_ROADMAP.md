@@ -350,7 +350,7 @@ Adding new units mid-rewrite means double-touching every unit. Adding new geneli
 
 ### Scope
 
-> **SUPERSEDED (2026-06-01):** the live MVP geneline set is now **α Primal · β Swarm · γ Fortress · δ Military** (role-triad), locked in `app/docs/active/MVP_GENELINES.md`. The selection below is the *original* roadmap proposal (a Classic/Distinct/Alien/Core/dark-mirror spread) — kept for design archaeology, not the shipping set.
+> **SUPERSEDED (2026-06-01):** the live MVP geneline set is now **α Primal · β Swarm · γ Fortress · δ Military** (role-triad), locked in `app/docs/mvp/GENELINES.md`. The selection below is the *original* roadmap proposal (a Classic/Distinct/Alien/Core/dark-mirror spread) — kept for design archaeology, not the shipping set.
 
 Lock a 5-6 geneline set spanning the cosmology's full design language:
 

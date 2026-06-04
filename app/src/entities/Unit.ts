@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { UnitDef, Side, UnitState, RenderUnit, Route, AttackRange, GenePalette, ComponentTag, UnitPersistent, PassiveDef, GeneLine } from '../types';
+import type { UnitDef, Side, UnitState, RenderUnit, Route, AttackRange, GenePalette, ComponentTag, UnitPersistent, PassiveDef, GeneLine, CasteKey, SfxKey, IUnit } from '../types';
 import { hasActiveEffect } from '../systems/EffectSystem';
 import type { DamageType } from '../config/combat/damageTypes';
 import type { ResistanceTier } from '../config/combat/resistances';
@@ -78,6 +78,9 @@ export class Unit extends Phaser.GameObjects.Container {
 
   // Player-triggered signature ability (Elite/Royal active) + its cooldown.
   signatureAbility?: string;
+  caste?: CasteKey;
+  phaseThreshold?: number;
+  sfx?: SfxKey;
   signatureCooldown: number;
   sigCd: number;
 
@@ -96,6 +99,11 @@ export class Unit extends Phaser.GameObjects.Container {
   passedEnemies: number;
   ambush: boolean;
   _swinging: boolean;
+  /** Target captured when the foreswing STARTS, so the hit commits to it: the
+   *  impact lands on this foe even if a closer one drifts in during windup (as
+   *  long as it's still a valid foe). null = re-find nearest at impact (bases,
+   *  or the locked foe died/left → graceful fallback). */
+  lockedTarget: IUnit | null;
   foreswing: number;
   backswing: number;
   foreswingTimer: number;
@@ -175,12 +183,16 @@ export class Unit extends Phaser.GameObjects.Container {
     this.passedEnemies = 0;
     this.ambush = false;
     this._swinging = false;
+    this.lockedTarget = null;
     this.foreswing = 0;
     this.backswing = 0;
     this.foreswingTimer = 0;
     this.backswingTimer = 0;
     this.poiseAccum = 0;
     this.healTimer = 0;
+    this.caste = undefined;
+    this.phaseThreshold = undefined;
+    this.sfx = undefined;
     this.signatureAbility = undefined;
     this.signatureCooldown = 0;
     this.sigCd = 0;
@@ -248,6 +260,9 @@ export class Unit extends Phaser.GameObjects.Container {
     this.attackRange = def.attackRange ?? 'melee';
     this.defaultAbility = def.defaultAbility;
     this.deathAbility = def.deathAbility;
+    this.caste = def.caste;
+    this.phaseThreshold = def.phaseThreshold;
+    this.sfx = def.sfx;
     this.signatureAbility = def.signatureAbility;
     this.signatureCooldown = def.signatureCooldown ?? 8;
     this.sigCd = 0;
@@ -271,6 +286,7 @@ export class Unit extends Phaser.GameObjects.Container {
     this.passedEnemies = 0;
     this.ambush = false;
     this._swinging = false;
+    this.lockedTarget = null;
 
     const interval = 1 / def.atkRate;
     this.foreswing = def.foreswing ?? interval * 0.3;
@@ -544,6 +560,24 @@ export class Unit extends Phaser.GameObjects.Container {
       g.fillEllipse(gx, gyA, rw * 0.62, rh * 0.62);
     }
 
+    // Phase-2 (Elite enrage) — once HP crosses the unit's phaseThreshold the
+    // unit turns RED, so "it just got dangerous" reads instantly. Crucially this
+    // is a BODY treatment, NOT a ground aura: an UPRIGHT halo enveloping the
+    // silhouette (taller than wide), the opposite orientation of cohesion's wide,
+    // flat ground pool — so the two never blur, even though α's own colour is red.
+    // The body sheen below (drawn over the silhouette) and the fast throb finish
+    // the read. Used again by the HP bar.
+    const inPhase2 = this.phaseThreshold != null && this.hp / this.maxHp <= this.phaseThreshold;
+    if (inPhase2) {
+      const ep = 0.55 + 0.45 * Math.abs(Math.sin(this.bob * 3));
+      const cx = this.unitW / 2;
+      const cy = uy + this.unitH * 0.42;
+      g.fillStyle(0xff2010, 0.22 * ep);
+      g.fillEllipse(cx, cy, this.unitW * 0.95, this.unitH * 1.45);
+      g.fillStyle(0xff5030, 0.3 * ep);
+      g.fillEllipse(cx, cy, this.unitW * 0.55, this.unitH * 0.9);
+    }
+
     if (slowed) g.setAlpha(0.85);
 
     // Draw the ant body using the renderer
@@ -581,6 +615,15 @@ export class Unit extends Phaser.GameObjects.Container {
       g.fillEllipse(this.unitW / 2, uy + this.unitH * 0.5, this.unitW * 0.5, this.unitH * 0.5);
     }
 
+    // Enrage body sheen — the silhouette itself runs red-hot (drawn OVER the body,
+    // so the enraged elite glows from within, not from the floor). Same fast throb
+    // as the halo behind it.
+    if (inPhase2) {
+      const ep = 0.5 + 0.5 * Math.abs(Math.sin(this.bob * 3));
+      g.fillStyle(0xff3018, 0.3 * ep);
+      g.fillEllipse(this.unitW / 2, uy + this.unitH * 0.5, this.unitW * 0.6, this.unitH * 0.62);
+    }
+
     // Slow indicator
     if (slowed) {
       g.fillStyle(0x80c8ff, 0.3);
@@ -589,15 +632,35 @@ export class Unit extends Phaser.GameObjects.Container {
 
     g.setAlpha(1);
 
-    // HP bar
+    // HP bar — drawn on the dedicated top-layer graphics (added after gfx, so it
+    // sits ABOVE the body + effects and stays legible). Elites/Royals get a
+    // "premium" bar with a vertical divider at their phase-2 threshold (telegraphs
+    // the enrage point + turns red once crossed); soldiers get a clean thin bar,
+    // so a richer bar reads as "this one matters".
     this.hpBar.clear();
-    const bw = this.unitW + 8;
-    const hpFrac = this.hp / this.maxHp;
-    this.hpBar.fillStyle(0x111111);
-    this.hpBar.fillRect(-4, uy - 10, bw, 4);
-    const hpColor = hpFrac > 0.5 ? 0x40cc40 : hpFrac > 0.25 ? 0xcccc30 : 0xcc3030;
-    this.hpBar.fillStyle(hpColor);
-    this.hpBar.fillRect(-4, uy - 10, bw * Math.max(0, hpFrac), 4);
+    const hpFrac = Math.max(0, Math.min(1, this.hp / this.maxHp));
+    if (this.caste === 'elite' || this.caste === 'royal') {
+      const bw = this.unitW * 1.1;
+      const bh = 3;
+      const bx = (this.unitW - bw) / 2;
+      const by = uy - 9;
+      this.hpBar.fillStyle(0x000000, 0.6);
+      this.hpBar.fillRect(bx - 1, by - 1, bw + 2, bh + 2);
+      this.hpBar.fillStyle(inPhase2 ? 0xff3020 : hpFrac > 0.5 ? 0x40d040 : 0xf0c040, 1);
+      this.hpBar.fillRect(bx, by, bw * hpFrac, bh);
+      if (this.phaseThreshold != null) {
+        const dx = bx + bw * this.phaseThreshold;
+        this.hpBar.fillStyle(0xffffff, 0.9);
+        this.hpBar.fillRect(dx - 0.5, by - 1, 1, bh + 2);
+      }
+    } else {
+      const bw = this.unitW + 8;
+      this.hpBar.fillStyle(0x111111);
+      this.hpBar.fillRect(-4, uy - 10, bw, 4);
+      const hpColor = hpFrac > 0.5 ? 0x40cc40 : hpFrac > 0.25 ? 0xcccc30 : 0xcc3030;
+      this.hpBar.fillStyle(hpColor);
+      this.hpBar.fillRect(-4, uy - 10, bw * hpFrac, 4);
+    }
   }
 
   kill(): void {

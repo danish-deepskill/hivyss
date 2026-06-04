@@ -13,6 +13,7 @@ export const sharpAbilities: Record<string, AbilityDef> = {
     targetCount: 1,
     trigger: 'onAttack',
     tiers: linearDamageTiers(),
+    sfx: 'jaw',
   },
 
   pricker_jab: {
@@ -35,6 +36,7 @@ export const sharpAbilities: Record<string, AbilityDef> = {
     targetCount: 1,
     trigger: 'onAttack',
     tiers: linearDamageTiers(),
+    sfx: 'needle',
   },
 
   piercing_shot: {

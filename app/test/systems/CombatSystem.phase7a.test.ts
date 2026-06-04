@@ -21,8 +21,8 @@ import {
   applyHealPhase,
   applyEffectsPhase,
   applyVarianceAndCritModify,
-  makeDotDispatcher,
-} from '../../src/systems/CombatSystem';
+} from '../../src/systems/CombatPhases';
+import { makeDotDispatcher } from '../../src/systems/CombatDispatch';
 import {
   applyEffect,
   updateEffects,

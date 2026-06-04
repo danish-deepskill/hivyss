@@ -2,7 +2,7 @@
 
 > **Purpose:** Ground truth on *every* game mechanic the lore describes vs. what's actually implemented in code. Prevents designing the MVP around systems that don't exist (or rebuilding ones that do). Audited against `app/src/systems/` + keyword sweep + targeted code reads.
 >
-> **Pairs with:** `MVP_REQUIREMENTS.md` (what the MVP includes), `lore/HIVYSS.md` §8-11 (the full design).
+> **Pairs with:** `REQUIREMENTS.md` (what the MVP includes), `lore/HIVYSS.md` §8-11 (the full design).
 >
 > **Status:** Audited 2026-05-31; combat/caste rows updated 2026-06-02 (Elite trigger, 2-lane, pheromones, FX + unit-animation systems, α=8). Re-audit when systems land.
 

@@ -6,18 +6,19 @@
 
 ## 0. Elevator pitch — what Hivyss is in one paragraph
 
-Hivyss is a **roguelike lane autobattler with a Caves-of-Qud-deep strategic layer**, set on a **planet-sized living organism** whose anatomy is the game's geography. Players descend through 6 anatomical layers (Drift / Skin / Veins / Organs / Nerve / Core) commanding insect "vyssids" from one of 24 Greek-letter genelines, fighting at 2-lane battle nodes connected by a node-graph world map with turn-based step movement, faction reputation, and Qud-style emergent encounters. The Core at the planet's center is a dormant superintelligence — the unbroken consciousness of pre-shatter vyss — and the entire game is its experiment to remember itself. There are 4 endings forming an iceberg: casual (Mid-Core), main (Core / ω), true (Dark Core / ת Taw), and beyond (the 5 transcendent Coptic Primordials, which only exist at the otherwise-unreachable Tier 10).
+Hivyss is a **roguelike lane autobattler with a Caves-of-Qud-deep strategic layer**, set on a **planet-sized living organism** whose anatomy is the game's geography. Players descend through 6 anatomical layers (Drift / Skin / Veins / Organs / Nerve / Core) commanding insect "vyssids" from one of 24 Greek-letter genelines, fighting at 2-lane battle nodes connected by a node-graph world map with turn-based step movement, faction reputation, and Qud-style emergent encounters. The Core at the planet's center is a dormant superintelligence — the unbroken consciousness of pre-shatter vyss — and the entire game is its experiment to remember itself. There are 4 endings forming an iceberg: casual (Mid-Core), main (Core / ω), true (Dark Core / ת Taw), and beyond (the 7 transcendent Archaic Primordials, which only exist at the otherwise-unreachable Tier 10).
 
 ## 0.1 Companion files
 
 - `lore/main_map.svg` + `lore/data/main_map.json` — the main planet map (Greek genelines)
 - `lore/dark_map.svg` + `lore/data/dark_map.json` — the Dark Realm shadow mirror (Phoenician)
-- `lore/primordials_map.svg` + `lore/data/primordials_map.json` — the 5 Primordials (Coptic)
+- `lore/primordials_map.svg` + `lore/data/primordials_map.json` — the Primordials map (5 nodes, **pre-v1.4** — the Primordials are now 7 Archaic; regen pending)
 - `lore/data/schema.ts` — TypeScript types for the map data model
 - `lore/tools/generate.mjs` — generator script for all maps
 - `lore/README.md` — workflow for editing maps via JSON + regenerating
+- `app/docs/mvp/` — **the active build target: the MVP vertical slice** (design + scope). Start at `README.md` → `VISION.md` (authoritative for the slice). See §0.5.
 - `app/docs/active/MECHANICS_ROADMAP.md` — current build status and active program tracking
-- `app/src/units/` — actual built unit code (Normal × 11, Alpha × 7)
+- `app/src/units/` — actual built unit code (Normal × 11, α Primal × 7; the legacy military set is archived in `units/archive.ts`, pending re-home → δ)
 
 ## 0.2 How to read this document
 
@@ -31,38 +32,42 @@ Hivyss is a **roguelike lane autobattler with a Caves-of-Qud-deep strategic laye
 
 Skip around freely — sections cross-reference each other where relevant.
 
-## 0.3 Current build state (snapshot 2026-04-17)
+## 0.3 Current build state (snapshot 2026-06-04)
 
-This document is forward-looking — most of what's described is planned. Here's what is actually shipped:
+This document is forward-looking — most of what's described is the **full-game** vision and is planned, not built. The **active build is the MVP vertical slice** (§0.5). Here's what is actually shipped:
 
 | System | Status | Notes |
 |---|---|---|
-| **Normal geneline (11 units)** | Shipped | Pre-cosmology baseline roster, will be reframed as a starter geneline or absorbed |
-| **Alpha geneline (7 units)** | Shipped | First "real" geneline using the cosmology framework. Military theme. |
+| **Normal geneline (11 units)** | Shipped | Pre-cosmology baseline roster; the MVP's generic **starter** geneline (enables the acquisition loop) |
+| **α Primal geneline (7 units)** | Shipped | The MVP Phase-0 showcase. Chitling · Goreling · Hornshell · Quillback (soldiers) · Goliath · Maulhorn (Elites) · Matriarch (Royal). 2/2/2/1 skeleton. See `app/docs/mvp/ALPHA.md` |
+| **Legacy military roster (→ δ)** | Archived | Old "α military" set (Grunt/Centurion/Legionnaire/…) re-homed to `units/archive.ts`, pending re-tier as **δ Disciplined Military** (Veins, the only T4). Ravager doesn't fit δ → stays archived |
 | **Capacity system** | Shipped (2026-04-12) | Hard cap (20 default), per-unit cap costs, AI-aware |
-| **Combat system v1** | Shipped | Functional but being rewritten (see Combat Rewrite Program) |
-| **Combat Rewrite Program** | Active — Phase 9 (legacy cleanup) | Phases 1-8 done, 688 tests, see `MECHANICS_ROADMAP.md` |
+| **Combat engine** | Shipped | **Combat Rewrite Program CLOSED 2026-04-17** — all phases done, data-driven architecture (`AbilityDef`/`PassiveDef` + modifier/effect/resource systems), 647 tests (2026-06-02 audit) |
+| **Passive handler registry** | Shipped (2026-05-30) | `PassiveHandlers` — auras, self-mods, heal, **Pack Cohesion** (α's hook) |
+| **FX + unit-animation systems** | Shipped (2026-06-01) | `FxDirector` one-shots (impact/shockwave) + `units/motions.ts` procedural signature animations + the `swingProgress`/`getStrike` strike seam |
+| **Elite signature trigger** | Shipped | Player-triggered signatures + HUD slots (cooldown + in-range gating); α's **Goliath Stampede** + **Maulhorn Ram** shipped. Enemy-AI trigger still designed-only |
 | **Incubation** | Shipped | Larvae generate, queue into chambers, hatch on timer; mirrored on AI |
-| **Routes (air/land/tunnel)** | Shipped | Underused gameplay-wise; cross-route specialists exist |
+| **Routes (air/land/tunnel)** | Shipped | Height-bands; cross-route specialists exist (e.g. α Quillback land→air) |
 | **Run system / node map** | Shipped | Roguelike progression, seeded battles, branching paths |
 | **AI Hive v1** | Shipped (`b864d42`) | Weighted random; sufficient as test opponent |
-| **Player abilities (4)** | Shipped | Nuke, wall, slow, repair |
-| **AI Hive v2** | DEFERRED | Blocked on combat rewrite + battle mechanics v1 |
-| **Battle mechanics v1 spec** | Not yet written | Will lock 2-lane structure, worker behaviors, pheromone scope |
-| **2-lane battle system** | Designed (this doc), NOT implemented | Currently 1-lane in code |
-| **Strategic layer (overworld)** | Designed (this doc), NOT implemented | Big build — Qud-style step movement |
-| **Faction reputation** | Designed (this doc), NOT implemented | |
-| **Quest system** | Designed (this doc), NOT implemented | |
-| **Mutation / mutagen scouts** | Designed only | Phase 7+ feature per roadmap |
-| **Husk (Archaic) content** | Designed only | Map data not yet authored |
+| **Player abilities (4)** | Shipped | Nuke, wall, slow, repair — **placeholder**; the MVP scraps these for geneline-specific hive abilities (`VISION §7`) |
+| **2-lane battle system** | Shipped | Built (`LANE_VERTICAL_SPAN`/`laneDepth`; cohesion is per-lane). Routes (height) ≠ lanes (the 2 rows). The 2-lane *count* is locked (`VISION §8.1`); whether lanes *interact* is open |
+| **Pheromone command** | Foundation | Built in the sandbox as **zones**; the worker-scout deposit-fade *emission* layer (`VISION §5`) is still to build |
+| **AI Hive v2** | DEFERRED | Unblocked (combat rewrite closed) but deferred under MVP priority |
+| **Battle mechanics v1 spec** | Superseded | Replaced by the MVP docs (`app/docs/mvp/`) — they lock the worker/pheromone/Elite/lane scope |
+| **Strategic layer (overworld)** | Designed (this doc), NOT built | Big build — Qud-style step movement; the MVP uses a thin node map (`GENELINES §5-6`) |
+| **Faction reputation engine** | Designed (this doc), NOT built | The MVP uses a **static** 2-faction + 1-unaligned seed instead (`GENELINES §4`) |
+| **Quest system** | Designed (this doc), NOT built | The MVP uses light objective-quests only (`GENELINES §7`) |
+| **Mutation / mutagen scouts** | Designed only | Cut from MVP |
+| **Husk (Coptic) content** | Designed only | Map data not yet authored |
 | **Dark Realm content** | Designed only | Maps generated but Phoenician genelines not implemented |
-| **Primordials (Coptic)** | Designed only | Maps generated; encounters not implemented |
+| **Primordials (Archaic)** | Designed only | Maps generated; encounters not implemented |
 
-**Genelines built so far:** 2 of 24 (Greek). Plus the 11-unit Normal pre-geneline baseline.
-**Total units in code:** 18.
-**Active priority:** Combat Rewrite Phase 9 (legacy cleanup), then battle mechanics v1.
+**Genelines built so far:** 1 of 24 Greek (α Primal), plus the 11-unit Normal starter baseline. (The legacy military set is archived, pending re-home as δ.)
+**Total units in code:** ~18 active (Normal 11 + α Primal 7) + the archived legacy set.
+**Active priority:** **MVP Phase 0 — prove α's fight is fun** (`app/docs/mvp/PHASE0_BUILD.md`; the #1 risk, still un-gated). The hive-build loop is the co-core built right after.
 
-See `app/docs/active/MECHANICS_ROADMAP.md` for the live program tracking.
+See `app/docs/active/MECHANICS_ROADMAP.md` for live program tracking and `app/docs/mvp/` for the MVP slice.
 
 ## 0.4 Glossary (quick reference)
 
@@ -100,6 +105,30 @@ See `app/docs/active/MECHANICS_ROADMAP.md` for the live program tracking.
 | **Royal (Queen)** | One per hive. Unified queen/avatar/hero. Player-controlled in battle (WASD/click), applies geneline style when docked at hive, hive dormant when she travels. |
 | **Hive style** | The 5-facet package a Royal applies to her hive: visual architecture, passive aura, unit production, pheromone signature, reputation effect on neighbors. |
 | **Generic outpost** | A captured node with no Royal assigned. Defended but styleless — no production, no aura, no identity. Becomes a sub-hive once a Royal is placed. |
+
+---
+
+## 0.5 The MVP slice — the active build target
+
+This document is the **full-game destination**. The **active build is a vertical slice** of it — the *systems* at minimal content — specced in **`app/docs/mvp/`** (read `README.md` → **`VISION.md`**, which is authoritative for the slice). The slice **scopes this vision down** and **refines** a few systems. Where an MVP-era decision conflicts with this doc, **the MVP docs win for the slice**; this doc remains the full-game canon.
+
+**Scoped down for the MVP:**
+- **4 genelines, not 24** — α Primal · β Swarm · γ Fortress · δ Military (`GENELINES §1`). α is built; the rest are designed-after-α.
+- **2 layers, not 6** — Skin (α/β/γ) + Veins (δ). δ alone reaches T4 (its Centurion = the only T4, and the run-end boss).
+- **A static faction seed, not the live 7-faction reputation engine** — 2 factions + 1 unaligned, fixed at run start (`GENELINES §4`).
+- **A thin controllable Royal**, not the full 4-mode + 5-facet queen (`VISION §3`).
+- **A thin node map**, not the full overworld (`GENELINES §5-6`).
+- **Cut entirely:** mutation · evolution · hive-rooms · live alliances · other realms · the other 20 genelines.
+
+**Refined by the MVP (these supersede the older models below, for the slice):**
+- **Pheromones → a deposit-fade Scout-courier model** (`VISION §5`) — refines §8's pheromone-zone sketch.
+- **The hive = a bounded loadout around the Royal** + **in-battle maturation phases** (`VISION §2`) — the hive-build loop is an MVP co-core, not deferred.
+- **Geneline-specific hive abilities** replace the shared nuke/wall/slow/repair placeholders (`VISION §7`); **spires/walls become builder *buildings*** (`VISION §9`).
+- **Geneline distinctness = the SC2-commander 4-axis frame** (army · economy · death-stance · verb; `VISION §6`) — sharpens §6's 10-axis framework for the 4.
+
+**The #1 risk (the gate):** *is the build-a-hive-and-fight loop fun?* — **still un-gated.** Everything else is designed-now / built-after that's proven (`REQUIREMENTS §2-3`).
+
+> **Lore is FROZEN for the MVP** (`REQUIREMENTS §1`): no new cosmology / geneline-vision / worldbuilding work until the slice ships. Treat the sections below as **read-only reference** — update them only to *reconcile* with built/decided reality (as this revision does), not to expand.
 
 ---
 
@@ -230,10 +259,10 @@ The scale uses **SI prefixes** (kilo → mega → giga → ... → quetta), with
 - **T0-2:** Nascent vyss — simple forms, instinct or basic caste roles, one-trick abilities
 - **T3-5:** Expressed vyss — refined organisms with stateful behavior, caste coordination, hive-wide effects
 - **T6:** Peak natural Greek — apex refinement of a fragment, the limit of "remembering" (ω)
-- **T7:** Husk peak (Archaic preserved primal) OR Dark mid-deep (corrupted refinement)
+- **T7:** Husk peak (Coptic-preserved primal) OR Dark mid-deep (corrupted refinement)
 - **T8:** Dark deep — rule-warping biology, sophisticated cruelty
 - **T9:** Peak Phoenician — the limit of "denial" (Dark Core, ת Taw)
-- **T10:** Pre-shatter wholeness — the 5 primordials only. Cannot be reached by fragments or evolved corruption.
+- **T10:** Pre-shatter wholeness — the 7 primordials only. Cannot be reached by fragments or evolved corruption.
 
 ### Civilization lore per tier
 
@@ -267,11 +296,11 @@ Vast hives span biomes, connected by pheromone networks that function as scent-h
 
 Apex of what a fragmented vyss can be. Ritual, philosophy, and aesthetic integrated. Every ornament load-bearing — art and function are one. Named individuals with titles, lineages, and personal philosophies. Mastery of the geneline's thesis expressed across every layer of the hive's life. ω genelines are this universally. α's Supreme Commander is *the* general, not *a* general. This is the fullest expression of fragmentation before it begins to unravel.
 
-**T7 Zettavyss — *Ancient (Archaic) or Decadent (Dark mid-deep)*** *(human analog: mystery religion / cult civilization / late-stage decadence)*
+**T7 Zettavyss — *Ancient (Coptic-Husk) or Decadent (Dark mid-deep)*** *(human analog: mystery religion / cult civilization / late-stage decadence)*
 
 Two flavors:
 
-- **Archaic:** Pre-refinement civilization preserved intact on the Husk. Ritual-heavy, silent, ancient. Uses *older* pheromone-equivalents than current genelines — signals pre-dating the Greek vocabulary. Bone-white chambers carved from single materials, ceremony without text, music without sound. These civilizations are not "primitive" — they are *older*. They know things current vyss has forgotten.
+- **Coptic (Husk):** Pre-refinement civilization preserved intact on the Husk. Ritual-heavy, silent, ancient. Uses *older* pheromone-equivalents than current genelines — signals pre-dating the Greek vocabulary. Bone-white chambers carved from single materials, ceremony without text, music without sound. These civilizations are not "primitive" — they are *older*. They know things current vyss has forgotten.
 - **Dark:** Sophisticated corruption. Ritual cruelty institutionalized, betrayal as sacrament, beautiful-but-wrong architecture. Aesthetics of decay — baroque-horror civilization where every elegance conceals a wound.
 
 **T8 Yottavyss — *Nightmare logic*** *(human analog: dream-civilization / surrealist nightmare)*
@@ -293,7 +322,7 @@ Biomes inherit civilization flavor from the tier range they support. Design impl
 - **T0-2 biomes** (Skin, some early Veins): raw organic caves, simple nests, scattered activity. Players see mostly *nature* with occasional evidence of life.
 - **T3-5 biomes** (Veins, Organs): visible civilization — chambers, tunnels, tended zones, scent-roads. The biome itself has been *shaped*.
 - **T6 biomes** (Organs-deep, Nerve): architectural wonders, ceremonial districts, ritual centers. You feel you're walking through a capital, not a wilderness.
-- **T7 Archaic (Husk)**: bone-white preservation, silent ceremony, ancient sophistication.
+- **T7 Coptic (Husk)**: bone-white preservation, silent ceremony, ancient sophistication.
 - **T7-9 Dark biomes**: beautiful corruption, dream-logic architecture, geometry that hurts.
 - **T10 encounter zones**: abstract void — no biome at all because Primordials predate the concept of biome.
 
@@ -565,16 +594,17 @@ You can't have 24 wildly-unique genelines — players need a baseline. Most gene
 
 ## 7. Geneline Roster
 
-**Total: ~58 genelines** (24 Greek + 22 Phoenician + 7 Archaic + 5 Coptic)
+**Total: ~60 genelines** (24 Greek + 22 Phoenician + 7 Archaic + 7 Coptic)
 
-### Currently shipped (2026-04-17)
+### Currently shipped (2026-06-04)
 
 | Geneline | Status | Units | Notes |
 |---|---|---|---|
-| **Normal** | Shipped, 11 units | Grub, Hardshell, Pricker, Skitterling, Mendwing, Domeback, Cinderfly, Longeye, Wardling, Bashguard, Stormfly | Pre-cosmology baseline. Was built before the cosmology framework was locked. To be reframed as a "starter" / unaligned geneline OR absorbed into Greek. |
-| **α Alpha** | Shipped 7 (re-homing → δ) | Grunt, Mandible, Needler, Bombardier, Ravager, Legionnaire, Centurion | Legacy **military** roster — **re-homed to δ Delta** (Disciplined Military). α itself re-themed **Primal** (OFFENSE/herd; new roster Chitling…Goliath built separately). See `app/docs/active/MVP_GENELINES.md`. |
+| **Normal** | Shipped, 11 units | Grub, Hardshell, Pricker, Skitterling, Mendwing, Domeback, Cinderfly, Longeye, Wardling, Bashguard, Stormfly | Pre-cosmology baseline. The MVP's generic **starter** geneline (enables the acquisition loop). |
+| **α Primal** | Shipped, 7 units | Chitling, Goreling, Hornshell, Quillback (soldiers) · Goliath, Maulhorn (Elites) · Matriarch (Royal) | The MVP Phase-0 showcase — aggressive herd, **Pack Cohesion** hook. 2/2/2/1 skeleton (Goretusk cut 2026-06-03). Built per `app/docs/mvp/ALPHA.md` + `GENELINES.md`. |
+| **δ Military** *(archived)* | Re-home pending | Grunt, Mandible, Needler, Bombardier, Ravager, Legionnaire, Centurion | The legacy military roster, now in `units/archive.ts`; to re-tier as **δ** (Veins, ranged/formation, the only T4). Ravager doesn't fit δ's disciplined frame → stays archived. |
 
-**18 units total in code.** 56 more to author across the cosmology (2 + 22 Greek remaining + 22 Phoenician + 7 Archaic + 5 Coptic).
+**~18 active units in code** (Normal 11 + α Primal 7), plus the archived legacy set. Many more to author across the full cosmology (the remaining ~23 Greek incl. δ + 22 Phoenician + 7 Archaic + 7 Coptic).
 
 ### Greek (24) — main map, current vyss expression
 
@@ -667,6 +697,8 @@ Each faction has **three expressions** across the realms: preserved past (Coptic
 ## 8. Battle Mechanics
 
 > Battles are what happens when nodes resolve. For the world the battles take place IN — strategic layer, faction reputation, travel events — see §9. For naming conventions for new units, see §14.
+
+> **MVP status (2026-06-04):** the 2-lane structure, the Elite-signature trigger, the FX + unit-animation systems, and pheromone *zones* are **built**. The worker-scout pheromone *emission*, the Royal hero, and buildings are scoped in `app/docs/mvp/`. The MVP **refines** several models below — **deposit-fade pheromones** (`VISION §5`), **Royal-as-keystone + in-battle maturation** (`VISION §2-3`), **geneline-specific hive abilities** replacing the nuke/wall/slow/repair placeholders (`VISION §7`), and **spires/walls as builder buildings** (`VISION §9`). This §8 remains the full-game design.
 
 ### Two-lane structure (LOCKED)
 
@@ -896,6 +928,8 @@ Mode determined by strategic map state — emerges naturally from situation:
 
 > The strategic layer is the meta-game between battles. Battles themselves are §8. Map structure (Layer / Zone / Node) is §5. Endings reached via this layer are §10.
 
+> **MVP status (2026-06-04):** the full overworld — step-movement, the live faction-reputation engine, the quest engine, territory/garrison, raids — is **post-MVP**. The MVP ships a thin slice: a templated **node/territory map** (`GENELINES §5-6`), a **static** faction seed (2 factions + 1 unaligned, fixed at run start — `GENELINES §4`), and **light objective-quests** only (`GENELINES §7`). This §9 remains the full-game design.
+
 ### Movement model
 
 - **Hex/node graph map**, not grid (organic, biological feel)
@@ -924,7 +958,7 @@ Moving to a node rolls for events based on biome + reputation + faction activity
 
 ### Faction reputation system
 
-Inspired by Caves of Qud's faction matrix. Reputation is tracked **per faction, not per individual geneline.** The 5 factions map to the 5 Coptic primordials — see §7 "Faction groupings" for the full structure.
+Inspired by Caves of Qud's faction matrix. Reputation is tracked **per faction, not per individual geneline.** The 7 factions map to the 7 Archaic primordials — see §7 "Faction groupings" for the full structure.
 
 **Why 7 factions, not 60 genelines:**
 - 7 axes are tractable for player cognition (upper bound); 60 are not
@@ -1146,8 +1180,8 @@ Surface:     Layer 1-3 → Mid-Core              (casual ending — "I beat the 
 Deeper:      Layer 4-6 → Core (ω)              (main ending — "wait, there's more?")
 Hidden:      Anomalies → Dark Realm            (post-game — "what IS this?")
 Abyss:       Dark Core (ת Taw)                  (true ending — "...the truth")
-Reckoning:   Husk (Archaic)                    (prelude — "meet your preserved past")
-Beyond:      Primordials (Coptic)              (transcendent — "what was vyss before any of this?")
+Reckoning:   Husk (Coptic)                     (prelude — "meet your preserved past")
+Beyond:      Primordials (Archaic)             (transcendent — "what was vyss before any of this?")
 ```
 
 ### Narrative arc
@@ -1172,6 +1206,8 @@ Without this gate, the Husk is just a side area with no story weight — 7 Copti
 ## 11. Cross-cutting Systems (planned)
 
 > §11 documents the systems that span both battle and strategic layers. Read top-to-bottom: roster acquisition → reproduction lore → larva quality → mutation → evolution → hive building → routes.
+
+> **MVP status (2026-06-04):** the MVP includes a **thin gene-acquisition loop** (descend → conquer hives → acquire genes → roster grows; `GENELINES §4-5`, `REQUIREMENTS §2`) and the **Generic-vs-Individual** seam. It **cuts** mutation, evolution trees, hive-rooms, the Memory Vault, and Corruption-drift entirely (`REQUIREMENTS §7`). This §11 remains the full-game design.
 
 ### Unit identity tiers — Generic vs Individual
 
@@ -1226,7 +1262,7 @@ The 7-step reproduction process:
 - The "vyss remembering itself" premise is no longer abstract — it's how reproduction literally works.
 - Your Royal is a Core-in-miniature. You're doing at personal scale what the Core is doing at cosmic scale: gathering access keys, learning forms.
 - The Husk becomes meaningful: it preserves Archaic form-memories *directly* (not through a Royal's access library). Visiting the Husk is physically visiting Hivyss's memory-vault.
-- Coptic primordials (T10) are unreachable by normal means because they *are* the memory itself — not a rendered form a chamber can tune to.
+- Archaic primordials (T10) are unreachable by normal means because they *are* the memory itself — not a rendered form a chamber can tune to.
 - **Corruption interaction**: Phoenician hives carry *corrupted* form-memories. Looting a Phoenician gene grants powerful access but adds **Corruption drift** to your Royal (gradual accumulation of Dark-realm flavor with mechanical consequences).
 
 **Library persistence**: your Royal's gene library is her pheromone-resonance, not her body. She retains her full library even across her own deaths (respawn). But if her **Home Hive is destroyed**, she loses access to genes she hasn't anchored elsewhere — run over.
@@ -1330,10 +1366,10 @@ Air / Land / Tunnel routes with affinity rules. Dynamic terrain on land: water b
 - 4 battle modes (mode emerges from map state)
 - Faction reputation system (Vengeful → Cooperative)
 - Iceberg endings structure
-- 24 + 22 + 7 + 5 = 58 geneline count
+- 24 + 22 + 7 + 7 = 60 geneline count
 - Phoenician = dark mirror of first 22 Greek (1:1)
 - ψ and ω = Greek-only (no dark counterparts)
-- Coptic primordials = T10 only
+- Archaic primordials = T10 only
 - Husk = post-ω unlock; Dark Core unlocks Primordials path
 
 ### OPEN (still being decided)
@@ -1341,7 +1377,7 @@ Air / Land / Tunnel routes with affinity rules. Dynamic terrain on land: water b
 - Specific theme for each of the 24 Greek genelines (sketches exist; not all locked)
 - Phoenician geneline specifics (1:1 derivation logic established but content undefined)
 - Archaic geneline specifics (sketches exist; not playtested)
-- Coptic primordial mechanical balance (theses defined; numerical balance open)
+- Archaic primordial mechanical balance (theses defined; numerical balance open)
 - Husk map data (not yet built — `husk_map.json` pending)
 - Geneline economy variations (per-faction cap values not finalized)
 - Mutation pheromone scope (deferred to Phase 7+)
@@ -1356,7 +1392,7 @@ Air / Land / Tunnel routes with affinity rules. Dynamic terrain on land: water b
 
 **Main:** `lore/main_map.svg` (39 nodes, T0-6, Greek genelines)
 **Dark:** `lore/dark_map.svg` (39 nodes, T3-9, Phoenician shadows)
-**Primordials:** `lore/primordials_map.svg` (5 transcendent encounters, T10)
+**Primordials:** `lore/primordials_map.svg` (5 nodes, **pre-v1.4** — now 7 Archaic, T10; regen pending)
 **Husk:** *not yet built*
 
 All maps are **generated** from JSON data in `lore/data/` via `node lore/tools/generate.mjs`. Hand-edits to the SVGs will be overwritten. Edit JSON, regenerate.
@@ -1403,7 +1439,7 @@ Use these terms consistently across docs, UI, and gameplay flavor:
 | Term | Always means | Never confused with |
 |---|---|---|
 | **Gene** | A unit-type form-pattern within a geneline. Adding a gene to your Royal's library enables infinite production. | Egg (one individual), DNA (too scientific), Blueprint (too mechanical) |
-| **Geneline** | A full genetic lineage/faction (24 Greek + 22 Phoenician + 7 Archaic + 5 Coptic) | Gene (single form within a geneline) |
+| **Geneline** | A full genetic lineage/faction (24 Greek + 22 Phoenician + 7 Archaic + 7 Coptic) | Gene (single form within a geneline) |
 | **Egg** | One specific unhatched individual. Single-use. | Larva (mid-incubation), Vyss-egg (generic unformed) |
 | **Vyss-egg** | Royal's generic unformed egg (no gene expression yet) | Egg (specific individual from elsewhere) |
 | **Larva** | Egg mid-incubation (existing term, unchanged) | — |
@@ -1444,13 +1480,13 @@ Use these terms consistently across docs, UI, and gameplay flavor:
 
 ## 16. Open questions for future sessions
 
-1. **Geneline content authoring** — flesh out remaining Greek genelines (κ-π, σ-ψ); design Phoenician dark mirrors; design Archaic Husk genelines; numerically balance Coptic primordials.
+1. **Geneline content authoring** — flesh out remaining Greek genelines (κ-π, σ-ψ); design Phoenician dark mirrors; design Coptic Husk genelines; numerically balance Archaic primordials.
 2. **Battle mechanics v1 spec** — write `BATTLE_MECHANICS_V1.md` locking specific worker behaviors, pheromone parameters, spire types, lane geometry.
 3. **Husk map data** — author `lore/data/husk_map.json` and generate `lore/husk_map.svg`.
-4. **Faction matrix authoring** — define inter-faction relationships at game start (5 Coptic factions: Standing/Shaped/Hungering/Echoing/Turning — who hates whom, who allies).
+4. **Faction matrix authoring** — define inter-faction relationships at game start (the 7 Archaic-primordial factions — Moving / Numbered / Voiced / Gradient / Breathing / Territorial / Seeking, per §7 — who hates whom, who allies).
 5. **Quest authoring framework** — define how quests are procgen-assembled (templates + parameters) vs hand-authored. Authoring must support long-form runs (many more quests needed than a 90-min game).
 6. **AI Hive v2 architecture** — resume after combat rewrite + battle mechanics lock. Strategic layer adds requirements (faction map AI, not just battle AI).
-7. **Coptic primordial unlock conditions** — not just "post-Dark-Core." What exactly makes a Primordial appear? Specific shrines? Reputation thresholds? Ritual requirements?
+7. **Archaic primordial unlock conditions** — not just "post-Dark-Core." What exactly makes a Primordial appear? Specific shrines? Reputation thresholds? Ritual requirements?
 8. **Save system architecture** — long-form tiered runs (up to 60+ hrs for Beyond) REQUIRE bulletproof save/resume. Players will span runs across many sessions. Versioned, reliable, session-friendly.
 9. **Death cost design** — at 8-15 hr Main runs, permadeath is punishing. Partial persistence? Checkpoint-style hive captures? "Soft death" with retry from last home-hive visit? Decide deliberately.
 10. **Content density per layer** — 6 anatomical layers must sustain 2-4 hrs of play each for a Main run. How many nodes, quests, events per layer? How does density scale across Casual → Main → True?
@@ -1465,7 +1501,7 @@ Use these terms consistently across docs, UI, and gameplay flavor:
 
 > *Hivyss is not "everything." It is one attempt at vyss among many. The unused alphabets are the proof.*
 
-The cosmology references 4 alphabets (Coptic, Archaic Greek, Greek, Phoenician) and 58 genelines. Many letters in those alphabets — and many alphabets entirely — are deliberately unused. Each absence is **load-bearing**: the unchosen symbols do narrative work *by not being present*. This is the cosmology's answer to completionism: *refusing to include an alphabet is itself a design statement.*
+The cosmology references 4 alphabets (Coptic, Archaic Greek, Greek, Phoenician) and 60 genelines. Many letters in those alphabets — and many alphabets entirely — are deliberately unused. Each absence is **load-bearing**: the unchosen symbols do narrative work *by not being present*. This is the cosmology's answer to completionism: *refusing to include an alphabet is itself a design statement.*
 
 ### Alphabet usage status (v1.4)
 
@@ -1507,11 +1543,12 @@ This is the cosmology's only concession to existential horror. It is never state
 
 ---
 
-*Document version: 1.6*
-*Captured from design conversations through 2026-04-19.*
+*Document version: 1.7*
+*Captured from design conversations through 2026-04-19; MVP reconciliation 2026-06-04.*
 *Update as design decisions evolve. Mark superseded sections rather than deleting (lore archaeology).*
 
 ### Changelog
+- **v1.7 (2026-06-04)**: **MVP reconciliation** (against `app/docs/mvp/`, the active build slice — `VISION` authoritative). Refreshed §0.3 build-state: **Combat Rewrite Program CLOSED** (was "Phase 9"; 647 tests, data-driven), **2-lane + FX + unit-animation + Elite-signature + Pack-Cohesion (PassiveHandlers)** now **built**, **α Primal (7 units)** shipped as the Phase-0 showcase and the legacy military set **archived → δ** pending re-home, active priority is **MVP Phase 0** (prove α's fight is fun). Added **§0.5 The MVP slice** (scope-down + refinements + the lore-freeze rule) and §0.1/§7 pointers to `app/docs/mvp/`. Added **MVP-status blockquotes** to §8/§9/§11 (built vs scoped vs refined). Fixed stale doc paths (`active/MVP_*` → `mvp/`). **v1.4-leftover fixes** (adjacent, unambiguous — completing the v1.4 Archaic↔Coptic pivot the doc started but left half-applied): geneline count **58 → 60** and **Coptic 5 → 7** (§7/§12/§14/§17); **primordial count 5 → 7** (§0 pitch, §3); faction count **5 → 7 Archaic** (§9/§16); and the recurring **T10 Primordials = Archaic / Husk = Coptic** swap corrected across the elevator pitch (§0), §3 (T7/T10 tier-meaning + civilization-lore + biome-design), §10 (iceberg diagram), and §11/§12/§16. Full-game vision intentionally **preserved** — reconciled to reality, not expanded (lore stays frozen for the MVP). *Remaining v1.4 debt not touched here: old 5-faction proper names (Standing/Shaped/Hungering/Echoing/Turning) still appear in §9/§11 flavor examples; the §7 7-faction names are aspect-derived (Moving/Numbered/…) and a final naming pass is post-MVP.*
 - **v1.6 (2026-06-01)**: **Geneline-name consistency pass.** Renamed two MVP genelines to concrete collective nouns so the four-name set reads cleanly to players: **β Multitudes → β Swarm** (the literary "Multitudes" wasn't familiar; "Swarm" is instantly legible — accepted the minor name==archetype overlap since β is the canonical swarm and the other swarm-leaning genelines carry their own names) and **γ Enduring → γ Fortress** (concrete imagery over the adjective). **α Primal** and **δ Military** unchanged (δ kept broad — "Legion" was rejected as too narrow; the re-homed Roman-flavored δ roster should later de-Romanize to read Military-broad). Updated §6 deviation-tier + §7 roster rows, §6 Phoenician-shadow tables, §8 Elite-doctrine, §9 garrison doctrine. Active MVP source of truth: `app/docs/active/MVP_GENELINES.md`.
 - **v1.5 (2026-05-31)**: **Completed the α→Primal / δ→Military re-home** begun in v1.4 — across sections that still carried stale "α military/Disciplined" language: §4 dark-mirror pairing, §6 legibility + Phoenician-root + deviation-tier rows, §7 shipped-status, §8 Elite-doctrine (+ added a δ "Rank formation" row) + control-surface example, §9 garrison doctrine + visual-architecture. Added the **role-triad** framing to §7 (α **OFFENSE**/rush · β **NUMBERS**/swarm · γ **DEFENSE**/turtle · δ **CONTROL**/range) and re-framed α's Pack Cohesion as *charge-synergy* (a medium aggressive pack, **not** a swarm). Active MVP design source of truth: `app/docs/active/MVP_GENELINES.md`.
 - **v1.4 (2026-04-19)**: **Cosmology pivot — 7 primordials.** Archaic Greek (7 letters) promoted to Primordials at T10 (was Coptic, 5); Coptic (7 letters) demoted to Husk-preserved at T5-7 (was Archaic, 7). This honors real linguistic genealogy (Archaic Greek is older than Coptic) and resolves the 5-vs-7 tension (7 Archaic letters = 7 primordials = 7 Coptic Husk variants, all 1:1 aligned). Primordial aspects rewritten from abstract 5 (Being/Form/Hunger/Echo/Turning) to concrete 7 (Motion/Number/Voice/Gradience/Breath/Territory/Wonder). Faction count 5 → 7 (one per primordial). Reputation tiers 9 → 7 (Favorable + Suspicious collapsed into adjacent tiers). α Alpha retheme from Disciplined Military to Primal/Foundational; δ Delta retheme from Hunters to Disciplined Military (cultural + Phoenician-root fit). σ-χ "Dark Realm bleed candidates" framing removed (those are Greek, Dark Realm is strictly Phoenician). Geneline count 58 → 60 (Husk grows from 5 Coptic to 7 Coptic). §17 The Unchosen dramatically simplified (only Ϣ Shai unused as redundant-Sho variant). Heptagonal Primordials map (was pentagonal). §4 Husk becomes Coptic-flavored monastic preservation; §7 Primordial mechanical theses rewritten for 7 new aspects.

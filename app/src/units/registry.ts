@@ -15,12 +15,14 @@ import { drawBasicBody } from "./renderUtils";
 import { units as starterUnits } from "./normal";
 import { units as alphaUnits } from "./alpha"; // α Primal — the canonical alpha
 import { units as archiveUnits } from "./archive"; // retired legacy "military alpha"
+import { units as workerUnits } from "./worker"; // universal worker caste (Scout)
 
 // All unit modules keyed by unit ID
 const UNITS: Record<string, UnitModule> = {
   ...starterUnits,
   ...alphaUnits,
   ...archiveUnits,
+  ...workerUnits,
 };
 
 // Tier display definitions

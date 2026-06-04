@@ -481,6 +481,9 @@ export class SandboxHUDScene extends Phaser.Scene {
     this.cardRefs.clear();
     const keys = GENELINES[this.activeGeneline] ?? [];
     for (const key of keys) {
+      // Workers (Scouts) aren't roster units — they deploy via the command
+      // buttons (pick Rally/Charge/Retreat → click). Keep them out of the grid.
+      if (UNIT_DEFS[key]?.caste === 'worker') continue;
       const card = createUnitCard(key, {
         preview: this.previewCache.get(key),
         onClick: () => {

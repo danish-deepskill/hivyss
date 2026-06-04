@@ -9,314 +9,31 @@ import { BaseEntity } from '../entities/BaseEntity';
 import { AudioManager } from './AudioManager';
 import { EventBus } from './EventBus';
 import { CombatPipeline } from './CombatPipeline';
-import { updateEffects, applyEffect, hasActiveEffect } from './EffectSystem';
-import { shiftTier, type ResistanceTier } from '../config/combat/resistances';
-import type { CalcAttacker, CalcTarget } from './CombatPipeline';
+import { updateEffects, hasActiveEffect } from './EffectSystem';
 import { setDotDispatcher } from '../config/combat/effects/dispatch';
 import { setStunFxDispatcher, setStaggerFxDispatcher } from '../config/combat/effects/cc';
 import { applyModifiers } from './ModifierSystem';
 import { getResource, addResource } from './ResourceSystem';
-import { runSelectorInRange } from './Targeting';
+import { runSelectorInRange, resolveImpactTarget, signatureWouldWhiff } from './Targeting';
+import {
+  setHealFxDispatcher,
+  setDeathTriggerDispatcher,
+  makeDotDispatcher,
+  dispatchCastFx,
+  dispatchImpactFx,
+} from './CombatDispatch';
+import {
+  applyHealPhase,
+  setAoeRiderAliveAccessor,
+  registerPhase8PostApplyHandlers,
+  registerPhase8ModifyHandlers,
+} from './CombatPhases';
 import { lookupAbility } from '../config/combat/abilities';
 import { PASSIVE_HANDLERS, type PassiveTickEnv } from './PassiveHandlers';
 
-/**
- * Variance + crit modify-phase subscriber. Deterministic by default;
- * opt-in per ability via `AbilityTierStats.variancePct` /
- * `.critChance` / `.critMult`. Read order: variance first, then crit;
- * both compound multiplicatively. Rounds + floors at 1 so downstream
- * subscribers see an integer.
- *
- * The `!stats` guard turns override events (DOT dispatcher, death_bomb)
- * into pass-throughs — they have no tier table to read.
- */
-export function applyVarianceAndCritModify(event: DamageEvent): void {
-  if (event.cancelled) return;
-  const stats = event.ability.tiers?.[event.effectiveTier] ?? event.ability.tiers?.normal;
-  if (!stats) return;
-
-  if (stats.variancePct) {
-    const roll = (Math.random() * 2 - 1) * stats.variancePct;
-    event.finalDamage *= (1 + roll);
-  }
-
-  if (stats.critChance && Math.random() < stats.critChance) {
-    event.finalDamage *= (stats.critMult ?? 2.0);
-    (event as unknown as { _crit?: boolean })._crit = true;
-  }
-
-  event.finalDamage = Math.max(1, Math.round(event.finalDamage));
-}
-
-/**
- * Aura damage modify-phase subscriber. Reads the target's `dmg_taken`
- * modifier stack and folds the result into `event.finalDamage`.
- * Registered AFTER variance/crit — defender-side reduction scales
- * whatever damage the caster-side RNG rolled, crit included.
- */
-export function applyAuraDamageModify(event: DamageEvent): void {
-  if (event.cancelled) return;
-  const modified = applyModifiers(event.target, event.finalDamage, 'dmg_taken');
-  event.finalDamage = Math.round(modified);
-}
-
-/**
- * Terminal modify-phase clamp — every successful hit deals ≥ 1.
- * SINGLE clamping site; do NOT distribute Math.max(1, ...) across
- * subscribers. Registered LAST: no subscriber may come after it, or
- * the invariant unravels. Pinned by phase8.test.ts modify-order pin.
- */
-export function applyFinalDamageFloor(event: DamageEvent): void {
-  if (event.cancelled) return;
-  event.finalDamage = Math.max(1, event.finalDamage);
-}
-
-/**
- * Heal-category pre_apply subscriber. Heals the target by
- * `ability.healAmount`, dispatches heal FX, cancels the event so
- * damage-path subscribers are skipped. Dead targets no-op on the heal
- * but still cancel.
- */
-export function applyHealPhase(event: DamageEvent): void {
-  if (event.cancelled) return;
-  if (event.ability.category !== 'heal') return;
-
-  const amount = event.ability.healAmount ?? 0;
-  const target = event.target as IUnit;
-  if (amount > 0 && !target.dead && typeof target.heal === 'function') {
-    const healed = target.heal(amount);
-    if (healed > 0) {
-      dispatchHealFx(target, healed);
-    }
-  }
-  event.cancelled = true;
-}
-
-// Heal FX dispatcher — module-level singleton set by CombatSystem
-// constructor so applyHealPhase stays pure (Phaser-free testability).
-// Pass the ACTUAL `healed` amount capped by maxHp, not the requested
-// amount — a target at 95/100 healing for 20 shows "+5".
-export type HealFxDispatcher = (target: IUnit, amount: number) => void;
-let _healFxDispatcher: HealFxDispatcher = () => {};
-
-export function setHealFxDispatcher(fn: HealFxDispatcher): void {
-  _healFxDispatcher = fn;
-}
-
-/**
- * Ability impact FX seam (the FX_SYSTEM.md toehold). Fired once per damage
- * event at the impact phase with the ability's `fx` descriptor + hit center +
- * a `magnitude` scalar (e.g. damage; later cohesion for signatures). Default
- * NO-OP keeps the sim deterministic (FX off in tests) — the scene installs the
- * real FxDirector. This is the integration point, NOT the renderer.
- */
-export interface ImpactFxSignal {
-  ability: AbilityDef;
-  x: number;
-  y: number;
-  magnitude: number;
-}
-export type ImpactFxDispatcher = (signal: ImpactFxSignal) => void;
-let _impactFxDispatcher: ImpactFxDispatcher = () => {};
-
-export function setImpactFxDispatcher(fn: ImpactFxDispatcher): void {
-  _impactFxDispatcher = fn;
-}
-
-/**
- * CAST FX seam — fired ONCE per ability cast at the caster (vs the per-hit
- * impact dispatcher). This is where caster-anchored signatures live: Goliath's
- * Stampede shockwave, etc. `magnitude` carries cohesion (0..1) so the visual
- * scales with the herd. No-op default → presentation-only, deterministic.
- */
-export interface CastFxSignal {
-  ability: AbilityDef;
-  x: number;
-  y: number;
-  magnitude: number;
-}
-export type CastFxDispatcher = (signal: CastFxSignal) => void;
-let _castFxDispatcher: CastFxDispatcher = () => {};
-
-export function setCastFxDispatcher(fn: CastFxDispatcher): void {
-  _castFxDispatcher = fn;
-}
-
-export function dispatchHealFx(target: IUnit, amount: number): void {
-  _healFxDispatcher(target, amount);
-}
-
-/**
- * DOT dispatcher factory. Builds the closure CombatSystem registers
- * with `setDotDispatcher` — reads _currentCtx, save-restores
- * `_lastAttacker` around queueAbility + resolveFrame. Save-restore (not
- * set-clear) is mandatory: if a future refactor nests updateEffects
- * inside a resolve frame, set-clear would clobber the outer attacker.
- * Factored so tests can exercise the shape without CombatSystem.
- */
-export interface DotDispatcherHooks {
-  getCurrentCtx(): CombatContext | null;
-  getLastAttacker(): IUnit | null;
-  setLastAttacker(u: IUnit | null): void;
-  queueAbility(
-    attacker: IUnit,
-    target: IUnit,
-    abilityName: string,
-    opts: { baseDamageOverride: number; legacyHitFlavor: HitFlavor },
-  ): void;
-  resolveFrame(): void;
-}
-
-export function makeDotDispatcher(
-  hooks: DotDispatcherHooks,
-): (attacker: unknown, target: unknown, dmg: number, flavor: HitFlavor) => void {
-  return (attacker, target, dmg, flavor) => {
-    const ctx = hooks.getCurrentCtx();
-    if (!ctx) return; // defensive: DOT tick outside a resolve window
-    const prev = hooks.getLastAttacker();
-    const src = (attacker as IUnit | null) ?? (target as IUnit);
-    hooks.setLastAttacker(src);
-    try {
-      hooks.queueAbility(src, target as IUnit, 'override_damage_event', {
-        baseDamageOverride: dmg,
-        legacyHitFlavor: flavor,
-      });
-      hooks.resolveFrame();
-    } finally {
-      hooks.setLastAttacker(prev);
-    }
-  };
-}
-
-/**
- * Apply-effects post_apply subscriber. Reads `event.effects` and calls
- * `applyEffect` for each; forwards `event.attacker` as the ActiveEffect
- * `source` so hooks like knockback.onApply can reach attacker fields.
- *
- * REGISTRATION ORDER: must run AFTER _applyDeathEffectsPhase. Death
- * handler runs first, sets `dead = true` on lethal hits; this
- * subscriber then no-ops on corpses via applyEffect's dead-target guard.
- */
-export function applyEffectsPhase(event: DamageEvent): void {
-  if (event.cancelled) return;
-  const effects = event.effects;
-  if (!effects || effects.length === 0) return;
-  const target = event.target as unknown as Parameters<typeof applyEffect>[0];
-  const source = event.attacker;
-  const knockForce = event.ability.tiers?.[event.effectiveTier]?.knockForce;
-  for (const name of effects) {
-    applyEffect(target, name, { source, appliedTier: event.effectiveTier, knockForce });
-  }
-}
-
-// Death-trigger downstream dispatcher. Closure captures pipeline +
-// alive-roster access; CombatSystem constructor installs it. The
-// closure does NOT call resolveFrame — the outer drain loop handles
-// it (selector-in-subscriber safety rule).
-export type DeathTriggerDispatcher = (dyingUnit: IUnit, deathAbilityName: string) => void;
-let _deathTriggerDispatcher: DeathTriggerDispatcher = () => {};
-
-export function setDeathTriggerDispatcher(fn: DeathTriggerDispatcher): void {
-  _deathTriggerDispatcher = fn;
-}
-
-/**
- * AOE rider post_apply subscriber. Applies `aoeRider.effect` to up to
- * `targetCount` enemies within `radius` of the PRIMARY target (center-
- * to-center). Registered AFTER applyEffectsPhase (primary goes first)
- * and BEFORE applyDeathTriggerPhase (deaths could remove ride targets).
- */
-type AliveListAccessor = () => readonly IUnit[];
-let _getAliveList: AliveListAccessor = () => [];
-
-export function setAoeRiderAliveAccessor(fn: AliveListAccessor): void {
-  _getAliveList = fn;
-}
-
-export function applyAoeRiderPhase(event: DamageEvent): void {
-  if (event.cancelled) return;
-  const rider = event.ability.aoeRider;
-  if (!rider) return;
-  const primary = event.target as IUnit;
-  const allAlive = _getAliveList();
-
-  const secondaries = (allAlive as readonly IUnit[])
-    .filter(e => {
-      if (rider.excludePrimary && e === primary) return false;
-      if (e.side === (event.attacker as IUnit).side) return false;
-      // Same-lane only — AOE spreads within the primary's lane.
-      if (e.lane !== primary.lane) return false;
-      if (e.dead || e.burrowed) return false;
-      // Center-to-center distance.
-      const dist = Math.abs(
-        (e.x + e.unitW / 2) - (primary.x + primary.unitW / 2),
-      );
-      return dist < rider.radius;
-    })
-    .sort((a, b) =>
-      Math.abs(a.x - primary.x) - Math.abs(b.x - primary.x),
-    )
-    .slice(0, rider.targetCount);
-
-  const dmgType = event.ability.dmgType;
-  const pen = dmgType ? (event.attacker as CalcAttacker).penetration?.[dmgType] ?? 0 : 0;
-  for (const t of secondaries) {
-    let appliedTier: ResistanceTier = 'normal';
-    if (dmgType) {
-      const secondaryRes = (t as CalcTarget).resistance?.[dmgType] ?? 'normal';
-      appliedTier = shiftTier(secondaryRes, -pen);
-    }
-    applyEffect(t as Parameters<typeof applyEffect>[0], rider.effect, { appliedTier });
-  }
-}
-
-/**
- * Death-trigger post_apply subscriber — fires at most once per unit
- * death. Asymmetric latch ownership with _applyDeathEffectsPhase:
- * the death-effects subscriber CHECKS `_deathTriggerFired`; this
- * subscriber SETS it. DO NOT move the set below the `!deathAbility`
- * check — every dying unit (not just those with death abilities)
- * must arm the latch so _applyDeathEffectsPhase can bail on event 2+.
- */
-export function applyDeathTriggerPhase(event: DamageEvent): void {
-  if (event.cancelled) return;
-  const target = event.target as IUnit;
-  if (!target.dead) return;
-  if (target._deathTriggerFired) return;
-  target._deathTriggerFired = true;
-  const deathAbilityName = target.deathAbility;
-  if (!deathAbilityName) return;
-  _deathTriggerDispatcher(target, deathAbilityName);
-}
-
-/**
- * post_apply registration order:
- *   1. deathEffects      — death FX + Finding 12 check-only guard
- *   2. applyEffectsPhase — apply queued effects to the target
- *   3. applyAoeRiderPhase — AOE spread for abilities with aoeRider
- *   4. applyDeathTriggerPhase — check-and-set _deathTriggerFired
- * Order is load-bearing; pinned by phase8.test.ts.
- */
-export function registerPhase8PostApplyHandlers(
-  pipeline: CombatPipeline,
-  legacyPostApply: (event: DamageEvent) => void,
-): void {
-  pipeline.on('post_apply', legacyPostApply);
-  pipeline.on('post_apply', applyEffectsPhase);
-  pipeline.on('post_apply', applyAoeRiderPhase);
-  pipeline.on('post_apply', applyDeathTriggerPhase);
-}
-
-/**
- * modify phase order — variance/crit first (attacker-side RNG), aura
- * next (defender scales post-RNG value), floor LAST (terminal clamp).
- * DO NOT register after applyFinalDamageFloor — pinned by phase8.test.ts.
- */
-export function registerPhase8ModifyHandlers(pipeline: CombatPipeline): void {
-  pipeline.on('modify', applyVarianceAndCritModify);
-  pipeline.on('modify', applyAuraDamageModify);
-  pipeline.on('modify', applyFinalDamageFloor); // terminal — DO NOT register after
-}
+// Min gap between hit sounds — a packed herd lands many hits per frame; without
+// this throttle they pile into a buzz. Shared by the category + fitted paths.
+const HIT_SOUND_THROTTLE_MS = 80;
 
 // Consistent damage indicator colors by type
 const DMG_COLORS: DamageColorMap = {
@@ -544,11 +261,19 @@ export class CombatSystem {
       this.pipeline.queueAbility(u, t as IUnit, u.signatureAbility, {});
     }
     if (ability.fx) {
-      _castFxDispatcher({
+      dispatchCastFx({
         ability,
         x: u.x + u.unitW / 2,
         y: u.y + u.unitH / 2,
         magnitude: u.cohesionLevel?.().frac ?? 0,
+      });
+    }
+    // Signature sound — bypasses the herd hit-throttle (cooldown-gated, it's a
+    // hero beat) and swells with cohesion so a massed Stampede lands heavier.
+    if (ability.sfx) {
+      ctx.audio?.playSfx(ability.sfx, {
+        pitch: this._pitchForUnit(u),
+        intensity: u.cohesionLevel?.().frac ?? 0,
       });
     }
   }
@@ -592,6 +317,9 @@ export class CombatSystem {
         const requested = this._pendingSignatureSides.has(u.side) || this._pendingSignatureUnits.has(u.id);
         if (!requested) continue;
         if (!u.canSignature()) continue;
+        // Whiff guard — don't burn a DAMAGE signature's cooldown when no foe is
+        // in range (keeps it ready). signatureWouldWhiff() is pure + unit-tested.
+        if (signatureWouldWhiff(lookupAbility(u.signatureAbility!), u, alive)) continue;
         u.sigCd = u.signatureCooldown;
         if (u.signatureAnim && u.startSignatureAnim) {
           u.startSignatureAnim(); // telegraph → impact fires at the windup peak
@@ -656,8 +384,13 @@ export class CombatSystem {
       // target (attacks AND pushes); its boost lives in the march
       // override so it only applies when there's nothing in range.
       const zone = this._activeCommand(u, zones);
-      const cmd = zone ? zone.kind : null;
-      const effTarget = (cmd === 'rally' || cmd === 'retreat') ? null : target;
+      // Workers (Scouts) are NON-COMBATANT and ignore commands — they just run
+      // forward emitting their OWN zone. (Reading their own zone would idle a
+      // rally-scout on its center / send a retreat-scout backward.) So for a
+      // worker null both `cmd` (→ plain forward march) and the attack target.
+      const isWorker = u.caste === 'worker';
+      const cmd = (isWorker || !zone) ? null : zone.kind;
+      const effTarget = (isWorker || cmd === 'rally' || cmd === 'retreat') ? null : target;
 
       if (effTarget) {
         u.startAttack();
@@ -698,6 +431,10 @@ export class CombatSystem {
           } else {
             this._lastAttacker = u;
             const hitType: HitFlavor = u.range >= 50 ? 'ranged' : 'melee';
+            // Windup-drift fix: commit the hit to the foe LOCKED at swing-start
+            // (so damage matches the lunge), falling back to the current nearest
+            // if it died/left. Pure + unit-tested via resolveImpactTarget().
+            const impactTarget = resolveImpactTarget(u.lockedTarget, effTarget as IUnit, u);
 
             {
               const abilityName = u.defaultAbility!;
@@ -719,7 +456,7 @@ export class CombatSystem {
                 let secondaries: IUnit[];
                 if (ability.chainRange != null) {
                   const cr = ability.chainRange;
-                  const primary = effTarget as IUnit;
+                  const primary = impactTarget;
                   secondaries = (ctx.allAlive as IUnit[])
                     .filter(e =>
                       e !== primary &&
@@ -744,10 +481,10 @@ export class CombatSystem {
                   // roster, so re-filter to the attacker's lane to keep
                   // multi-hit from leaking across the front.
                   secondaries = selectorResults
-                    .filter(e => e !== effTarget && (e as IUnit).lane === u.lane)
+                    .filter(e => e !== impactTarget && (e as IUnit).lane === u.lane)
                     .slice(0, tc - 1) as IUnit[];
                 }
-                const targets = [effTarget as IUnit, ...secondaries];
+                const targets = [impactTarget, ...secondaries];
 
                 // Every-Nth-cast damage doubling via ResourceSystem
                 // castCount. Gated on ability.overchargeEvery.
@@ -791,16 +528,16 @@ export class CombatSystem {
 
                 // Single resolveFrame drains ALL queued events.
                 this.pipeline.resolveFrame();
-                this._playHitSound(audio, hitType);
+                this._playAbilitySound(audio, ability, u, hitType);
               } else {
                 this.pipeline.queueAbility(
                   u,
-                  effTarget,
+                  impactTarget,
                   abilityName,
                   { legacyHitFlavor: hitType },
                 );
                 this.pipeline.resolveFrame();
-                this._playHitSound(audio, hitType);
+                this._playAbilitySound(audio, ability, u, hitType);
               }
             }
             this._lastAttacker = null;
@@ -815,6 +552,9 @@ export class CombatSystem {
           // Start new attack cycle — begin foreswing
           u.foreswingTimer = u.foreswing;
           u._swinging = true;
+          // Lock the target NOW (windup-start) so the hit commits to it; a closer
+          // foe drifting in mid-swing won't steal it. Bases don't move → no lock.
+          u.lockedTarget = effTarget instanceof BaseEntity ? null : (effTarget as IUnit);
         }
       } else {
         // March
@@ -851,9 +591,10 @@ export class CombatSystem {
           u.x += u.facing * spd * 60 * dt;
         }
 
-        // Player unit reaches enemy base — attack it
+        // Player unit reaches enemy base — attack it (workers just clamp + idle)
         if (u.side === 'player' && u.x + u.unitW >= this.worldW - SBW) {
           u.x = this.worldW - SBW - u.unitW;
+          if (isWorker) { /* non-combatant — hold at the line, keep emitting */ } else {
           u.startAttack();
 
           if (u.foreswingTimer > 0) {
@@ -872,11 +613,13 @@ export class CombatSystem {
             u.foreswingTimer = u.foreswing;
             u._swinging = true;
           }
+          }
         }
 
-        // Enemy unit reaches player base — attack it
+        // Enemy unit reaches player base — attack it (workers just clamp + idle)
         if (u.side === 'enemy' && u.x <= SBW) {
           u.x = SBW;
+          if (isWorker) { /* non-combatant — hold at the line, keep emitting */ } else {
           u.startAttack();
 
           if (u.foreswingTimer > 0) {
@@ -900,6 +643,7 @@ export class CombatSystem {
           } else if (u.canAttack() && u.backswingTimer <= 0) {
             u.foreswingTimer = u.foreswing;
             u._swinging = true;
+          }
           }
         }
 
@@ -1021,7 +765,7 @@ export class CombatSystem {
     // FX_SYSTEM.md seam — impact FX (no-op until the scene installs a real
     // FxDirector). Reads the ability's `fx` descriptor + hit center; magnitude
     // = damage for now (signatures will pass cohesion). Presentation-only.
-    _impactFxDispatcher({
+    dispatchImpactFx({
       ability: event.ability,
       x: u.x + u.unitW / 2,
       y: u.y + u.unitH / 2,
@@ -1109,7 +853,7 @@ export class CombatSystem {
   _playHitSound(audio: AudioManager | null, type: HitFlavor | HitSoundType): void {
     if (!audio) return;
     const now = performance.now();
-    if (now - this._lastHitSound < 80) return;
+    if (now - this._lastHitSound < HIT_SOUND_THROTTLE_MS) return;
     this._lastHitSound = now;
     if (type === 'heal') {
       if (now - this._lastHealSound > 500) {
@@ -1121,5 +865,34 @@ export class CombatSystem {
     if (type === 'aoe') audio.aoeHit();
     else if (type === 'ranged') audio.rangedShot();
     else audio.meleeHit();
+  }
+
+  // Basic-attack sound, ability-fitted when the ability names an `sfx` recipe
+  // (jaw/needle/ram), else the category fallback. Shares the herd throttle so a
+  // massed pack doesn't buzz; per-unit timbre rides on body size via pitch.
+  _playAbilitySound(
+    audio: AudioManager | null,
+    ability: AbilityDef,
+    attacker: IUnit,
+    fallback: HitFlavor,
+  ): void {
+    if (!audio) return;
+    // Per-unit voice wins over the ability's default — units sharing an attack
+    // (the whole herd line is on jaw_strike) still sound distinct.
+    const key = attacker.sfx ?? ability.sfx;
+    if (!key) { this._playHitSound(audio, fallback); return; }
+    const now = performance.now();
+    if (now - this._lastHitSound < HIT_SOUND_THROTTLE_MS) return;
+    this._lastHitSound = now;
+    audio.playSfx(key, { pitch: this._pitchForUnit(attacker) });
+  }
+
+  // Body size → voice pitch: small bodies crisp/high, big bodies deep. Spans
+  // well over an octave across the roster (Chitling w16 → Matriarch w40) so size
+  // reads clearly, and the floor sits low enough that the heavies stay distinct
+  // instead of all pinning to the clamp.
+  _pitchForUnit(u: IUnit): number {
+    const ref = 22;
+    return Math.max(0.5, Math.min(1.7, ref / (u.unitW || ref)));
   }
 }

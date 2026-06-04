@@ -7,8 +7,9 @@
 - `app/src/units/CLAUDE.md` — Unit file structure, data-driven unit behavior fields, draw function conventions.
 
 ## Docs Layout (`app/docs/`)
+- `mvp/` — **all MVP design + scope in one folder; start at `README.md`.** `VISION.md` is authoritative (vision · scope · loop · build order); then GENELINES, REQUIREMENTS, ALPHA, MECHANICS_INVENTORY, PHASE0_BUILD. Read this for any MVP work.
 - `reference/` — stable contracts read while working (DESIGN_PATTERNS, COMBAT_REFERENCE, TIER_CONTRACT, UI_ARCHITECTURE, SPRITE_STYLE, ABILITY_TEST_CASES, GAME_DESIGN)
-- `active/` — live program tracking (MECHANICS_ROADMAP, UNIT_LIFECYCLE_*, AI_PLAN, CAPACITY_DESIGN)
+- `active/` — live program tracking (MECHANICS_ROADMAP, UNIT_LIFECYCLE_*, AI_PLAN, CAPACITY_DESIGN, FX_SYSTEM, UNIT_ANIMATION_SYSTEM, SESSION_HANDOFF)
 - `process/` — orchestrator meta (ORCHESTRATOR_RESUME, ORCHESTRATOR_TEMPLATE)
 - `archive/` — completed programs, content historically accurate (COMBAT_REWRITE_*, SANDBOX_OVERHAUL_DESIGN, COMBAT_EXECUTOR_GUIDE)
 

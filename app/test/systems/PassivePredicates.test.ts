@@ -102,12 +102,35 @@ describe('PassivePredicates — lookupPredicate helper', () => {
   });
 });
 
+describe('PassivePredicates — in_phase_2 (Elite enrage)', () => {
+  const predicate = PREDICATE_TABLE.in_phase_2;
+  const u = (hp: number, maxHp: number, phaseThreshold?: number) =>
+    ({ hp, maxHp, phaseThreshold } as unknown as IUnit);
+
+  it('is registered in PREDICATE_TABLE', () => {
+    expect(predicate).toBeDefined();
+    expect(typeof predicate).toBe('function');
+  });
+
+  it('is TRUE at/below the unit\'s own phaseThreshold', () => {
+    expect(predicate(u(40, 100, 0.4))).toBe(true); // exactly at
+    expect(predicate(u(20, 100, 0.4))).toBe(true); // below
+  });
+
+  it('is FALSE above the threshold', () => {
+    expect(predicate(u(60, 100, 0.4))).toBe(false);
+  });
+
+  it('is FALSE when the unit has no phaseThreshold (most units)', () => {
+    expect(predicate(u(10, 100, undefined))).toBe(false);
+  });
+});
+
 describe('PassivePredicates — table completeness pin', () => {
-  it('PREDICATE_TABLE contains exactly the documented Stage 4 inventory', () => {
-    // Inventory pin — adding a new predicate requires updating this
-    // test. Stage 4 ships with one predicate: `hp_below_half`
-    // (Ravager rage).
+  it('PREDICATE_TABLE contains exactly the documented inventory', () => {
+    // Inventory pin — adding a predicate requires updating this. Currently:
+    // `hp_below_half` (Ravager rage) + `in_phase_2` (Elite enrage).
     const keys = Object.keys(PREDICATE_TABLE).sort();
-    expect(keys).toEqual(['hp_below_half']);
+    expect(keys).toEqual(['hp_below_half', 'in_phase_2']);
   });
 });

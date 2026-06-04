@@ -68,6 +68,15 @@ export const PREDICATE_TABLE: Record<string, (u: IUnit) => boolean> = {
    * application.
    */
   hp_below_half: (u: IUnit): boolean => u.hp / u.maxHp <= 0.5,
+
+  /**
+   * Elite phase-2 (enrage). True at/below the unit's OWN `phaseThreshold`
+   * HP fraction — so the threshold is configurable per unit while the
+   * predicate stays param-less (it reads the data off the unit, not a
+   * closure). False if no phaseThreshold.
+   */
+  in_phase_2: (u: IUnit): boolean =>
+    u.phaseThreshold != null && u.hp / u.maxHp <= u.phaseThreshold,
 };
 
 /**

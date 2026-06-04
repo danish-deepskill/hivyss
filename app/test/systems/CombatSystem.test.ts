@@ -33,11 +33,10 @@ import {
   applyVarianceAndCritModify,
   applyFinalDamageFloor,
   applyHealPhase,
-  setHealFxDispatcher,
-  setDeathTriggerDispatcher,
   registerPhase8PostApplyHandlers,
   registerPhase8ModifyHandlers,
-} from '../../src/systems/CombatSystem';
+} from '../../src/systems/CombatPhases';
+import { setHealFxDispatcher, setDeathTriggerDispatcher } from '../../src/systems/CombatDispatch';
 import { applyEffect, updateEffects, hasActiveEffect } from '../../src/systems/EffectSystem';
 import { lookupEffect, hasEffect } from '../../src/config/combat/effects';
 import { setStaggerFxDispatcher } from '../../src/config/combat/effects/cc';
@@ -46,9 +45,9 @@ import { lookupAbility } from '../../src/config/combat/abilities';
 import { UNIT_DEFS } from '../../src/units/registry';
 import { applyModifiers, addModifier, removeModifiersBySource } from '../../src/systems/ModifierSystem';
 import { lookupPredicate } from '../../src/systems/PassivePredicates';
-import { runSelectorInRange } from '../../src/systems/Targeting';
+import { runSelectorInRange, resolveImpactTarget, signatureWouldWhiff } from '../../src/systems/Targeting';
 import { getResource, addResource } from '../../src/systems/ResourceSystem';
-import type { DamageEvent, IUnit, WorldEntity, ComponentTag, PassiveDef } from '../../src/types';
+import type { DamageEvent, IUnit, WorldEntity, ComponentTag, PassiveDef, AbilityDef } from '../../src/types';
 import type { Modifier } from '../../src/systems/ModifierSystem';
 import type { DamageType } from '../../src/config/combat/damageTypes';
 import type { ResistanceTier } from '../../src/config/combat/resistances';
@@ -4148,5 +4147,58 @@ describe('phase9 Batch 1 item 3 — aoeRider', () => {
       const def = UNIT_DEFS[key];
       expect(def.defaultAbility, `${key} should have defaultAbility`).toBeDefined();
     }
+  });
+});
+
+// ------------------------------------------------------------------
+// Windup-drift target-lock: a swing commits to the foe locked at its
+// start, instead of snapping damage to whoever's nearest at impact.
+// ------------------------------------------------------------------
+describe('resolveImpactTarget — windup-drift target-lock', () => {
+  const foe = (over: Partial<IUnit> = {}): IUnit =>
+    ({ dead: false, burrowed: false, side: 'enemy', lane: 0, ...over } as IUnit);
+  const attacker = foe({ side: 'player' });
+
+  it('commits to the locked foe when it is still valid (a closer foe drifted in)', () => {
+    const locked = foe();
+    const nearest = foe();
+    expect(resolveImpactTarget(locked, nearest, attacker)).toBe(locked);
+  });
+
+  it('falls back to nearest when the locked foe died or burrowed', () => {
+    const nearest = foe();
+    expect(resolveImpactTarget(foe({ dead: true }), nearest, attacker)).toBe(nearest);
+    expect(resolveImpactTarget(foe({ burrowed: true }), nearest, attacker)).toBe(nearest);
+  });
+
+  it('falls back when the locked unit left the lane or is friendly', () => {
+    const nearest = foe();
+    expect(resolveImpactTarget(foe({ lane: 1 }), nearest, attacker)).toBe(nearest);
+    expect(resolveImpactTarget(foe({ side: 'player' }), nearest, attacker)).toBe(nearest);
+  });
+
+  it('falls back to nearest when there is no lock', () => {
+    const nearest = foe();
+    expect(resolveImpactTarget(null, nearest, attacker)).toBe(nearest);
+    expect(resolveImpactTarget(undefined, nearest, attacker)).toBe(nearest);
+  });
+});
+
+// ------------------------------------------------------------------
+// Signature whiff guard: a DAMAGE signature with no foe in range must
+// not consume its cooldown (it stays ready instead of misfiring).
+// ------------------------------------------------------------------
+describe('signatureWouldWhiff — no-target cooldown guard', () => {
+  const caster = ({
+    side: 'player', lane: 0, x: 100, unitW: 20, range: 70, dead: false, burrowed: false,
+  } as unknown as IUnit);
+
+  it('a DAMAGE signature with no foes in range whiffs (cooldown must be spared)', () => {
+    expect(signatureWouldWhiff(lookupAbility('stampede'), caster, [])).toBe(true);
+  });
+
+  it('a non-damage (utility/buff) signature is never whiff-blocked', () => {
+    const utility = { ...lookupAbility('stampede'), category: 'utility' } as AbilityDef;
+    expect(signatureWouldWhiff(utility, caster, [])).toBe(false);
   });
 });

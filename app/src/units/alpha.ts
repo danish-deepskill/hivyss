@@ -1,9 +1,10 @@
-// α Primal — MVP Phase-0 showcase roster (GENELINE_ALPHA.md).
-// Pyramid (8 units): T0 Chitling·Goreling · T1 Hornshell·Goretusk·Quillback(ranged) ·
-// T2 = 2 Elites (Goliath, Maulhorn) · T3 = the Royal (Matriarch).
-// Built: Pack Cohesion (hook) + both Elite signatures (Goliath Stampede, Maulhorn
-// Ram, each w/ FX + body animation) + Quillback (α's ranged anti-air) + Goretusk
-// tight-wedge cohesion (sharper payoff, tighter radius) + Goliath's cohesion-
+// α Primal — MVP Phase-0 showcase roster (docs/mvp/ALPHA.md).
+// Pyramid (7 = the base skeleton): T0 Chitling·Goreling · T1 Hornshell·Quillback(ranged)
+// · T2 = 2 Elites (Goliath, Maulhorn) · T3 = the Royal (Matriarch). 4 soldiers + 2
+// Elites + 1 Royal. (Goretusk's tight-wedge cohesion was cut — its role overlapped
+// the baseline cohesion + Goliath's amplifier; α trimmed to 4 soldiers per the budget.)
+// Built: Pack Cohesion (hook) + both Elite signatures (Goliath Stampede, Maulhorn Ram,
+// each w/ FX + body animation) + Quillback (α's ranged anti-air) + Goliath's cohesion-
 // amplifier aura. To build: the Matriarch's Royal ultimate (needs Royal system).
 import type { UnitDef, UnitModule, PassiveDef, CohesionConfig } from "../types";
 import { PALETTES } from "../config/Palettes";
@@ -12,7 +13,6 @@ import drawChitling from "../draws/alpha/chitling";
 import drawGoreling from "../draws/alpha/goreling";
 import drawHornshell from "../draws/alpha/hornshell";
 import drawQuillback from "../draws/alpha/quillback";
-import drawGoretusk from "../draws/alpha/goretusk";
 import drawMaulhorn from "../draws/alpha/maulhorn";
 import drawGoliath from "../draws/alpha/goliath";
 import drawMatriarch from "../draws/alpha/matriarch";
@@ -92,6 +92,7 @@ const gorelingDef = aDef({
   incubation: 4,
   caste: "soldier",
   defaultAbility: "jaw_strike",
+  sfx: "gore", // a charger's rough, wet chomp — distinct from Chitling's snip
   passives: [cohesion()],
 });
 
@@ -117,6 +118,7 @@ const hornshellDef = aDef({
   incubation: 5,
   caste: "soldier",
   defaultAbility: "jaw_strike",
+  sfx: "clack", // a heavy shell-tank's hard chitin tok
   passives: [cohesion()],
 });
 
@@ -148,37 +150,6 @@ const quillbackDef = aDef({
   passives: [cohesion()],
 });
 
-const goretuskDef = aDef({
-  name: "Goretusk",
-  ico: "\u{1FAB3}",
-  hp: 150,
-  atk: 36,
-  spd: 1.6,
-  range: 22,
-  atkRate: 0.9,
-  cost: 80,
-  cap: 3,
-  reward: 36,
-  w: 24,
-  h: 18,
-  trait: "goretusk",
-  role: "dps",
-  desc: "Wedge",
-  route: "land",
-  attackRange: "melee",
-  tier: 1,
-  incubation: 9,
-  caste: "soldier",
-  defaultAbility: "jaw_strike",
-  // T1 "attack with a twist" (TIER_CONTRACT §2): the geneline cohesion hook,
-  // SHARPENED into a tight advancing wedge. Narrow radius (45 vs the default
-  // 60) but higher payoff per ally (+15% vs +10%, up to +60% atk in a full
-  // clump). A concentrated knot hits disproportionately hard — and is the
-  // juiciest AOE target. The tight-vs-spread tension, dialed up. Pure data,
-  // no custom logic — exactly the T1 budget.
-  passives: [cohesion({ radius: 45, perAlly: 15 })],
-});
-
 const maulhornDef = aDef({
   name: "Maulhorn",
   ico: "\u{1F982}",
@@ -201,6 +172,7 @@ const maulhornDef = aDef({
   incubation: 7,
   caste: "elite",
   defaultAbility: "jaw_strike",
+  sfx: "gore", // bruiser's basic bite is a heavy gore (Ram Charge is its own sound)
   // Elite signature — a hard ram-charge with the roster's biggest knockback
   // (see blunt.ts). Uses the `ram` motion (crouch → flat thrust → recoil
   // bounce), distinct from Goliath's forward-settling `charge`.
@@ -208,7 +180,13 @@ const maulhornDef = aDef({
   signatureCooldown: 6,
   signatureAnim: ram({ thrust: 0.55, recoil: 0.25 }),
   signatureAnimPhases: { windup: 0.15, active: 0.1, recover: 0.3 },
-  passives: [cohesion()],
+  // Phase-2: a cornered bruiser goes berserk near death (enrage modifiers below).
+  phaseThreshold: 0.4,
+  passives: [
+    cohesion(),
+    { kind: "self_modifier", stat: "atk", type: "percent", value: 50, condition: "in_phase_2" },
+    { kind: "self_modifier", stat: "atkRate", type: "percent", value: 40, condition: "in_phase_2" },
+  ],
 });
 
 // Goliath — α's apex ELITE (T2): the herd-anchor with the player-triggered
@@ -248,6 +226,8 @@ const goliathDef = aDef({
   // that it AMPLIFIES the pack: an aura that adds +cohesion_perAlly to nearby
   // allies (the cohesion handler reads perAlly through modifiers), so the
   // anchor doesn't just gather the herd — it makes the herd hit harder.
+  // Phase-2: the wounded anchor digs in near death (enrage modifiers below).
+  phaseThreshold: 0.5,
   passives: [
     cohesion({ radius: 90 }),
     {
@@ -257,6 +237,8 @@ const goliathDef = aDef({
       value: 5,
       range: 100,
     },
+    { kind: "self_modifier", stat: "atk", type: "percent", value: 40, condition: "in_phase_2" },
+    { kind: "self_modifier", stat: "atkRate", type: "percent", value: 30, condition: "in_phase_2" },
   ],
 });
 
@@ -295,7 +277,6 @@ export const units: Record<string, UnitModule> = {
   goreling: { def: gorelingDef, draw: drawGoreling },
   hornshell: { def: hornshellDef, draw: drawHornshell },
   quillback: { def: quillbackDef, draw: drawQuillback },
-  goretusk: { def: goretuskDef, draw: drawGoretusk },
   maulhorn: { def: maulhornDef, draw: drawMaulhorn },
   goliath: { def: goliathDef, draw: drawGoliath },
   matriarch: { def: matriarchDef, draw: drawMatriarch },

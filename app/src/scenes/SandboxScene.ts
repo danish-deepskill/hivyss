@@ -13,7 +13,8 @@ import { resolveColors } from '../config/Palettes';
 import { Unit, resetUid } from '../entities/Unit';
 import { BaseStructure } from '../entities/BaseStructure';
 import { BaseEntity } from '../entities/BaseEntity';
-import { CombatSystem, setCastFxDispatcher } from '../systems/CombatSystem';
+import { CombatSystem } from '../systems/CombatSystem';
+import { setCastFxDispatcher } from '../systems/CombatDispatch';
 import { FxDirector } from '../systems/FxDirector';
 import { registerCoreFx } from '../systems/FxRenderers';
 import { EventBus } from '../systems/EventBus';
@@ -452,7 +453,12 @@ export class SandboxScene extends Phaser.Scene {
     // pans the camera (ViewportController) / deletes placements.
     if (this.selectedPheromone !== null && !pointer.rightButtonDown()) {
       if (!this.isValidPlacementForPointer(pointer.worldX)) return;
-      this.placePheromone(this.selectedPheromone, pointer.worldX, pointer.worldY);
+      // Normal click deploys a Scout that carries the command (the real path).
+      // Shift+click drops a free static zone instead — a debug convenience for
+      // isolating zone tuning from scout behaviour.
+      const debugStatic = (pointer.event as MouseEvent | undefined)?.shiftKey === true;
+      if (debugStatic) this.placePheromone(this.selectedPheromone, pointer.worldX, pointer.worldY);
+      else this.deployScout(this.selectedPheromone, pointer.worldX, pointer.worldY);
       return;
     }
 
@@ -560,6 +566,38 @@ export class SandboxScene extends Phaser.Scene {
       side: this.sideForX(x),
       lane: this.laneForY(y),
       remaining: def.duration,
+    });
+    this.drawPheromoneZones();
+  }
+
+  /**
+   * Deploy a Scout (worker) carrying `kind` at world-(x, y): a fast, fragile,
+   * NON-combatant that runs forward emitting a MOBILE pheromone zone bound to
+   * it. Kill the Scout → the command dies with it (update() tracks + culls the
+   * owner-zone). This is the real, vulnerable command path that replaces the
+   * old free instant click-zone. Live spawn — running only.
+   */
+  private deployScout(kind: PheromoneKind, x: number, y: number): void {
+    if (!this.running) return;
+    const side = this.sideForX(x);
+    const lane = this.laneForY(y);
+    const baseDef = side === 'enemy' ? ENEMY_DEFS['escout'] : UNIT_DEFS['scout'];
+    if (!baseDef) return;
+
+    const scout = new Unit(this, { ...baseDef, _key: 'scout' }, side, x, lane);
+    scout.primary = PHEROMONE_DEFS[kind].color; // tint the scout to its command
+    scout.setDepth(60 + lane);
+    this.units.push(scout);
+
+    const pdef = PHEROMONE_DEFS[kind];
+    this.pheromoneZones.push({
+      kind,
+      x: scout.x + scout.unitW / 2,
+      radius: pdef.radius,
+      side,
+      lane,
+      remaining: pdef.duration, // unused for owner-zones (culled on scout death)
+      ownerUnitId: scout.id,
     });
     this.drawPheromoneZones();
   }
@@ -838,10 +876,22 @@ export class SandboxScene extends Phaser.Scene {
     // Pheromone zones — decay then drop expired BEFORE resolve reads
     // them (resolve only READS zones). Redraw on any change.
     if (this.pheromoneZones.length > 0) {
-      const before = this.pheromoneZones.length;
-      for (const z of this.pheromoneZones) z.remaining -= dt;
-      this.pheromoneZones = this.pheromoneZones.filter(z => z.remaining > 0);
-      if (this.pheromoneZones.length !== before) this.drawPheromoneZones();
+      let changed = false;
+      this.pheromoneZones = this.pheromoneZones.filter((z) => {
+        if (z.ownerUnitId != null) {
+          // Mobile worker-zone: track the Scout each frame; the command dies
+          // with it (cull when the owner is dead/gone).
+          const owner = this.units.find((u) => u.id === z.ownerUnitId && !u.dead);
+          if (!owner) { changed = true; return false; }
+          const nx = owner.x + owner.unitW / 2;
+          if (nx !== z.x || owner.lane !== z.lane) { z.x = nx; z.lane = owner.lane; changed = true; }
+          return true;
+        }
+        z.remaining -= dt;
+        if (z.remaining <= 0) { changed = true; return false; }
+        return true;
+      });
+      if (changed) this.drawPheromoneZones();
     }
 
     this.combat.resolve(
