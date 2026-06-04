@@ -5,11 +5,13 @@ export interface Chamber {
   def: UnitDef;
   remaining: number;
   total: number;
+  lane: number; // lane this unit hatches into — captured at queue (deploy) time
 }
 
 export interface HatchedUnit {
   key: string;
   def: UnitDef;
+  lane: number;
 }
 
 export const START_CHAMBERS = 6;
@@ -32,12 +34,14 @@ export class IncubationManager {
     this.larvaTimer = 0;
   }
 
-  /** Queue a unit into the first empty unlocked chamber. Consumes one larva. Returns chamber index or -1 if full/no larvae. */
-  queue(key: string, def: UnitDef): number {
+  /** Queue a unit into the first empty unlocked chamber. Consumes one larva. The
+   *  unit hatches into `lane` (captured now, at deploy time). Returns chamber
+   *  index or -1 if full/no larvae. */
+  queue(key: string, def: UnitDef, lane = 0): number {
     if (this.larvaCount <= 0) return -1;
     for (let i = 0; i < this.numChambers; i++) {
       if (this.chambers[i] === null) {
-        this.chambers[i] = { key, def, remaining: def.incubation, total: def.incubation };
+        this.chambers[i] = { key, def, remaining: def.incubation, total: def.incubation, lane };
         this.larvaCount--;
         return i;
       }
@@ -84,7 +88,7 @@ export class IncubationManager {
 
       c.remaining -= dt;
       if (c.remaining <= 0) {
-        hatched.push({ key: c.key, def: c.def });
+        hatched.push({ key: c.key, def: c.def, lane: c.lane });
         this.chambers[i] = null;
       }
     }

@@ -42,8 +42,8 @@ export class WorldScene extends Phaser.Scene {
     this.registry.set('eventBus', this.gm.events);
 
     // Subscribe to UI action events (MenuUIScene emits these)
-    const onDeploy = (evt: { key: string }) => {
-      const result = this.gm.playerSpawn(evt.key);
+    const onDeploy = (evt: { key: string; lane: number }) => {
+      const result = this.gm.playerSpawn(evt.key, evt.lane);
       if (result.message) this.gm.events.emit('logMessage', { message: result.message });
     };
     const onAbility = (evt: { key: string }) => {

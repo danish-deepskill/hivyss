@@ -69,6 +69,9 @@ export class GameManager {
   // combat.resolve so own-side units obey the painted lane commands.
   pheromoneZones: PheromoneZone[] = [];
 
+  // Round-robin lane cursor for wave/AI enemy spawns so both lanes populate.
+  private _enemyLaneCursor = 0;
+
   // Game state
   running: boolean;
   won: string | null;
@@ -231,7 +234,7 @@ export class GameManager {
     // Incubation — hatch ready units
     const hatched = this.incubation.update(dt);
     for (const h of hatched) {
-      this.createUnit(h.key, 'player', h.def, this.SBW + 2);
+      this.createUnit(h.key, 'player', h.def, this.SBW + 2, h.lane);
     }
     this.playerHive.cocoons.update(dt, this.incubation.chambers, this.incubation.numChambers);
     this.playerHive.larvae.update(dt, this.incubation.larvaCount);
@@ -331,7 +334,7 @@ export class GameManager {
     }
   }
 
-  playerSpawn(key: string): SpawnResult {
+  playerSpawn(key: string, lane = 0): SpawnResult {
     const def = UNIT_DEFS[key];
     if (!def) return { success: false, message: '' };
     if (!this.economy.canAfford(def.cost)) {
@@ -350,7 +353,7 @@ export class GameManager {
     this.economy.spend(def.cost);
     // Capture larva position before consuming it
     const larvaPos = this.playerHive.larvae.consumeLarva(this.incubation.larvaCount);
-    const chamberIdx = this.incubation.queue(key, def);
+    const chamberIdx = this.incubation.queue(key, def, lane);
     if (chamberIdx >= 0) {
       this.playerHive.cocoons.setCocoonPosition(chamberIdx, larvaPos.x, larvaPos.y);
     }
@@ -375,11 +378,10 @@ export class GameManager {
       scaledDef = { ...def, hp: Math.ceil(def.hp * scale), atk: Math.ceil(def.atk * scale) };
     }
 
-    // TEMP single-lane: the real battle's 2-lane deploy/lane-switch UX isn't built
-    // yet, so enemies spawn on lane 0 to match player hatches — a clean head-to-head
-    // instead of an unopposed second lane. Restore round-robin across both lanes
-    // once the 2-lane control UI lands.
-    this.createUnit(key, 'enemy', scaledDef, this.worldW - this.SBW - def.w - 2, 0);
+    // Round-robin enemies across both lanes so the front splits across the field.
+    const lane = this._enemyLaneCursor;
+    this._enemyLaneCursor ^= 1;
+    this.createUnit(key, 'enemy', scaledDef, this.worldW - this.SBW - def.w - 2, lane);
   }
 
   createUnit(key: string, side: Side, def: UnitDef, x: number, lane = 0): void {

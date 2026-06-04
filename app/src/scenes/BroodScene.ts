@@ -16,6 +16,9 @@ const RUN_DECK_SIZE = 3;
 // geneline picker lands, these become the player's CHOSEN geneline + its Royal.
 const RUN_GENELINE = 'alpha';
 const RUN_ROYAL = 'matriarch';
+// Starting brood is capped to low tiers — you begin with fodder/soldiers and
+// ACQUIRE the higher-tier Elites over the run (VISION: start thin, roster grows).
+const RUN_MAX_TIER = 1;
 
 interface BroodSceneData {
   mode?: 'run';
@@ -53,11 +56,14 @@ export class BroodScene extends Phaser.Scene {
     this.runMode = data?.runMode || 'permadeath';
 
     if (this.isRunMode) {
-      // Run mode: pick from the geneline's non-Royal vyssids (soldiers + elites);
-      // the Royal keystone is auto-prepended at START RUN below.
+      // Run mode: pick from the geneline's low-tier (≤ RUN_MAX_TIER) non-Royal
+      // vyssids. The Royal keystone is auto-prepended at START RUN below; Elites
+      // and higher tiers are acquired over the run, not picked at the start.
       this.pool = Object.keys(UNIT_DEFS).filter(k => {
         const def = UNIT_DEFS[k];
-        return def.geneline === RUN_GENELINE && def.caste !== 'royal';
+        return def.geneline === RUN_GENELINE
+          && def.caste !== 'royal'
+          && (def.tier as number) <= RUN_MAX_TIER;
       });
       this.deckSize = Math.min(RUN_DECK_SIZE, this.pool.length);
     } else {

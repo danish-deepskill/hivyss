@@ -39,6 +39,13 @@ export class MenuUIScene extends Phaser.Scene {
   private eliteSlotBtns: HTMLButtonElement[] = [];
   private eliteSlots: EliteSlot[] = [];
 
+  // Active deploy lane (0 = top, 1 = bottom). Units hatch into this lane;
+  // Shift+deploy sends ONE unit to the other lane (a sticky toggle + override —
+  // the RTS rally-point model). Tab flips the active lane.
+  private activeLane = 0;
+  private shiftHeld = false; // Shift held → highlight previews the cross-send lane
+  private leftArrows: HTMLElement[] = []; // ▲/▼ active-lane indicator + switch control (left edge)
+
   // Enemy HUD
   private enemyBar!: HTMLElement | null;
   private enemyNectarLbl!: HTMLElement;
@@ -82,19 +89,28 @@ export class MenuUIScene extends Phaser.Scene {
     panel.appendChild(this.buildAbilities());
     panel.appendChild(this.buildLog());
 
+    outer.appendChild(this.buildLaneIndicator());
     outer.appendChild(panel);
     this.add.dom(640, 360, outer);
+    this.refreshLaneHighlight(); // light both the HUD toggle + the left arrows
 
-    // Keyboard shortcuts: 1-9, 0 = slots 1-10
+    // Keyboard: Tab flips the active lane; 1-9/0 deploy slots 1-10 into the
+    // active lane (Shift+digit → the other lane, a one-off cross-send). Uses
+    // e.code so Shift+1 still reads as digit 1 (not '!'). Holding Shift previews
+    // the cross-send lane on the highlight via _trackShift.
+    this.input.keyboard!.addCapture('TAB');
     this.input.keyboard!.on('keydown', (e: KeyboardEvent) => {
-      const k = e.key;
+      this._trackShift(e.shiftKey);
+      if (e.code === 'Tab') { e.preventDefault(); this.setActiveLane(1 - this.activeLane); return; }
       let idx = -1;
-      if (k >= '1' && k <= '9') idx = parseInt(k) - 1;
-      else if (k === '0') idx = 9;
+      if (e.code >= 'Digit1' && e.code <= 'Digit9') idx = parseInt(e.code.slice(5)) - 1;
+      else if (e.code === 'Digit0') idx = 9;
       if (idx >= 0 && idx < this.deckKeys.length) {
-        this.eventBus.emit('deployUnit', { key: this.deckKeys[idx] });
+        const lane = e.shiftKey ? 1 - this.activeLane : this.activeLane;
+        this.eventBus.emit('deployUnit', { key: this.deckKeys[idx], lane });
       }
     });
+    this.input.keyboard!.on('keyup', (e: KeyboardEvent) => this._trackShift(e.shiftKey));
 
     // Listen for events from GameManager
     this.logListener = (data) => { this.logTxt.textContent = data.message; };
@@ -328,9 +344,11 @@ export class MenuUIScene extends Phaser.Scene {
     this.deckKeys.forEach(key => {
       if (!UNIT_DEFS[key]) return;
 
-      const div = createUnitCard(key, {
-        preview: previews[key],
-        onClick: () => this.eventBus.emit('deployUnit', { key }),
+      const div = createUnitCard(key, { preview: previews[key] });
+      // Read Shift off the click itself → cross-send to the other lane.
+      div.addEventListener('click', (ev) => {
+        const lane = (ev as MouseEvent).shiftKey ? 1 - this.activeLane : this.activeLane;
+        this.eventBus.emit('deployUnit', { key, lane });
       });
 
       slots.appendChild(div);
@@ -361,6 +379,48 @@ export class MenuUIScene extends Phaser.Scene {
 
   // Elite signature trigger row — one button per live player Elite. Hidden when
   // none are out. Click fires THAT Elite's signature (emits `triggerSignature`).
+  private setActiveLane(lane: number): void {
+    this.activeLane = lane;
+    this.refreshLaneHighlight();
+  }
+
+  // Shift held → the highlight previews the cross-send lane (the deploy target).
+  private _trackShift(held: boolean): void {
+    if (this.shiftHeld === held) return;
+    this.shiftHeld = held;
+    this.refreshLaneHighlight();
+  }
+
+  // Light the lane the NEXT deploy will go to (active lane, or its opposite while
+  // Shift is held) on the left-edge arrows.
+  private refreshLaneHighlight(): void {
+    const shown = this.shiftHeld ? 1 - this.activeLane : this.activeLane;
+    this.leftArrows.forEach((a, i) => {
+      const on = i === shown;
+      a.style.color = on ? '#a0e070' : '#33402f';
+      a.style.opacity = on ? '1' : '0.3';
+      a.style.transform = on ? 'scale(1.3)' : 'scale(1)';
+    });
+  }
+
+  // Active-lane indicator AND control, pinned to the LEFT of the screen (where
+  // your base + freshly-hatched units are). ▲ = top lane, ▼ = bottom; the active
+  // (or Shift-previewed) one lights up and scales. Click an arrow to switch lanes
+  // (Tab also flips it). Replaces the old bottom-HUD toggle row.
+  private buildLaneIndicator(): HTMLElement {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'position:absolute; left:10px; top:30%; display:flex; flex-direction:column; gap:64px; pointer-events:none;';
+    this.leftArrows = ['▲', '▼'].map((glyph, lane) => {
+      const a = document.createElement('div');
+      a.textContent = glyph;
+      a.style.cssText = 'font-size:34px; line-height:1; text-shadow:0 0 5px #000; cursor:pointer; pointer-events:auto; transition:opacity .12s, color .12s, transform .12s;';
+      a.addEventListener('click', () => this.setActiveLane(lane));
+      wrap.appendChild(a);
+      return a;
+    });
+    return wrap;
+  }
+
   // Pheromone command row (Rally / Charge / Retreat). Interim delivery: clicking
   // casts the command onto the player army's front (GameManager.castPheromone);
   // click-to-target + Scout deposit-fade is the deferred upgrade (VISION §5).

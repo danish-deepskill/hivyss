@@ -17,7 +17,7 @@ export interface GameEvents {
   baseHit: { side: 'player' | 'enemy'; damage: number };
   gameOver: { winner: 'player' | 'enemy' };
   // UI action events (MenuUIScene → WorldScene)
-  deployUnit: { key: string };
+  deployUnit: { key: string; lane: number };
   useAbility: { key: string };
   cancelIncubation: { index: number };
   triggerSignature: { unitId: number };
