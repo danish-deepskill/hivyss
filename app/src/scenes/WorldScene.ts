@@ -1,12 +1,6 @@
 import Phaser from 'phaser';
-import { DEFAULT_WORLD_W, H } from '../config/Constants';
-import { BG_THEMES } from '../config/BackgroundDefs';
-import { LANE } from '../config/Layout';
-import { getGroundY } from '../config/RouteMatrix';
-// Ground-field top = the UPPER lane's ground, so the filled ground spans
-// BOTH lanes (lane 0 stands on the top edge, lane 1 on the field below).
-// LANE.land.groundY is now the gap *between* the two lanes (the divider).
-const GND = getGroundY('land', 0);
+import { DEFAULT_WORLD_W } from '../config/Constants';
+import { drawBiomeBackground } from './BiomeBackground';
 import { ABILITY_DEFS } from '../config/AbilityDefs';
 import { GameManager } from '../systems/GameManager';
 import { capUsed, MAX_CAPACITY } from '../systems/Capacity';
@@ -18,7 +12,6 @@ interface WorldSceneData {
   deck: string[];
   startWave: number;
   worldW?: number;
-  theme?: string;
   customWaves?: WaveDef[];
   runBuffs?: RunBuff[];
   hiveProfile?: HiveProfile;
@@ -28,7 +21,6 @@ interface WorldSceneData {
 export class WorldScene extends Phaser.Scene {
   gm!: GameManager;
   private worldW: number = DEFAULT_WORLD_W;
-  private theme: string = 'random';
   private viewport!: ViewportController;
 
   constructor() {
@@ -37,7 +29,6 @@ export class WorldScene extends Phaser.Scene {
 
   create(data: WorldSceneData): void {
     this.worldW = data.worldW ?? DEFAULT_WORLD_W;
-    this.theme = data.theme ?? 'random';
 
     this.drawBackground();
 
@@ -182,93 +173,10 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private drawBackground(): void {
-    const ww = this.worldW;
-    const bg: Phaser.GameObjects.Graphics = this.add.graphics();
-
-    const themeKeys = Object.keys(BG_THEMES);
-    const picked = this.theme === 'random'
-      ? themeKeys[Math.floor(Math.random() * themeKeys.length)]
-      : this.theme;
-    const t = BG_THEMES[picked] ?? BG_THEMES.day;
-
-    // Sky — gradient from top to horizon
-    const skySteps = 12;
-    const stepH = Math.ceil(GND / skySteps);
-    for (let i = 0; i < skySteps; i++) {
-      const frac = i / (skySteps - 1);
-      const r = ((t.sky >> 16) & 0xff) + (((t.skyLow >> 16) & 0xff) - ((t.sky >> 16) & 0xff)) * frac;
-      const g2 = ((t.sky >> 8) & 0xff) + (((t.skyLow >> 8) & 0xff) - ((t.sky >> 8) & 0xff)) * frac;
-      const b = (t.sky & 0xff) + ((t.skyLow & 0xff) - (t.sky & 0xff)) * frac;
-      bg.fillStyle((Math.round(r) << 16) | (Math.round(g2) << 8) | Math.round(b));
-      bg.fillRect(0, i * stepH, ww, stepH + 1);
-    }
-
-    // Stars (night only)
-    if (t.stars) {
-      bg.fillStyle(0xffffff, 0.15);
-      for (let i = 0; i < 200; i++) {
-        bg.fillRect((i * 137.5) % ww, (i * 73) % (GND - 20), 1, 1);
-      }
-    }
-
-    // Distant mountains
-    bg.fillStyle(t.mtn);
-    const mtnStep: number = 130;
-    const mtnCount: number = Math.ceil(ww / mtnStep) + 1;
-    for (let i = 0; i < mtnCount; i++) {
-      bg.beginPath();
-      bg.moveTo(i * mtnStep, GND);
-      bg.lineTo(i * mtnStep + 90, GND - 70);
-      bg.lineTo(i * mtnStep + 180, GND);
-      bg.closePath();
-      bg.fillPath();
-    }
-
-    // Ground
-    bg.fillStyle(t.ground);
-    bg.fillRect(0, GND, ww, H - GND);
-    bg.fillStyle(t.groundTop);
-    bg.fillRect(0, GND, ww, 8);
-
-    // Ground texture
-    bg.lineStyle(1, t.groundTex);
-    for (let i = 0; i < ww; i += 14) {
-      bg.beginPath();
-      bg.moveTo(i, GND + 2);
-      bg.lineTo(i + 7, GND + 6);
-      bg.strokePath();
-    }
-
-    // Lane divider — faint dashed line between the upper and lower lanes
-    const laneDivY = LANE.land.groundY;
-    bg.lineStyle(1, 0xffffff, 0.05);
-    for (let x = 0; x < ww; x += 28) {
-      bg.lineBetween(x, laneDivY, x + 14, laneDivY);
-    }
-
-    // Air lane indicator — faint dashed line in the sky
-    const airY = LANE.air.groundY;
-    bg.lineStyle(1, 0xffffff, 0.06);
-    for (let x = 0; x < ww; x += 30) {
-      bg.lineBetween(x, airY, x + 15, airY);
-    }
-
-    // Tunnel lane indicator — dark strip below ground
-    const tunY = LANE.tunnel.groundY;
-    bg.fillStyle(0x000000, 0.15);
-    bg.fillRect(0, tunY - 10, ww, 25);
-    bg.lineStyle(1, 0x604020, 0.2);
-    for (let x = 0; x < ww; x += 20) {
-      bg.lineBetween(x, tunY, x + 10, tunY);
-    }
-
-    // Midline marker
-    bg.lineStyle(1, 0xffffff, 0.06);
-    for (let y = GND - 10; y < GND; y += 12) {
-      bg.beginPath();
-      bg.moveTo(ww / 2, y);
-      bg.lineTo(ww / 2, Math.min(y + 4, GND));
-      bg.strokePath();
-    }
+    // Shared biome landscape (sky → surface → underground) — the same 2.5D
+    // cross-section the sandbox uses, so the real battle and the sandbox match.
+    // Biome is α's Sun Carapace for now (runs are α-only); it'll derive from the
+    // node/zone when the geneline picker lands.
+    drawBiomeBackground(this, 'sunCarapace', this.worldW);
   }
 }
