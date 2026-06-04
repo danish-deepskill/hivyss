@@ -51,6 +51,28 @@ The 2s are **lean capacity**, not a sacred number — keep the control surface t
 ### 2.1 In-battle hive maturation [LEAN]
 The captured/young hive **matures through 3-4 discrete phases** during a battle (RTS tech-tiers): e.g. Phase 1 fodder only → Phase 2 unlock Elites → Phase 3 the Royal's ultimate. **Phases advance by player investment** (spend larva/nectar to tech up) — the classic *tech-up vs pump-units* decision. (Avoid "mature by winning" as the *only* driver — it snowballs.)
 
+### 2.2 Mixing — soft purity [LEAN]
+You may **deploy any captured unit** (Battle Cats freedom — no faction lockout), but the **identity lives in the Hive + Royal + the synergy hooks, which reward only same-geneline units.** A pure army hits the geneline's **peak**; a mixed army still **works** but plays flat — off-geneline units are **mercenaries** (they fight on raw stats, but feed no cohesion, get no Royal amplification, and ignore the geneline's signature tools). **Pure = peak, mixed = functional.** This is the **Hearthstone-tribal / MTG-splash** model — and it's already how cohesion behaves ("+atk per *same-geneline* ally"), so we're *naming the mechanic, not adding one*.
+
+- **The line:** the **rank-and-file Soldiers mix** (soft); the **Hive toolkit — Royal · Elites · hive abilities · signature pheromone · signature building — stays ONE committed geneline** (hard; the hive *is* the geneline's toolkit, so mixing toolkits would erase identity + spike cognitive load). The generic base commands (Rally/Charge/Retreat) + Normal fodder are the shared substrate everyone uses.
+- **The knob — the *purity premium*** (how much stronger pure is than mixed): too small → identity dissolves into soup; too large → mercs are dead weight (de-facto hard purity); right → pure is the goal, but a smart merc-splash is a legit early/matchup call. A playtest number, not a design one.
+
+### 2.3 Acquisition — the loadout timeline [LEAN] · the stable [OPEN]
+Two acquisition loops feed the loadout:
+1. **In-run — grow the hive you're playing:** acquire more of *its* units (purifying the bulk from merc-flat toward peak), mature it, fill its toolkit slots.
+2. **Meta — collect new hives:** conquer/ally a geneline's hive → it joins your **stable** of playable commanders, weak→strong. You bring **one hive per battle** (low cognitive load); switching genelines is a deliberate between-fight choice, never a mid-fight juggle.
+
+The loadout slots stay **bounded** the whole game; only the *pressure* on them changes — the deckbuilder arc:
+> **Scarcity** (fill empty slots) → **Abundance** (curate an overflowing pool into a few slots — the moment your first toolkit completes) → **Optimization** (variants / mutation, hard cuts).
+
+So early game is acquisition-gated ("field what I've got"); late game is choice-gated ("best of too many"). **The pivot — when a geneline's toolkit first fills — is when Hivyss becomes a deckbuilder.** Cognitive load stays low throughout: you command *one* toolkit, and mercs are *simpler* than your synergy units (they just walk and hit).
+
+> **[OPEN] The fork that rewrites the pacing: is the stable PERSISTENT or PER-RUN?**
+> - **Persistent** (campaign — commanders unlocked across runs; the timeline above is a long mastery arc, most SC2-coop-like).
+> - **Per-run** (roguelike — capture hives each descent, reset on death; the whole Scarcity→Abundance→Optimization arc compresses into a *single* run).
+>
+> Everything above assumes **persistent**. This is unresolved and it changes the feel of the entire meta — lock it before building loop 2.
+
 ---
 
 ## 3. The Royal (keystone hero) [LOCKED concept]
