@@ -30,6 +30,7 @@ import {
 } from './CombatPhases';
 import { lookupAbility } from '../config/combat/abilities';
 import { PASSIVE_HANDLERS, type PassiveTickEnv } from './PassiveHandlers';
+import { TRAIL_SPACING, TRAIL_BLOB_RADIUS, TRAIL_BLOB_FADE } from '../config/PheromoneDefs';
 
 // Min gap between hit sounds — a packed herd lands many hits per frame; without
 // this throttle they pile into a buzz. Shared by the category + fitted paths.
@@ -656,6 +657,20 @@ export class CombatSystem {
       }
     });
 
+    // Pheromone TRAIL deposit — a courier Scout (a unit carrying a
+    // `pheromoneKind`) drops a fading scent-blob every TRAIL_SPACING px it
+    // travels. Each blob is a static zone the caller decays like any other.
+    // Killing the courier stops new drops → the trail is exactly as long as it
+    // survived (proportional deposit); laid blobs fade Scout-independently.
+    for (const u of alive) {
+      if (!u.pheromoneKind) continue;
+      const cx = u.x + u.unitW / 2;
+      if (u._lastDepositX == null || Math.abs(cx - u._lastDepositX) >= TRAIL_SPACING) {
+        u._lastDepositX = cx;
+        zones.push({ kind: u.pheromoneKind, x: cx, radius: TRAIL_BLOB_RADIUS, side: u.side, lane: u.lane, remaining: TRAIL_BLOB_FADE });
+      }
+    }
+
     // Tick active effects AFTER the per-unit combat loop but BEFORE
     // clearing _currentCtx — DOT hooks route damage through the
     // pipeline and need the live ctx for FX.
@@ -670,8 +685,9 @@ export class CombatSystem {
   //
   // Zone membership is 1D center-x distance, side-scoped: only own-side
   // units obey, and the band is `|unit.center.x - zone.x| < zone.radius`.
-  // First matching zone wins (placement order = priority). resolve()
-  // only READS zones; lifetime/decay happens in GameManager.tick.
+  // First matching zone wins (placement order = priority). resolve() READS
+  // zones for commands AND appends courier-Scout trail blobs; lifetime/decay
+  // happens in the caller's tick (GameManager / SandboxScene).
 
   /** The kind of the FIRST own-side zone covering `u`, or null. */
   /**

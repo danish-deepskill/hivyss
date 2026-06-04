@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { UnitDef, Side, UnitState, RenderUnit, Route, AttackRange, GenePalette, ComponentTag, UnitPersistent, PassiveDef, GeneLine, CasteKey, SfxKey, IUnit } from '../types';
+import type { UnitDef, Side, UnitState, RenderUnit, Route, AttackRange, GenePalette, ComponentTag, UnitPersistent, PassiveDef, GeneLine, CasteKey, SfxKey, IUnit, PheromoneKind } from '../types';
 import { hasActiveEffect } from '../systems/EffectSystem';
 import type { DamageType } from '../config/combat/damageTypes';
 import type { ResistanceTier } from '../config/combat/resistances';
@@ -104,6 +104,8 @@ export class Unit extends Phaser.GameObjects.Container {
    *  long as it's still a valid foe). null = re-find nearest at impact (bases,
    *  or the locked foe died/left → graceful fallback). */
   lockedTarget: IUnit | null;
+  pheromoneKind?: PheromoneKind; // set → courier Scout laying a fading trail
+  _lastDepositX?: number;        // deposit-spacing tracker for the trail
   foreswing: number;
   backswing: number;
   foreswingTimer: number;
@@ -184,6 +186,8 @@ export class Unit extends Phaser.GameObjects.Container {
     this.ambush = false;
     this._swinging = false;
     this.lockedTarget = null;
+    this.pheromoneKind = undefined;
+    this._lastDepositX = undefined;
     this.foreswing = 0;
     this.backswing = 0;
     this.foreswingTimer = 0;
@@ -287,6 +291,8 @@ export class Unit extends Phaser.GameObjects.Container {
     this.ambush = false;
     this._swinging = false;
     this.lockedTarget = null;
+    this.pheromoneKind = undefined;
+    this._lastDepositX = undefined;
 
     const interval = 1 / def.atkRate;
     this.foreswing = def.foreswing ?? interval * 0.3;

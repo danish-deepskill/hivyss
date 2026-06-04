@@ -323,15 +323,9 @@ export interface PheromoneZone {
   side: Side;
   /** Lane the zone applies to (0 = upper, 1 = lower). Same-lane scoped. */
   lane: number;
-  /** Seconds of life left; decremented in GameManager.tick, NOT in resolve. */
+  /** Seconds of life left; decremented in the caller's tick (GameManager /
+   *  SandboxScene), NOT in resolve. For a trail blob this is its fade timer. */
   remaining: number;
-  /**
-   * If set, this is a MOBILE command zone emitted by a worker (Scout): each
-   * frame its `x`/`lane` track the owning unit, and the zone is removed when
-   * that unit dies. Static (click-placed) zones leave this undefined and decay
-   * by `remaining` instead.
-   */
-  ownerUnitId?: number;
 }
 
 export interface CombatContext {
@@ -509,6 +503,11 @@ export interface IUnit extends WorldEntity {
   /** Foe captured at foreswing-start so the hit commits to it (windup-drift fix);
    *  null/undefined = re-find nearest at impact. */
   lockedTarget?: IUnit | null;
+  /** If set, this unit is a courier Scout laying a fading pheromone trail of this
+   *  command as it moves (the sim drops scent-blobs in CombatSystem.resolve). */
+  pheromoneKind?: PheromoneKind;
+  /** x of the last trail blob dropped — the deposit-spacing tracker. */
+  _lastDepositX?: number;
   /** Player-triggered signature ability key (Elite/Royal active). */
   signatureAbility?: string;
   /** Signature cooldown length (seconds). */

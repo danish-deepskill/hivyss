@@ -29,3 +29,13 @@ export const PHEROMONE_DEFS: Record<PheromoneKind, PheromoneDef> = {
 
 /** Stable ordering for HUD button rows / keyboard binding (1/2/3). */
 export const PHEROMONE_ORDER: PheromoneKind[] = ['rally', 'charge', 'retreat'];
+
+// --- Deposit-fade trail (VISION §5) — the courier Scout lays scent as it runs ---
+// A Scout carrying a command drops a small fading scent-blob every TRAIL_SPACING
+// px it travels. The trail = the union of live blobs; a unit obeys if it sits in
+// ANY blob. Kill the courier → no new drops → the trail is exactly as long as it
+// survived (proportional deposit); laid blobs fade on their own timer. Placeholder
+// numbers, tuned at the playtest gate.
+export const TRAIL_SPACING = 28;     // px between dropped blobs
+export const TRAIL_BLOB_RADIUS = 26; // each blob's influence radius (overlap → continuous trail)
+export const TRAIL_BLOB_FADE = 5;    // seconds a blob lives before it fades out

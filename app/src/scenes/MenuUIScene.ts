@@ -434,7 +434,7 @@ export class MenuUIScene extends Phaser.Scene {
       const btn = document.createElement('button');
       btn.textContent = def.name;
       btn.style.cssText = `font-size:10px; padding:3px 9px; border-radius:3px; border:1px solid ${hex}; background:#10141a; color:${hex}; cursor:pointer; pointer-events:auto;`;
-      btn.onclick = () => this.eventBus.emit('castPheromone', { kind });
+      btn.onclick = () => this.eventBus.emit('castPheromone', { kind, lane: this.activeLane });
       row.appendChild(btn);
     });
     return row;

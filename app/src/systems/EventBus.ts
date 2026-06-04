@@ -21,7 +21,7 @@ export interface GameEvents {
   useAbility: { key: string };
   cancelIncubation: { index: number };
   triggerSignature: { unitId: number };
-  castPheromone: { kind: PheromoneKind };
+  castPheromone: { kind: PheromoneKind; lane: number };
   logMessage: { message: string };
   // Sandbox events (SandboxHUDScene ↔ SandboxScene)
   sandboxSelectUnit: { unitKey: string | null };

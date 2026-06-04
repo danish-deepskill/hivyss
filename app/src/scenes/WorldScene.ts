@@ -59,8 +59,8 @@ export class WorldScene extends Phaser.Scene {
       if (this.gm.running && evt.unitId != null) this.gm.combat.requestSignature(evt.unitId);
     };
     // Pheromone command button → cast it on the player army's front.
-    const onPheromone = (evt: { kind: PheromoneKind }) => {
-      const result = this.gm.castPheromone(evt.kind);
+    const onPheromone = (evt: { kind: PheromoneKind; lane: number }) => {
+      const result = this.gm.castPheromone(evt.kind, evt.lane);
       if (result.message) this.gm.events.emit('logMessage', { message: result.message });
     };
     this.gm.events.on('deployUnit', onDeploy);

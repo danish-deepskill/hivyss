@@ -573,10 +573,10 @@ export class SandboxScene extends Phaser.Scene {
 
   /**
    * Deploy a Scout (worker) carrying `kind` at world-(x, y): a fast, fragile,
-   * NON-combatant that runs forward emitting a MOBILE pheromone zone bound to
-   * it. Kill the Scout → the command dies with it (update() tracks + culls the
-   * owner-zone). This is the real, vulnerable command path that replaces the
-   * old free instant click-zone. Live spawn — running only.
+   * NON-combatant that runs forward laying a FADING pheromone TRAIL as it goes
+   * (the sim drops scent-blobs per `pheromoneKind` in CombatSystem.resolve).
+   * Kill the Scout → no new scent, but the laid trail persists and fades on its
+   * own timer (deposit-fade, VISION §5). Live spawn — running only.
    */
   private deployScout(kind: PheromoneKind, x: number, y: number): void {
     if (!this.running) return;
@@ -587,20 +587,9 @@ export class SandboxScene extends Phaser.Scene {
 
     const scout = new Unit(this, { ...baseDef, _key: 'scout' }, side, x, lane);
     scout.primary = PHEROMONE_DEFS[kind].color; // tint the scout to its command
+    scout.pheromoneKind = kind; // courier: the sim lays a fading trail as it runs
     scout.setDepth(60 + lane);
     this.units.push(scout);
-
-    const pdef = PHEROMONE_DEFS[kind];
-    this.pheromoneZones.push({
-      kind,
-      x: scout.x + scout.unitW / 2,
-      radius: pdef.radius,
-      side,
-      lane,
-      remaining: pdef.duration, // unused for owner-zones (culled on scout death)
-      ownerUnitId: scout.id,
-    });
-    this.drawPheromoneZones();
   }
 
   /** Cursor-follow preview circle for the selected pheromone. */
@@ -874,25 +863,11 @@ export class SandboxScene extends Phaser.Scene {
     this.playerBaseStructure.update(dt);
     this.enemyBaseStructure.update(dt);
 
-    // Pheromone zones — decay then drop expired BEFORE resolve reads
-    // them (resolve only READS zones). Redraw on any change.
-    if (this.pheromoneZones.length > 0) {
-      let changed = false;
-      this.pheromoneZones = this.pheromoneZones.filter((z) => {
-        if (z.ownerUnitId != null) {
-          // Mobile worker-zone: track the Scout each frame; the command dies
-          // with it (cull when the owner is dead/gone).
-          const owner = this.units.find((u) => u.id === z.ownerUnitId && !u.dead);
-          if (!owner) { changed = true; return false; }
-          const nx = owner.x + owner.unitW / 2;
-          if (nx !== z.x || owner.lane !== z.lane) { z.x = nx; z.lane = owner.lane; changed = true; }
-          return true;
-        }
-        z.remaining -= dt;
-        if (z.remaining <= 0) { changed = true; return false; }
-        return true;
-      });
-      if (changed) this.drawPheromoneZones();
+    // Pheromone trail — fading scent-blobs the courier Scouts lay in the sim.
+    // Decay the fade BEFORE resolve appends this frame's fresh blobs.
+    const hadTrail = this.pheromoneZones.length > 0;
+    if (hadTrail) {
+      this.pheromoneZones = this.pheromoneZones.filter((z) => (z.remaining -= dt) > 0);
     }
 
     this.combat.resolve(
@@ -901,6 +876,11 @@ export class SandboxScene extends Phaser.Scene {
       this.particles, 0, this.audio,
       this.pheromoneZones,
     );
+
+    // The trail changes every frame (deposit + fade) — redraw while active,
+    // and clear once when the last blob is gone.
+    if (this.pheromoneZones.length > 0) this.drawPheromoneZones();
+    else if (hadTrail) this.pheromoneLayer.clear();
 
     this.fxDirector.update(dt);
 

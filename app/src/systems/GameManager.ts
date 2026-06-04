@@ -384,11 +384,12 @@ export class GameManager {
     this.createUnit(key, 'enemy', scaledDef, this.worldW - this.SBW - def.w - 2, lane);
   }
 
-  createUnit(key: string, side: Side, def: UnitDef, x: number, lane = 0): void {
+  createUnit(key: string, side: Side, def: UnitDef, x: number, lane = 0): Unit {
     const unitDef = { ...def, _key: key };
     const unit = this.unitPool.spawn(unitDef, side, x, lane);
     this.units.push(unit);
     this.spatialIndex.add(unit);
+    return unit;
   }
 
   /**
@@ -429,40 +430,20 @@ export class GameManager {
   }
 
   /**
-   * Paint a pheromone command zone at world-x `x` on `side` in `lane`.
-   * The zone lives for `PHEROMONE_DEFS[kind].duration` seconds (decayed
-   * in tick) and commands own-side, same-lane units' movement while
-   * active.
+   * Cast a pheromone command (VISION §5 deposit-fade): spawn a courier Scout from
+   * the player hive in `lane`, carrying the command — it runs forward laying a
+   * fading scent-trail the sim deposits as it moves (CombatSystem.resolve). The
+   * Scout IS the cost: a vulnerable non-combatant, so intercepting it before it
+   * lays the scent is the counterplay. Killing it stops the trail; laid scent fades.
    */
-  addPheromoneZone(kind: PheromoneKind, x: number, side: Side, lane = 0): void {
-    const def = PHEROMONE_DEFS[kind];
-    this.pheromoneZones.push({
-      kind,
-      x,
-      radius: def.radius,
-      side,
-      lane,
-      remaining: def.duration,
-    });
-  }
-
-  /**
-   * Cast a pheromone command (interim: no click-targeting yet). Drops the zone on
-   * the player army's FRONT — centered on the frontmost living player unit — so it
-   * commands the engaged cluster. The spatial click-target + Scout deposit-fade
-   * delivery (VISION §5) is the deferred upgrade; this makes the commands reachable.
-   */
-  castPheromone(kind: PheromoneKind): { success: boolean; message: string } {
+  castPheromone(kind: PheromoneKind, lane = 0): { success: boolean; message: string } {
     if (!this.running) return { success: false, message: '' };
-    let frontX = this.SBW + 60; // fallback: just ahead of the player base
-    let found = false;
-    for (const u of this.units) {
-      if (u.side !== 'player' || u.dead) continue;
-      const cx = u.x + u.unitW / 2;
-      if (!found || cx > frontX) { frontX = cx; found = true; }
-    }
-    this.addPheromoneZone(kind, frontX, 'player', 0);
-    return { success: true, message: `${PHEROMONE_DEFS[kind].name} pheromone!` };
+    const def = UNIT_DEFS['scout'];
+    if (!def) return { success: false, message: '' };
+    const scout = this.createUnit('scout', 'player', def, this.SBW + 2, lane);
+    scout.pheromoneKind = kind;
+    scout.primary = PHEROMONE_DEFS[kind].color; // tint to its command
+    return { success: true, message: `${PHEROMONE_DEFS[kind].name} scout sent!` };
   }
 
   castAbility(key: PlayerAbilityKey): { success: boolean; message: string } {
