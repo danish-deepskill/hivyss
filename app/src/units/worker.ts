@@ -14,7 +14,7 @@ const scoutDef: UnitDef = {
   ico: "\u{1F41C}",
   hp: 40, // fragile — a sniped scout = a killed command
   atk: 1, // unused (never attacks)
-  spd: 2.6, // fast: "runs forward" with/ahead of the herd
+  spd: 1.3, // fast: "runs forward" with/ahead of the herd
   range: 16,
   atkRate: 0.5,
   cost: 15, // cheap — the command's economy cost

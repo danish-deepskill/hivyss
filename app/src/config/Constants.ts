@@ -4,7 +4,7 @@ export const H = 720;  // viewport height
 // GND removed — use LANE.land.groundY from Layout.ts
 export const BASE_W = 60;
 export const SBW = 85; // scaled base width (was Math.round(BASE_W * 1.422))
-export const SPD_MULT = 0.5; // global speed multiplier for all units (tune gameplay pace)
+export const SPD_MULT = 1.0; // global speed multiplier — 1.0 = neutral; the real per-unit speeds live in def.spd. Slide live to sweep tempo.
 export const BASE_HP = 1000;
 export const MAX_NECTAR = 300;
 export const MAX_CAPACITY = 20;
