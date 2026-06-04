@@ -109,7 +109,7 @@ So the MVP-mechanic question = **"built core + which 📐 systems do we pull in?
   - **Worker caste (base/universal)** — the agency foundation. Does TWO jobs: (a) **pheromone scout** — places/carries Rally/Charge/Retreat zones (vulnerable, killable → positioning matters); (b) **nectar gatherer** — active economy (gather + protect) vs passive trickle. Universal unit, shared across genelines (not α-specific). *Specialist/build workers (Engineer, etc.) stay deferred.*
   - **Pheromone command** — Rally/Charge/Retreat, emitted **via worker-scouts** (lore-native, not free placement). The active-agency layer.
   - **2-lane** — committed, but **sequenced**: built AFTER α's fun is validated in 1-lane first (doesn't block α design). *(UPDATE 2026-06-02: 2-lane was actually built ahead of this sequencing; the 1-vs-2 LOCK is still OPEN and α's fun is still untested — see `SESSION_HANDOFF.md §0`. The "add 2nd lane" step below is therefore already done, out of order.)*
-  - **Elite signature** — player-triggered ability on the one T4 Elite per geneline.
+  - **Elite signature** — player-triggered ability on the geneline's **Elite-caste units** (α: Goliath + Maulhorn, both T2). *(Not a "T4 per geneline" thing — the only MVP T4 is δ's Centurion, which is a Royal. See `REQUIREMENTS §5`.)*
   - **Gene acquisition** — the meta loop (build AFTER the fight is proven fun).
 - **Defer (post-MVP):** Royal-hero · **specialist/build workers** (spires/walls) · hive-building · factions · mutation/evolution · other realms
 

@@ -11,7 +11,7 @@ import { ABILITY_DEFS } from '../config/AbilityDefs';
 import { GameManager } from '../systems/GameManager';
 import { capUsed, MAX_CAPACITY } from '../systems/Capacity';
 import { ViewportController } from '../systems/ViewportController';
-import type { PlayerAbilityKey, WaveDef, HiveProfile } from '../types';
+import type { PlayerAbilityKey, WaveDef, HiveProfile, PheromoneKind } from '../types';
 import type { RunBuff } from '../systems/RunState';
 
 interface WorldSceneData {
@@ -63,9 +63,20 @@ export class WorldScene extends Phaser.Scene {
       const result = this.gm.cancelIncubation(evt.index);
       if (result.message) this.gm.events.emit('logMessage', { message: result.message });
     };
+    // Elite signature slot fired from the HUD → trigger THAT Elite's signature.
+    const onSignature = (evt: { unitId: number }) => {
+      if (this.gm.running && evt.unitId != null) this.gm.combat.requestSignature(evt.unitId);
+    };
+    // Pheromone command button → cast it on the player army's front.
+    const onPheromone = (evt: { kind: PheromoneKind }) => {
+      const result = this.gm.castPheromone(evt.kind);
+      if (result.message) this.gm.events.emit('logMessage', { message: result.message });
+    };
     this.gm.events.on('deployUnit', onDeploy);
     this.gm.events.on('useAbility', onAbility);
     this.gm.events.on('cancelIncubation', onCancel);
+    this.gm.events.on('triggerSignature', onSignature);
+    this.gm.events.on('castPheromone', onPheromone);
 
     // Cleanup on shutdown
     this.events.once('shutdown', () => {
@@ -73,6 +84,8 @@ export class WorldScene extends Phaser.Scene {
       this.gm.events.off('deployUnit', onDeploy);
       this.gm.events.off('useAbility', onAbility);
       this.gm.events.off('cancelIncubation', onCancel);
+      this.gm.events.off('triggerSignature', onSignature);
+      this.gm.events.off('castPheromone', onPheromone);
     });
 
     // ESC — toggle pause overlay
@@ -159,6 +172,7 @@ export class WorldScene extends Phaser.Scene {
       // Game state (MenuUIScene)
       this.registry.set('wave.stage', this.gm.waves.stage);
       this.registry.set('game.running', this.gm.running);
+      this.registry.set('elite.slots', this.gm.getEliteSlots());
     }
 
     if (!this.gm.running) return;

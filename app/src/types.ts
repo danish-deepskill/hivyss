@@ -289,6 +289,19 @@ export type HitSoundType = 'melee' | 'ranged' | 'aoe' | 'heal';
 // recipe serves every caster — per-unit timbre is layered on at play time via
 // pitch (body size), so there's no per-unit sound entry to maintain.
 export type SfxKey = 'jaw' | 'gore' | 'clack' | 'needle' | 'ram' | 'stampede';
+
+// EliteSlot — per-Elite signature-slot state the battle publishes to the HUD
+// (registry `elite.slots`); one per LIVE player Elite. The HUD renders a trigger
+// button per slot. UI data, computed by GameManager.getEliteSlots(); rendering
+// is per-HUD (the data is shared, the look is not).
+export interface EliteSlot {
+  id: number;        // unit id — echoed back on click to fire THIS Elite
+  name: string;
+  ready: boolean;    // signature off cooldown
+  cdFrac: number;    // 0..1 cooldown remaining (drives the fill bar)
+  firable: boolean;  // carries a signature ability at all
+  inRange: boolean;  // an enemy is in the signature's range (would connect)
+}
 export type UnitState = 'march' | 'attack';
 export type Side = 'player' | 'enemy';
 

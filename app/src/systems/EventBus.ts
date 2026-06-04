@@ -20,6 +20,8 @@ export interface GameEvents {
   deployUnit: { key: string };
   useAbility: { key: string };
   cancelIncubation: { index: number };
+  triggerSignature: { unitId: number };
+  castPheromone: { kind: PheromoneKind };
   logMessage: { message: string };
   // Sandbox events (SandboxHUDScene ↔ SandboxScene)
   sandboxSelectUnit: { unitKey: string | null };

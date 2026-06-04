@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
-import type { UnitDef, WaveDef, Side, PlayerAbilityKey, RenderUnit, IWaveController, HiveProfile, PheromoneZone, PheromoneKind } from '../types';
+import type { UnitDef, WaveDef, Side, PlayerAbilityKey, RenderUnit, IWaveController, HiveProfile, PheromoneZone, PheromoneKind, EliteSlot } from '../types';
 import { PHEROMONE_DEFS } from '../config/PheromoneDefs';
 import { resolveColors } from '../config/Palettes';
 import { W, DEFAULT_WORLD_W, SBW as SBW_CONST } from '../config/Constants';
 import type { RunBuff } from './RunState';
 // W = viewport width (used for camera), worldW = per-battle battlefield width
 import { UNIT_DEFS, drawUnit } from '../units/registry';
+import { lookupAbility } from '../config/combat/abilities';
 import { ENEMY_DEFS } from '../config/EnemyDefs';
 import { BaseStructure } from '../entities/BaseStructure';
 import { BaseEntity } from '../entities/BaseEntity';
@@ -67,11 +68,6 @@ export class GameManager {
   // Active pheromone command zones. Decayed each tick; passed to
   // combat.resolve so own-side units obey the painted lane commands.
   pheromoneZones: PheromoneZone[] = [];
-
-  // Round-robin lane assignment for AI/wave enemy spawns so both lanes
-  // populate. Player hatches default to lane 0 until a battle lane-UI
-  // exists (out of scope here).
-  private _enemyLaneCursor = 0;
 
   // Game state
   running: boolean;
@@ -379,10 +375,11 @@ export class GameManager {
       scaledDef = { ...def, hp: Math.ceil(def.hp * scale), atk: Math.ceil(def.atk * scale) };
     }
 
-    // Round-robin enemies across both lanes so the front splits.
-    const lane = this._enemyLaneCursor;
-    this._enemyLaneCursor ^= 1;
-    this.createUnit(key, 'enemy', scaledDef, this.worldW - this.SBW - def.w - 2, lane);
+    // TEMP single-lane: the real battle's 2-lane deploy/lane-switch UX isn't built
+    // yet, so enemies spawn on lane 0 to match player hatches — a clean head-to-head
+    // instead of an unopposed second lane. Restore round-robin across both lanes
+    // once the 2-lane control UI lands.
+    this.createUnit(key, 'enemy', scaledDef, this.worldW - this.SBW - def.w - 2, 0);
   }
 
   createUnit(key: string, side: Side, def: UnitDef, x: number, lane = 0): void {
@@ -390,6 +387,43 @@ export class GameManager {
     const unit = this.unitPool.spawn(unitDef, side, x, lane);
     this.units.push(unit);
     this.spatialIndex.add(unit);
+  }
+
+  /**
+   * Per-Elite signature-slot state for the HUD (published to registry
+   * `elite.slots`). One entry per LIVE player Elite — the HUD renders a trigger
+   * button per slot; clicking emits `triggerSignature` → combat.requestSignature.
+   */
+  getEliteSlots(): EliteSlot[] {
+    const slots: EliteSlot[] = [];
+    for (const u of this.units) {
+      if (u.side !== 'player' || u.dead) continue;
+      if (UNIT_DEFS[u.key]?.caste !== 'elite') continue;
+      const frac = u.signatureCooldown > 0 ? u.sigCd / u.signatureCooldown : 0;
+      slots.push({
+        id: u.id,
+        name: u.unitName,
+        ready: u.canSignature(),
+        cdFrac: frac < 0 ? 0 : frac > 1 ? 1 : frac,
+        firable: !!u.signatureAbility,
+        inRange: this.signatureHasTarget(u),
+      });
+    }
+    return slots;
+  }
+
+  /** True if an enemy sits within the unit's signature range (same lane) — i.e.
+   *  firing would actually connect, so the slot can light up as "ready". */
+  private signatureHasTarget(u: Unit): boolean {
+    if (!u.signatureAbility) return false;
+    const range = lookupAbility(u.signatureAbility).range ?? 0;
+    if (range <= 0) return false;
+    const ux = u.x + u.unitW / 2;
+    for (const e of this.units) {
+      if (e.side === u.side || e.dead || e.lane !== u.lane) continue;
+      if (Math.abs((e.x + e.unitW / 2) - ux) < range) return true;
+    }
+    return false;
   }
 
   /**
@@ -408,6 +442,25 @@ export class GameManager {
       lane,
       remaining: def.duration,
     });
+  }
+
+  /**
+   * Cast a pheromone command (interim: no click-targeting yet). Drops the zone on
+   * the player army's FRONT — centered on the frontmost living player unit — so it
+   * commands the engaged cluster. The spatial click-target + Scout deposit-fade
+   * delivery (VISION §5) is the deferred upgrade; this makes the commands reachable.
+   */
+  castPheromone(kind: PheromoneKind): { success: boolean; message: string } {
+    if (!this.running) return { success: false, message: '' };
+    let frontX = this.SBW + 60; // fallback: just ahead of the player base
+    let found = false;
+    for (const u of this.units) {
+      if (u.side !== 'player' || u.dead) continue;
+      const cx = u.x + u.unitW / 2;
+      if (!found || cx > frontX) { frontX = cx; found = true; }
+    }
+    this.addPheromoneZone(kind, frontX, 'player', 0);
+    return { success: true, message: `${PHEROMONE_DEFS[kind].name} pheromone!` };
   }
 
   castAbility(key: PlayerAbilityKey): { success: boolean; message: string } {

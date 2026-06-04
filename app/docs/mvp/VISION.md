@@ -81,7 +81,7 @@ A command is delivered by a **Scout (worker)** that couriers from the hive to a 
 - **Then it fades** on its own timer, Scout-independent (real pheromone lingers; killing the Scout *after* it laid the trail doesn't erase it).
 - **Counterplay = the run.** Intercept the courier *before* it lays the scent to thin/deny it; after, you're too late.
 - **Not OP, no invented nerf:** the fog fades (temporary), and re-deposit costs another vulnerable Scout. Balance = the distance it survives + the fade duration.
-- **Base commands** (Rally = gather/hold · Charge = advance faster · Retreat = fall back — *flip facing to actually run away*) are muddy/overlapping; you field **2 of a growing pool**, and the depth moves to **per-geneline signature pheromones** (§6).
+- **Base commands** (Rally = gather/hold · Charge = advance faster · Retreat = fall back — *flip facing to actually run away*) are muddy/overlapping; you field **2 of a growing pool**, and the depth lives in the **per-geneline signature pheromones** (§6) — **in MVP scope, sequenced after the base-command layer** (see §10).
 
 ---
 
@@ -145,9 +145,9 @@ The MVP is a **vertical slice**: the *systems* (the shape of the real game) at *
 | Genelines | **4** — α/β/γ/δ (`GENELINES §1`) | the other 20; the 4-vs-6 question (`§8` OPEN) |
 | Royal | **1** controllable + **1** ultimate | full 4-mode + 5-facet style |
 | Hive-build loop | **core** — compose / deploy / mature / grow | deep deckbuild, gene-library depth |
-| Pheromones | **1-2** base commands (deposit-fade Scout) | per-geneline signature pheromones |
+| Pheromones | base commands (deposit-fade Scout) **+ 1 per-geneline signature** (Frenzy Musk, etc.; *sequenced late*) | the rest of the *growing pool* of signatures |
 | Workers | **scout · gatherer · builder** (the full caste) | specialist workers (Engineer, etc.) |
-| Buildings | **1-2** (spire, wall) | the full set |
+| Buildings | **2** builder-placed (spire/wall) **+ 1 per-geneline signature** (e.g. α Spawning Mound; *sequenced late*) | the full set |
 | Maturation | **3-4 hive phases** | — (core) |
 | Lanes | **2 interactive + 1 cross-lane tool** | — (foundational) |
 | Run / map | the **node/territory map** — Forage→Warren→Hive funnel, biomes, node types `◦Wild/vhyst` (`GENELINES §5-6`) | live 7-faction rep engine · other realms · live alliances |
@@ -157,7 +157,9 @@ The MVP is a **vertical slice**: the *systems* (the shape of the real game) at *
 
 > **✅ RESOLVED 2026-06-03 → (A): the MVP expands.** `VISION` is the newest authority, so the **hive-build loop + a thin controllable Royal + maturation phases are MVP-core.** `REQUIREMENTS` is updated to match — its §7 now defers only the *full* 4-mode Royal + 5-facet styling, not the thin versions. **The combat-first gate still holds:** Phase 0 is still "prove the α fight is fun" (§11); the hive-build loop is the co-core built *right after*, not before.
 >
-> **Still OPEN — tier ceiling:** `REQUIREMENTS §4-5` says "1 T4 Elite per geneline," but α ships **T2 Elites + a T3 Royal, no T4** (`GENELINES §2`). Decide whether α's Elites are T4 (per the budget) or the roster's T2/T3 stands.
+> **✅ RESOLVED 2026-06-04 — tier ceiling:** α/β/γ cap at **T3** (Elites T2, Royal T3); **only δ reaches T4** — its Centurion is the **single T4 in the MVP** (δ's Royal + the run-end boss), per the §4 budget + `GENELINES §2`. (The stale "1 T4 Elite per geneline" line in `REQUIREMENTS §5` — which already conflicted with §4's own "Centurion = the only T4" — has been corrected.)
+>
+> **✅ RESOLVED 2026-06-04 — signature expressions:** each geneline's **signature pheromone** (Frenzy Musk, etc.) **and signature building** (Spawning Mound, etc.) are **IN the MVP slice** — one per geneline, as `§6` + `GENELINES §2` already define — but **sequenced late** (built after the worker-scout base-command emission layer, and after α's fun gate). They are *not* future content; only the *growing pool* of additional signatures is. This reconciles the earlier §10 rows that had deferred them.
 
 ---
 

@@ -11,6 +11,12 @@ import type { RenderUnit } from '../types';
 const MAX_DECK_SIZE = 10;
 const RUN_DECK_SIZE = 3;
 
+// Thin-first MVP: every run is the α geneline (VISION §10-11 — α-first). The
+// Royal is the keystone — always rostered, never a pickable slot. When the
+// geneline picker lands, these become the player's CHOSEN geneline + its Royal.
+const RUN_GENELINE = 'alpha';
+const RUN_ROYAL = 'matriarch';
+
 interface BroodSceneData {
   mode?: 'run';
   seed?: string;
@@ -47,10 +53,11 @@ export class BroodScene extends Phaser.Scene {
     this.runMode = data?.runMode || 'permadeath';
 
     if (this.isRunMode) {
-      // Run mode: normal (non-geneline) vyssids tier 0-1, pick 3
+      // Run mode: pick from the geneline's non-Royal vyssids (soldiers + elites);
+      // the Royal keystone is auto-prepended at START RUN below.
       this.pool = Object.keys(UNIT_DEFS).filter(k => {
         const def = UNIT_DEFS[k];
-        return def.geneline === 'normal' && (def.tier as number) <= 1;
+        return def.geneline === RUN_GENELINE && def.caste !== 'royal';
       });
       this.deckSize = Math.min(RUN_DECK_SIZE, this.pool.length);
     } else {
@@ -96,7 +103,8 @@ export class BroodScene extends Phaser.Scene {
     backBtn.onclick = () => {
       if (this.isRunMode) {
         if (this.selected.size < this.deckSize) return; // must pick all slots
-        const state = createRunState(this.runSeed, [...this.selected], this.runMode);
+        // Royal is the keystone (VISION §2) — always rostered, not a picked slot.
+        const state = createRunState(this.runSeed, [RUN_ROYAL, ...this.selected], this.runMode);
         this.scene.start('NodeMapScene', { runState: state });
       } else {
         this.save.setDeck([...this.selected]);

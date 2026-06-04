@@ -6,6 +6,8 @@ import { MAX_CHAMBERS, MAX_LARVAE, LARVA_SPAWN_RATE } from '../systems/Incubatio
 import type { Chamber } from '../systems/IncubationManager';
 import { MAX_CAPACITY, canDeploy } from '../systems/Capacity';
 import type { EventBus } from '../systems/EventBus';
+import type { EliteSlot } from '../types';
+import { PHEROMONE_DEFS, PHEROMONE_ORDER } from '../config/PheromoneDefs';
 
 export class MenuUIScene extends Phaser.Scene {
   private eventBus!: EventBus;
@@ -30,6 +32,12 @@ export class MenuUIScene extends Phaser.Scene {
 
   // Abilities
   private abilityBtns: Record<string, { btn: HTMLButtonElement; cdBar: HTMLElement }> = {};
+
+  // Elite signature slots (one trigger button per live player Elite)
+  private eliteRow!: HTMLElement;
+  private eliteSlotContainer!: HTMLElement;
+  private eliteSlotBtns: HTMLButtonElement[] = [];
+  private eliteSlots: EliteSlot[] = [];
 
   // Enemy HUD
   private enemyBar!: HTMLElement | null;
@@ -69,6 +77,8 @@ export class MenuUIScene extends Phaser.Scene {
     }
     panel.appendChild(this.buildLarvaMound());
     panel.appendChild(this.buildUnitSlots(previews));
+    panel.appendChild(this.buildEliteSlots());
+    panel.appendChild(this.buildPheromones());
     panel.appendChild(this.buildAbilities());
     panel.appendChild(this.buildLog());
 
@@ -217,6 +227,9 @@ export class MenuUIScene extends Phaser.Scene {
       b.btn.disabled = !(ablCanCast[key] ?? false) || !running;
       b.cdBar.style.width = (ablCdPct[key] ?? 100) + '%';
     });
+
+    // Elite signature slots
+    this.renderEliteSlots(this.registry.get('elite.slots') ?? []);
   }
 
   // --- DOM builders ---
@@ -344,6 +357,85 @@ export class MenuUIScene extends Phaser.Scene {
     });
 
     return container;
+  }
+
+  // Elite signature trigger row — one button per live player Elite. Hidden when
+  // none are out. Click fires THAT Elite's signature (emits `triggerSignature`).
+  // Pheromone command row (Rally / Charge / Retreat). Interim delivery: clicking
+  // casts the command onto the player army's front (GameManager.castPheromone);
+  // click-to-target + Scout deposit-fade is the deferred upgrade (VISION §5).
+  private buildPheromones(): HTMLElement {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex; gap:4px; align-items:center; padding:3px 8px; background:#080c10; border-bottom:1px solid #0e1a22; width:100%; pointer-events:auto;';
+    row.appendChild(this.el('span', 'font-size:10px; color:#40a0d0; letter-spacing:1px; margin-right:4px;', 'CMD'));
+    PHEROMONE_ORDER.forEach(kind => {
+      const def = PHEROMONE_DEFS[kind];
+      const hex = '#' + def.color.toString(16).padStart(6, '0');
+      const btn = document.createElement('button');
+      btn.textContent = def.name;
+      btn.style.cssText = `font-size:10px; padding:3px 9px; border-radius:3px; border:1px solid ${hex}; background:#10141a; color:${hex}; cursor:pointer; pointer-events:auto;`;
+      btn.onclick = () => this.eventBus.emit('castPheromone', { kind });
+      row.appendChild(btn);
+    });
+    return row;
+  }
+
+  private buildEliteSlots(): HTMLElement {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:none; gap:4px; align-items:center; padding:3px 8px; background:#0c0a06; border-bottom:1px solid #1a1408; width:100%; pointer-events:auto;';
+    const lbl = this.el('span', 'font-size:10px; color:#e0a020; letter-spacing:1px; margin-right:4px;', 'ELITE');
+    this.eliteSlotContainer = document.createElement('div');
+    this.eliteSlotContainer.style.cssText = 'display:flex; gap:4px; align-items:center; flex-wrap:wrap;';
+    row.append(lbl, this.eliteSlotContainer);
+    this.eliteRow = row;
+    return row;
+  }
+
+  private renderEliteSlots(slots: EliteSlot[]): void {
+    this.eliteRow.style.display = slots.length ? 'flex' : 'none';
+    // Rebuild buttons only when the count changes (Elites deploy / die).
+    if (this.eliteSlotBtns.length !== slots.length) {
+      this.eliteSlotContainer.replaceChildren();
+      this.eliteSlotBtns = slots.map((_, i) => {
+        const b = document.createElement('button');
+        b.style.cssText = 'position:relative; overflow:hidden; font-size:10px; padding:3px 8px; border-radius:3px; min-width:64px; text-align:center; pointer-events:auto;';
+        b.appendChild(document.createElement('span'));          // label
+        const cd = document.createElement('div');               // charge fill
+        cd.style.cssText = 'position:absolute; left:0; bottom:0; height:2px; background:#e0a020;';
+        b.appendChild(cd);
+        b.addEventListener('click', () => this.onEliteSlotClick(i));
+        this.eliteSlotContainer.appendChild(b);
+        return b;
+      });
+    }
+    slots.forEach((s, i) => {
+      const b = this.eliteSlotBtns[i];
+      const label = b.firstChild as HTMLSpanElement;
+      const cd = b.lastChild as HTMLElement;
+      if (!s.ready) {
+        // On cooldown — greyed; the bar charges toward ready.
+        label.textContent = s.name;
+        b.style.border = '1px solid #44402a'; b.style.background = '#14120c'; b.style.color = '#6a6048'; b.style.cursor = 'default'; b.style.fontWeight = 'normal';
+        cd.style.width = ((1 - s.cdFrac) * 100) + '%';
+      } else if (s.inRange) {
+        // Ready AND an enemy is in range — lit, clickable.
+        label.textContent = '⚡ ' + s.name;
+        b.style.border = '1px solid #e0a020'; b.style.background = '#2a2010'; b.style.color = '#ffcf50'; b.style.cursor = 'pointer'; b.style.fontWeight = 'bold';
+        cd.style.width = '0';
+      } else {
+        // Ready but no target in range — dim (firing would whiff).
+        label.textContent = s.name;
+        b.style.border = '1px solid #6a5a30'; b.style.background = '#16140e'; b.style.color = '#9a8a55'; b.style.cursor = 'default'; b.style.fontWeight = 'normal';
+        cd.style.width = '0';
+      }
+    });
+    this.eliteSlots = slots;
+  }
+
+  private onEliteSlotClick(i: number): void {
+    const s = this.eliteSlots[i];
+    if (!s || !s.ready || !s.inRange) return; // only a lit slot fires
+    this.eventBus.emit('triggerSignature', { unitId: s.id });
   }
 
   private buildLog(): HTMLElement {

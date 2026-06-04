@@ -64,7 +64,7 @@ Product scope ≠ build order. Build the riskiest thing first; everything else s
   - **Veins (T1–3):** δ (pursuit_veldt), ε (pulse_network), ζ (bond_hollow)
   - → the 4 MVP genelines are drawn from these owners.
 - **Descent and acquisition are the SAME loop:** start with the Normal generic starter → descend Skin → Veins → fight each layer's native geneline → acquire its genes → climax at the Veins boss.
-- **Tier discipline:** T0–T3 soldiers + **one** T4 signature Elite per geneline (the thesis-carrier, e.g. δ's Centurion). **NEVER T5–T6** (Nerve/Core apex — the 100–200-line "thesis-as-one-mechanic" units; the most expensive in the game; post-EA).
+- **Tier discipline:** T0–T3 soldiers; **Elites at T2** (α/β/γ — Royal at **T3**) or **T3** (δ); **exactly one T4 in the whole MVP — δ's Centurion** (δ's Royal *and* the run-end boss), per the §4 budget + `GENELINES §2`. **NEVER T5–T6** (Nerve/Core apex — the 100–200-line "thesis-as-one-mechanic" units; the most expensive in the game; post-EA).
 - **2-lane battle structure** (locked in lore §8).
 - **Each geneline is an ECOSYSTEM with a thesis** (§6 ten axes), built from **interdependent roles** — *not* one hook with reskins. (e.g. δ: shields protect the cannon; the cannon gives the shields offense; the commander multiplies both.) Only 1–2 units emit the hook; the rest are a real army that benefits from it.
 
@@ -81,7 +81,7 @@ Product scope ≠ build order. Build the riskiest thing first; everything else s
 ## 7. OUT OF SCOPE (explicit — the MVP does NOT include)
 
 - Layers 3–6 (Organs, Nerve, Core) + the Drift ascent side-branch
-- T4 beyond the one Elite per geneline; all T5–T10 units
+- T4 beyond δ's single Centurion; all T5–T10 units
 - Dark Realm, Husk, Primordials (the other 3 realms)
 - Strategic-overworld depth: faction reputation, quests, territory/garrison, hostile raids, allied factions
 - Royal 4-mode system, hive styling (5 facets), mutation, evolution trees
