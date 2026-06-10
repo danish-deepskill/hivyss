@@ -66,6 +66,9 @@ export class ViewportController {
   // handles edge-pan tracking, drag-origin capture, and drag updates.
   private mouseX = -1;
   private mouseDown = false;
+  /** Cursor is over the battlefield canvas (not a HUD DOM element). Edge-pan is
+   *  gated on this so hovering edge-pinned HUD controls doesn't scroll the map. */
+  private overCanvas = false;
   private nativeMouseMove!: (e: MouseEvent) => void;
   private nativeMouseLeave!: () => void;
   private nativeMouseDown!: (e: MouseEvent) => void;
@@ -125,6 +128,9 @@ export class ViewportController {
     };
     this.nativeMouseMove = (e: MouseEvent) => {
       this.mouseX = canvasX(e);
+      // Over the battlefield, the event target is the canvas; over a HUD bar
+      // (pointer-events:auto DOM) it's that element. Drives the edge-pan gate.
+      this.overCanvas = e.target === canvas;
       if (!this.mouseDown) return;
       const dx = this.dragStartX - this.mouseX;
       if (Math.abs(dx) > 5) this.dragging = true;
@@ -132,7 +138,7 @@ export class ViewportController {
         this.cam.scrollX = this.camStartX + dx;
       }
     };
-    this.nativeMouseLeave = () => { this.mouseX = -1; };
+    this.nativeMouseLeave = () => { this.mouseX = -1; this.overCanvas = false; };
     this.nativeMouseDown = (e: MouseEvent) => {
       if (e.button !== this.dragMouseButton) return;
       this.mouseDown = true;
@@ -167,9 +173,12 @@ export class ViewportController {
       this.cam.zoom = Math.max(this.minZoom, this.cam.zoom - this.zoomSpeed * dt);
     }
 
-    // Pan — arrow keys or mouse-edge
-    const atLeftEdge = this.mouseX >= 0 && this.mouseX < this.edgeZone;
-    const atRightEdge = this.mouseX > W - this.edgeZone && this.mouseX <= W;
+    // Pan — arrow keys or mouse-edge. Edge-pan fires only over the battlefield,
+    // never while the cursor is on a HUD element (else hovering edge-pinned
+    // controls — lane arrows, corner buttons — would scroll the map). Keyboard
+    // + drag pan are unaffected (not position-gated).
+    const atLeftEdge = this.overCanvas && this.mouseX >= 0 && this.mouseX < this.edgeZone;
+    const atRightEdge = this.overCanvas && this.mouseX > W - this.edgeZone && this.mouseX <= W;
 
     if (this.panKeys.left.isDown || this.panKeys.a.isDown) {
       this.cam.scrollX -= this.panSpeed * dt;
