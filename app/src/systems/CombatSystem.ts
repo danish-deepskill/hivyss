@@ -9,12 +9,13 @@ import { BaseEntity } from '../entities/BaseEntity';
 import { AudioManager } from './AudioManager';
 import { EventBus } from './EventBus';
 import { CombatPipeline } from './CombatPipeline';
-import { updateEffects, hasActiveEffect } from './EffectSystem';
+import { updateEffects, hasActiveEffect, applyEffect } from './EffectSystem';
 import { setDotDispatcher } from '../config/combat/effects/dispatch';
 import { setStunFxDispatcher, setStaggerFxDispatcher } from '../config/combat/effects/cc';
 import { applyModifiers } from './ModifierSystem';
 import { getResource, addResource } from './ResourceSystem';
 import { runSelectorInRange, resolveImpactTarget, signatureWouldWhiff } from './Targeting';
+import { resolveRoyalOrder, ROYAL_ARRIVE } from './RoyalControl';
 import {
   setHealFxDispatcher,
   setDeathTriggerDispatcher,
@@ -258,8 +259,20 @@ export class CombatSystem {
     const ability = lookupAbility(u.signatureAbility);
     const targets = runSelectorInRange(ability.targeting, u, ability, alive);
     ctx.sourceUnit = u;
-    for (const t of targets) {
-      this.pipeline.queueAbility(u, t as IUnit, u.signatureAbility, {});
+    if (ability.category === 'utility' && ability.appliesEffects && ability.appliesEffects.length > 0) {
+      // Buff/utility signature (Primal Roar) — apply its effects directly to the
+      // selected SAME-LANE allies; no damage pipeline. Lane-scoped like cohesion,
+      // so the Royal stays a lane anchor, not a cross-field god-buff. The caster
+      // (the Queen) leads the surge, so she roars herself too (selectors omit self).
+      for (const eff of ability.appliesEffects) applyEffect(u, eff, { source: u });
+      for (const t of targets) {
+        if ((t as IUnit).lane !== u.lane) continue;
+        for (const eff of ability.appliesEffects) applyEffect(t as IUnit, eff, { source: u });
+      }
+    } else {
+      for (const t of targets) {
+        this.pipeline.queueAbility(u, t as IUnit, u.signatureAbility, {});
+      }
     }
     if (ability.fx) {
       dispatchCastFx({
@@ -276,6 +289,36 @@ export class CombatSystem {
         pitch: this._pitchForUnit(u),
         intensity: u.cohesionLevel?.().frac ?? 0,
       });
+    }
+  }
+
+  /**
+   * One unit's attack-swing state machine for this frame — shared by every
+   * attack site (a unit/base target in range, and both base-assault march
+   * paths). Drives foreswing → _swinging → impact → backswing/cooldown
+   * uniformly:
+   *   - winding up            → wait
+   *   - foreswing completed    → fire `onImpact()`, then start backswing +
+   *                              cooldown (interval − foreswing, already elapsed)
+   *   - idle + ready          → begin a new foreswing; `onWindupStart` lets a
+   *                              moving-target caller lock the foe at swing-start
+   *                              (the base paths skip it — walls don't move)
+   * Caller has already established the unit attacks THIS frame. Keeps the
+   * 3-state dance + cooldown math in one place instead of copy-pasted per site.
+   */
+  private tickAttackSwing(u: IUnit, onImpact: () => void, onWindupStart?: () => void): void {
+    u.startAttack();
+    if (u.foreswingTimer > 0) return; // still winding up
+    if (u._swinging) {
+      u._swinging = false;
+      onImpact();
+      const effectiveAtkRate = applyModifiers(u, u.atkRate, 'atkRate');
+      u.atkCd = (1 / effectiveAtkRate) - u.foreswing;
+      u.backswingTimer = u.backswing;
+    } else if (u.canAttack() && u.backswingTimer <= 0) {
+      u.foreswingTimer = u.foreswing;
+      u._swinging = true;
+      onWindupStart?.();
     }
   }
 
@@ -385,23 +428,23 @@ export class CombatSystem {
       // target (attacks AND pushes); its boost lives in the march
       // override so it only applies when there's nothing in range.
       const zone = this._activeCommand(u, zones);
+      // Royal click-order (MOBA-lite): may force the attack target (a focus in
+      // range) or set a march destination. An explicit order outranks an ambient
+      // pheromone; a no-op for every uncommanded unit. (RoyalControl.ts.)
+      const order = resolveRoyalOrder(u);
       // Workers (Scouts) are NON-COMBATANT and ignore commands — they just run
       // forward emitting their OWN zone. (Reading their own zone would idle a
       // rally-scout on its center / send a retreat-scout backward.) So for a
       // worker null both `cmd` (→ plain forward march) and the attack target.
       const isWorker = u.caste === 'worker';
       const cmd = (isWorker || !zone) ? null : zone.kind;
-      const effTarget = (isWorker || cmd === 'rally' || cmd === 'retreat') ? null : target;
+      // order.disengage: a Royal TRAVELING under a click-order must not auto-
+      // engage — a foe in range would pin her in the attack branch and the move
+      // would never run (fighting preempts marching for every unit).
+      const effTarget = order.target ?? ((isWorker || order.disengage || cmd === 'rally' || cmd === 'retreat') ? null : target);
 
       if (effTarget) {
-        u.startAttack();
-
-        if (u.foreswingTimer > 0) {
-          // Still winding up — wait
-        } else if (u._swinging) {
-          // Foreswing just completed — DEAL DAMAGE
-          u._swinging = false;
-
+        this.tickAttackSwing(u, () => {
           if (effTarget instanceof BaseEntity) {
             // In-range base attack — ranged units only (melee units
             // can't enter this branch via _findTarget). Fires from
@@ -425,10 +468,6 @@ export class CombatSystem {
               if (particles) particles.float(this.worldW - SBW / 2, GND - 40, `-${dmg}`, DMG_COLORS.base);
               if (particles) particles.burst(this.worldW - SBW + 2, GND - 20, u.primary, 4);
             }
-
-            const effectiveAtkRate = applyModifiers(u, u.atkRate, 'atkRate');
-            u.atkCd = (1 / effectiveAtkRate) - u.foreswing;
-            u.backswingTimer = u.backswing;
           } else {
             this._lastAttacker = u;
             const hitType: HitFlavor = u.range >= 50 ? 'ranged' : 'melee';
@@ -542,21 +581,12 @@ export class CombatSystem {
               }
             }
             this._lastAttacker = null;
-
-            // Cooldown = total interval minus foreswing (already elapsed)
-            const effectiveAtkRate = applyModifiers(u, u.atkRate, 'atkRate');
-            u.atkCd = (1 / effectiveAtkRate) - u.foreswing;
-            u.backswingTimer = u.backswing;
-
           }
-        } else if (u.canAttack() && u.backswingTimer <= 0) {
-          // Start new attack cycle — begin foreswing
-          u.foreswingTimer = u.foreswing;
-          u._swinging = true;
-          // Lock the target NOW (windup-start) so the hit commits to it; a closer
-          // foe drifting in mid-swing won't steal it. Bases don't move → no lock.
+        }, () => {
+          // Lock the target at windup-start so the hit commits to it; a closer foe
+          // drifting in mid-swing won't steal it. Bases don't move → no lock.
           u.lockedTarget = effTarget instanceof BaseEntity ? null : (effTarget as IUnit);
-        }
+        });
       } else {
         // March
         u.state = 'march';
@@ -567,7 +597,25 @@ export class CombatSystem {
         // command reshapes the march velocity; `facing` is IMMUTABLE,
         // so retreat moves backward via a NEGATIVE velocity — never a
         // facing flip.
-        if (cmd === 'rally') {
+        if (order.marchTo != null) {
+          // Royal click-order movement. She's a controllable hero, so unlike
+          // forward-only rank-and-file she TURNS to face where she walks (no
+          // moonwalking backward), and once arrived she HOLDS the spot in a ready
+          // stance — facing the nearest threat, guarding it from either side —
+          // instead of marching in place.
+          const unitCx = u.x + u.unitW / 2;
+          const delta = order.marchTo - unitCx;
+          if (Math.abs(delta) > ROYAL_ARRIVE) {
+            u.facing = delta > 0 ? 1 : -1;
+            u.x += Math.sign(delta) * spd * 60 * dt;
+          } else if (order.crossing) {
+            // Arrived in X but still sliding between lanes — keep the WALK pose
+            // (state stays 'march') as she crosses; she guards only once landed.
+          } else {
+            u.state = 'attack';                    // arrived — stand/guard, not walk-in-place
+            u.facing = this._faceNearestFoe(u, foes);
+          }
+        } else if (cmd === 'rally') {
           // Mass toward the zone center; HOLD within ~8px so the herd
           // settles instead of jittering across the center line.
           const center = zone ? zone.x : null;
@@ -596,24 +644,13 @@ export class CombatSystem {
         if (u.side === 'player' && u.x + u.unitW >= this.worldW - SBW) {
           u.x = this.worldW - SBW - u.unitW;
           if (isWorker) { /* non-combatant — hold at the line, keep emitting */ } else {
-          u.startAttack();
-
-          if (u.foreswingTimer > 0) {
-            // Winding up
-          } else if (u._swinging) {
-            u._swinging = false;
-            const dmg = Math.max(1, u.atk);
-            enemyBase.setHp(enemyBase.hp - dmg);
-            enemyBase.flash(0.2);
-            if (particles) particles.float(this.worldW - SBW / 2, GND - 40, `-${dmg}`, DMG_COLORS.base);
-            if (particles) particles.burst(this.worldW - SBW + 2, GND - 20, u.primary, 4);
-            const effectiveAtkRate = applyModifiers(u, u.atkRate, 'atkRate');
-            u.atkCd = (1 / effectiveAtkRate) - u.foreswing;
-            u.backswingTimer = u.backswing;
-          } else if (u.canAttack() && u.backswingTimer <= 0) {
-            u.foreswingTimer = u.foreswing;
-            u._swinging = true;
-          }
+            this.tickAttackSwing(u, () => {
+              const dmg = Math.max(1, u.atk);
+              enemyBase.setHp(enemyBase.hp - dmg);
+              enemyBase.flash(0.2);
+              if (particles) particles.float(this.worldW - SBW / 2, GND - 40, `-${dmg}`, DMG_COLORS.base);
+              if (particles) particles.burst(this.worldW - SBW + 2, GND - 20, u.primary, 4);
+            });
           }
         }
 
@@ -621,30 +658,18 @@ export class CombatSystem {
         if (u.side === 'enemy' && u.x <= SBW) {
           u.x = SBW;
           if (isWorker) { /* non-combatant — hold at the line, keep emitting */ } else {
-          u.startAttack();
-
-          if (u.foreswingTimer > 0) {
-            // Winding up
-          } else if (u._swinging) {
-            // Foreswing done — hit base
-            u._swinging = false;
-            const dmg = Math.max(1, u.atk);
-            const actualDmg = wallActive > 0 ? 0 : dmg;
-            playerBase.setHp(playerBase.hp - actualDmg);
-            if (wallActive > 0) {
-              if (particles) particles.float(SBW / 2, GND - 40, 'BLOCKED!', DMG_COLORS.blocked);
-            } else {
-              playerBase.flash(0.2);
-              if (particles) particles.float(SBW / 2, GND - 40, `-${dmg}`, DMG_COLORS.base);
-            }
-            if (particles) particles.burst(SBW - 2, GND - 20, u.primary, 4);
-            const effectiveAtkRate = applyModifiers(u, u.atkRate, 'atkRate');
-            u.atkCd = (1 / effectiveAtkRate) - u.foreswing;
-            u.backswingTimer = u.backswing;
-          } else if (u.canAttack() && u.backswingTimer <= 0) {
-            u.foreswingTimer = u.foreswing;
-            u._swinging = true;
-          }
+            this.tickAttackSwing(u, () => {
+              const dmg = Math.max(1, u.atk);
+              const actualDmg = wallActive > 0 ? 0 : dmg;
+              playerBase.setHp(playerBase.hp - actualDmg);
+              if (wallActive > 0) {
+                if (particles) particles.float(SBW / 2, GND - 40, 'BLOCKED!', DMG_COLORS.blocked);
+              } else {
+                playerBase.flash(0.2);
+                if (particles) particles.float(SBW / 2, GND - 40, `-${dmg}`, DMG_COLORS.base);
+              }
+              if (particles) particles.burst(SBW - 2, GND - 20, u.primary, 4);
+            });
           }
         }
 
@@ -712,6 +737,23 @@ export class CombatSystem {
   // Returns the closest valid target for `u`. Ranged units can target
   // opposing bases; melee units can't (they fall through to the
   // at-wall attack path so their wall-touching animation is preserved).
+  /**
+   * Facing toward the nearest same-lane foe (either direction), or the unit's
+   * forward default when none. Lets the controllable Royal guard a held spot from
+   * BOTH sides — face an enemy that broke through behind her, not just stare
+   * forward — so next frame's facing-gated _findTarget can engage it.
+   */
+  private _faceNearestFoe(u: IUnit, foes: IUnit[]): number {
+    const cx = u.x + u.unitW / 2;
+    let best = Infinity;
+    let dir = u.side === 'player' ? 1 : -1;
+    for (const e of foes) {
+      const g = Math.abs((e.x + e.unitW / 2) - cx);
+      if (g < best) { best = g; dir = (e.x + e.unitW / 2) >= cx ? 1 : -1; }
+    }
+    return dir;
+  }
+
   _findTarget(u: IUnit, foes: IUnit[]): { target: IUnit | BaseEntity | null; dist: number } {
     let target: IUnit | BaseEntity | null = null;
     let bestDist = Infinity;

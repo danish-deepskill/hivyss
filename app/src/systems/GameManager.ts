@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { UnitDef, WaveDef, Side, PlayerAbilityKey, RenderUnit, IWaveController, HiveProfile, PheromoneZone, PheromoneKind, EliteSlot } from '../types';
+import type { UnitDef, WaveDef, Side, PlayerAbilityKey, RenderUnit, IWaveController, HiveProfile, PheromoneZone, PheromoneKind, EliteSlot, RoyalStatus } from '../types';
 import { PHEROMONE_DEFS } from '../config/PheromoneDefs';
 import { resolveColors } from '../config/Palettes';
 import { W, DEFAULT_WORLD_W, SBW as SBW_CONST } from '../config/Constants';
@@ -23,12 +23,18 @@ import { SaveManager } from './SaveManager';
 import { IncubationManager, MAX_CHAMBERS } from './IncubationManager';
 import { capUsed, canDeploy, MAX_CAPACITY } from './Capacity';
 import { EventBus } from './EventBus';
+import { addModifier, removeModifiersBySource } from './ModifierSystem';
 import { UnitPool } from './UnitPool';
 import { SpatialIndex } from './SpatialIndex';
 import { CocoonVisuals } from '../entities/CocoonVisuals';
 import { LarvaVisuals } from '../entities/LarvaVisuals';
 import { registerDebugCommand, unregisterDebugCommand } from './DebugConsole';
 import { HpHud } from './HpHud';
+
+// Royal lifecycle (VISION §3) — playtest knobs.
+const ROYAL_RESPAWN_TIME = 15;   // [sec] dead-window before the next lineage arrives
+const LEADERLESS_ATK_PCT = -20;  // [%] herd atk penalty while the Royal is gone
+const LEADERLESS_SOURCE = 'leaderless:player';
 
 export interface HiveView {
   base: BaseStructure;
@@ -68,6 +74,17 @@ export class GameManager {
   // Active pheromone command zones. Decayed each tick; passed to
   // combat.resolve so own-side units obey the painted lane commands.
   pheromoneZones: PheromoneZone[] = [];
+
+  /** The player's controllable Royal (VISION §3), cached at spawn for
+   *  click-control. Null until spawned / after death (until respawn lands). */
+  playerRoyal: Unit | null = null;
+  /** Royal key for respawn (the lineage continues); set at the first auto-spawn. */
+  private royalKey: string | null = null;
+  /** Seconds until the next Matriarch respawns; > 0 == the leaderless window. */
+  private royalRespawnTimer = 0;
+  /** Royal command mode (R / profile toggle). Clicks only order her while true;
+   *  cleared on her death. Published to the HUD as 'royal.selected'. */
+  royalSelected = false;
 
   // Round-robin lane cursor for wave/AI enemy spawns so both lanes populate.
   private _enemyLaneCursor = 0;
@@ -219,6 +236,26 @@ export class GameManager {
       this.audio.waveStart();
       this.events.emit('logMessage', { message: `\u26A0 Wave ${data.wave} incoming!` });
     });
+
+    // The Royal is on the field from the opening bell (VISION \u00A73): find her key
+    // and auto-spawn her, held at the hive (she doesn't auto-march). Hidden from
+    // the deploy bar (WorldScene) \u2014 not incubated like other units.
+    this.royalKey = this.deckKeys.find(k => UNIT_DEFS[k]?.caste === 'royal') ?? null;
+    this.playerRoyal = this.spawnPlayerRoyal();
+  }
+
+  /**
+   * Spawn the player's Royal at the hive and give her a HOLD order on the spot \u2014
+   * she does NOT auto-march like rank-and-file; she waits + guards home until the
+   * player commits her (a move/focus click). Shared by the opening spawn + respawn.
+   */
+  private spawnPlayerRoyal(): Unit | null {
+    if (!this.royalKey) return null;
+    const def = UNIT_DEFS[this.royalKey];
+    if (!def) return null;
+    const royal = this.createUnit(this.royalKey, 'player', def, this.SBW + 40, 0);
+    royal.order = { kind: 'move', x: royal.x + royal.unitW / 2 }; // hold at spawn, guard the hive
+    return royal;
   }
 
   tick(dt: number): void {
@@ -294,6 +331,9 @@ export class GameManager {
       }
       return true;
     });
+
+    // Royal lifecycle (VISION §3) — death → respawn countdown + leaderless window.
+    this.updateRoyalLifecycle(dt);
 
     // Update particles
     this.particles.update(dt);
@@ -401,10 +441,11 @@ export class GameManager {
     const slots: EliteSlot[] = [];
     for (const u of this.units) {
       if (u.side !== 'player' || u.dead) continue;
-      if (UNIT_DEFS[u.key]?.caste !== 'elite') continue;
+      if (UNIT_DEFS[u.key]?.caste !== 'elite') continue; // Royal has its own profile panel
       const frac = u.signatureCooldown > 0 ? u.sigCd / u.signatureCooldown : 0;
       slots.push({
         id: u.id,
+        key: u.key,
         name: u.unitName,
         ready: u.canSignature(),
         cdFrac: frac < 0 ? 0 : frac > 1 ? 1 : frac,
@@ -419,7 +460,10 @@ export class GameManager {
    *  firing would actually connect, so the slot can light up as "ready". */
   private signatureHasTarget(u: Unit): boolean {
     if (!u.signatureAbility) return false;
-    const range = lookupAbility(u.signatureAbility).range ?? 0;
+    const ability = lookupAbility(u.signatureAbility);
+    // Buff/utility signatures (Primal Roar) buff allies — always "connects".
+    if (ability.category !== 'damage') return true;
+    const range = ability.range ?? 0;
     if (range <= 0) return false;
     const ux = u.x + u.unitW / 2;
     for (const e of this.units) {
@@ -444,6 +488,127 @@ export class GameManager {
     scout.pheromoneKind = kind;
     scout.primary = PHEROMONE_DEFS[kind].color; // tint to its command
     return { success: true, message: `${PHEROMONE_DEFS[kind].name} scout sent!` };
+  }
+
+  /**
+   * Player click on the battlefield (MOBA-lite Royal control, VISION §3):
+   *   - click the ROYAL herself → enter command mode (the discoverable select;
+   *     R and the profile card toggle it too). Issues no move.
+   *   - then, while selected: an enemy under the click (same lane, within its
+   *     body) = focus + chase; open ground = move to that spot.
+   *   - a field click while NOT selected does nothing (you must pick her up first).
+   * `lane` comes from the click's world-Y. No-op when she's dead / the battle's over.
+   */
+  commandRoyalClick(worldX: number, lane: number): void {
+    const r = this.playerRoyal;
+    if (!r || r.dead || !this.running) return;
+
+    // Clicked on/near the Royal IN HER LANE → select her (don't move her onto
+    // herself). Lane-scoped so a click in the OTHER lane at her x is read as a
+    // lane-switch command, not a select. Generous x hit-box — a fumbled "almost
+    // hit her" click should select, not silently no-op.
+    const grabHalf = Math.max(24, r.unitW);
+    if (lane === r.lane && Math.abs(worldX - (r.x + r.unitW / 2)) <= grabHalf) {
+      this.royalSelected = true;
+      return;
+    }
+
+    // Field clicks only command her once she's selected. Say so — a silent
+    // no-op here reads as "clicking is broken".
+    if (!this.royalSelected) {
+      this.events.emit('logMessage', { message: 'Select the Matriarch first — click her, her card, or press R.' });
+      return;
+    }
+
+    let focus: Unit | null = null;
+    for (const u of this.units) {
+      if (u.side !== 'enemy' || u.dead || u.lane !== lane) continue;
+      if (worldX >= u.x - 4 && worldX <= u.x + u.unitW + 4) { focus = u; break; }
+    }
+    // Clamp ground-clicks to the playable field — a click past the hive walls
+    // means "all the way back/forward", not "stand inside the hive".
+    const x = Math.max(this.SBW, Math.min(this.worldW - this.SBW, worldX));
+    // Set the destination lane — if it differs, this kicks off the cross-lane slide
+    // (Unit eases _laneVisual across; her combat row flips at the midpoint, so the
+    // front she's LEAVING threatens her first, then the one she's ENTERING).
+    r._laneTarget = lane;
+    r.order = focus ? { kind: 'focus', target: focus } : { kind: 'move', x };
+  }
+
+  /** Toggle Royal command mode (R key / profile click). Only a living Royal can
+   *  be selected; deselect always allowed. */
+  toggleRoyalSelect(): void {
+    if (this.royalSelected) { this.royalSelected = false; return; }
+    if (this.playerRoyal && !this.playerRoyal.dead) this.royalSelected = true;
+  }
+
+  /** Royal state for the HUD profile panel (registry 'royal.status'). */
+  getRoyalStatus(): RoyalStatus {
+    const r = this.playerRoyal;
+    const key = this.royalKey ?? '';
+    const def = key ? UNIT_DEFS[key] : undefined;
+    if (!r || r.dead) {
+      return {
+        present: this.royalKey != null, alive: false,
+        key, name: def?.name ?? 'Royal',
+        hp: 0, maxHp: def?.hp ?? 0, hpFrac: 0,
+        respawnIn: Math.max(0, Math.ceil(this.royalRespawnTimer)),
+        id: -1, sigName: '', sigReady: false, sigCdFrac: 0,
+      };
+    }
+    const sigName = r.signatureAbility ? lookupAbility(r.signatureAbility).name : '';
+    const frac = r.signatureCooldown > 0 ? r.sigCd / r.signatureCooldown : 0;
+    return {
+      present: true, alive: true,
+      key, name: r.unitName,
+      hp: r.hp, maxHp: r.maxHp, hpFrac: r.maxHp > 0 ? r.hp / r.maxHp : 0,
+      respawnIn: 0, id: r.id, sigName,
+      sigReady: r.canSignature(),
+      sigCdFrac: frac < 0 ? 0 : frac > 1 ? 1 : frac,
+    };
+  }
+
+  /**
+   * Royal lifecycle (VISION §3). Three tiers around the authored baseline:
+   * baseline (no Royal) < amplified (Royal alive, via her cohesion-amplifier
+   * aura) — and, transiently, leaderless (she just died) BELOW baseline.
+   *
+   *   - Death → start the respawn countdown (which IS the leaderless window).
+   *   - Countdown elapses → a fresh lineage Matriarch emerges.
+   *   - Leaderless penalty is maintained per-frame on every living player unit
+   *     while she's gone, so units deployed mid-gap inherit it; lifted the frame
+   *     she returns. DEATH-triggered, not "no Royal present" — a skirmish that
+   *     never had a Queen (legacy / sandbox) sits at clean baseline, no penalty.
+   * The cohesion-amplifier DROP is automatic (her aura's death-cleanup), so it's
+   * not handled here — this only adds the extra leaderless penalty + respawn.
+   */
+  private updateRoyalLifecycle(dt: number): void {
+    if (this.playerRoyal && this.playerRoyal.dead) {
+      this.playerRoyal = null;
+      this.royalSelected = false; // can't command a corpse
+      this.royalRespawnTimer = ROYAL_RESPAWN_TIME;
+      this.events.emit('logMessage', { message: 'The Matriarch has fallen — the herd is leaderless!' });
+    }
+
+    if (this.royalRespawnTimer > 0) {
+      this.royalRespawnTimer -= dt;
+      if (this.royalRespawnTimer <= 0) {
+        this.royalRespawnTimer = 0;
+        this.playerRoyal = this.spawnPlayerRoyal();
+        if (this.playerRoyal) this.events.emit('logMessage', { message: 'A new Matriarch emerges!' });
+      }
+    }
+
+    const leaderless = this.royalRespawnTimer > 0;
+    for (const u of this.units) {
+      if (u.side !== 'player' || u.dead) continue;
+      const has = u.modifiers?.some(m => m.source === LEADERLESS_SOURCE) ?? false;
+      if (leaderless && !has) {
+        addModifier(u, { stat: 'atk', type: 'percent', value: LEADERLESS_ATK_PCT, source: LEADERLESS_SOURCE });
+      } else if (!leaderless && has) {
+        removeModifiersBySource(u, LEADERLESS_SOURCE);
+      }
+    }
   }
 
   castAbility(key: PlayerAbilityKey): { success: boolean; message: string } {

@@ -1,13 +1,13 @@
 import Phaser from 'phaser';
-import type { UnitDef, Side, UnitState, RenderUnit, Route, AttackRange, GenePalette, ComponentTag, UnitPersistent, PassiveDef, GeneLine, CasteKey, SfxKey, IUnit, PheromoneKind } from '../types';
+import type { UnitDef, Side, UnitState, RenderUnit, Route, AttackRange, GenePalette, ComponentTag, UnitPersistent, PassiveDef, GeneLine, CasteKey, SfxKey, IUnit, PheromoneKind, RoyalOrder } from '../types';
 import { hasActiveEffect } from '../systems/EffectSystem';
 import type { DamageType } from '../config/combat/damageTypes';
 import type { ResistanceTier } from '../config/combat/resistances';
 import type { Modifier } from '../systems/ModifierSystem';
 import type { ActiveEffect } from '../config/combat/effects/types';
 import { resolveColors } from '../config/Palettes';
-import { SPD_MULT } from '../config/Constants';
-import { getGroundY, laneDepth } from '../config/RouteMatrix';
+import { SPD_MULT, LANE_CROSS_REACH } from '../config/Constants';
+import { getGroundY, laneDepth, laneDepthLerp } from '../config/RouteMatrix';
 import { drawUnit } from '../units/registry';
 import { NEUTRAL, type Motion, type MotionTransform, type AnimPhase } from '../units/motions';
 import { UNIT_COMPONENTS } from '../systems/EntityComponents';
@@ -38,6 +38,12 @@ export class Unit extends Phaser.GameObjects.Container {
    * lane-offset ground Y. NOT persistent — re-laned on pool recycle.
    */
   lane: number;
+  /** Visual lane (float) while mid lane-switch — eases toward `_laneTarget` across
+   *  the depth stack. `lane` = round(_laneVisual), so the combat row flips at the
+   *  midpoint of a cross. Equals `lane`/`_laneTarget` when settled. */
+  _laneVisual: number;
+  /** Destination lane of a lane-switch; `_laneVisual` slides to it. Only the Royal moves it. */
+  _laneTarget: number;
   geneline: GeneLine;
 
   // Stats
@@ -106,6 +112,7 @@ export class Unit extends Phaser.GameObjects.Container {
   lockedTarget: IUnit | null;
   pheromoneKind?: PheromoneKind; // set → courier Scout laying a fading trail
   _lastDepositX?: number;        // deposit-spacing tracker for the trail
+  order: RoyalOrder | null;      // player click-order (Royal control); null = autonomous
   foreswing: number;
   backswing: number;
   foreswingTimer: number;
@@ -153,6 +160,8 @@ export class Unit extends Phaser.GameObjects.Container {
     this.key = '';
     this.side = 'player';
     this.lane = 0;
+    this._laneVisual = 0;
+    this._laneTarget = 0;
     this.geneline = 'normal';
     this.hp = 0;
     this.maxHp = 0;
@@ -188,6 +197,7 @@ export class Unit extends Phaser.GameObjects.Container {
     this.lockedTarget = null;
     this.pheromoneKind = undefined;
     this._lastDepositX = undefined;
+    this.order = null;
     this.foreswing = 0;
     this.backswing = 0;
     this.foreswingTimer = 0;
@@ -238,6 +248,8 @@ export class Unit extends Phaser.GameObjects.Container {
     this.key = def._key!;
     this.side = side;
     this.lane = lane;
+    this._laneVisual = lane;
+    this._laneTarget = lane; // settled until a lane-switch moves the target
     this.geneline = def.geneline;
 
     this.hp = def.hp;
@@ -293,6 +305,7 @@ export class Unit extends Phaser.GameObjects.Container {
     this.lockedTarget = null;
     this.pheromoneKind = undefined;
     this._lastDepositX = undefined;
+    this.order = null;
 
     const interval = 1 / def.atkRate;
     this.foreswing = def.foreswing ?? interval * 0.3;
@@ -376,6 +389,27 @@ export class Unit extends Phaser.GameObjects.Container {
     // ActiveEffect durations tick via CombatSystem.resolve's
     // updateEffects call (once per combat frame, not per Unit).
 
+    // Lane-switch slide — the controllable Royal eases across the 2.5D depth stack
+    // toward her new `lane` (combat already committed to it). Rate scales with her
+    // OWN speed (≈ LANE_CROSS_REACH / spd seconds), so nimble genelines cross
+    // faster, ponderous ones slower. Settled units (visual == lane) skip it.
+    if (this._laneVisual !== this._laneTarget) {
+      const rate = this.spd / LANE_CROSS_REACH; // lanes per second
+      const dir = this._laneTarget > this._laneVisual ? 1 : -1;
+      this._laneVisual += dir * rate * dt;
+      if ((dir > 0 && this._laneVisual >= this._laneTarget) || (dir < 0 && this._laneVisual <= this._laneTarget)) {
+        this._laneVisual = this._laneTarget;
+      }
+      // Combat row = the lane her BODY is in (flips at the midpoint), so enemies
+      // engage her by physical position: the front she's LEAVING threatens her
+      // first, the one she's ENTERING last (the option-A hand-off).
+      this.lane = Math.round(this._laneVisual);
+      const depth = laneDepthLerp(this._laneVisual);
+      this.setScale(depth.scale);
+      this.setAlpha(depth.alpha);
+      this.y = Math.round(getGroundY(this.currentRoute, this._laneVisual) - this.unitH * depth.scale);
+    }
+
     // Bob animation
     this.bob += dt * (this.state === 'march' ? 10 : 3);
 
@@ -384,7 +418,11 @@ export class Unit extends Phaser.GameObjects.Container {
   }
 
   getSpeed(): number {
-    return hasActiveEffect(this, 'slow') ? this.spd * 0.45 : this.spd;
+    let s = this.spd;
+    if (hasActiveEffect(this, 'slow')) s *= 0.45;
+    // Primal Roar charge — the herd surges forward 1.5× while roaring.
+    if (hasActiveEffect(this, 'herd_roar')) s *= 1.5;
+    return s;
   }
 
   march(dt: number): void {
@@ -542,7 +580,7 @@ export class Unit extends Phaser.GameObjects.Container {
     // ground distance by scaleY so the shadow lands ON the ground line
     // even when the container is depth-scaled (else it sits at scale²).
     if (this.currentRoute !== 'tunnel') {
-      const groundLocalY = (getGroundY('land', this.lane) - this.y) / (this.scaleY || 1);
+      const groundLocalY = (getGroundY('land', this._laneVisual) - this.y) / (this.scaleY || 1);
       g.fillStyle(0x000000, 0.25);
       g.fillEllipse(this.unitW / 2, groundLocalY + 1, this.unitW / 2 + 2, 3);
     }

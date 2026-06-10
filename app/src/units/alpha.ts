@@ -269,7 +269,19 @@ const matriarchDef = aDef({
   incubation: 16,
   caste: "royal",
   defaultAbility: "jaw_strike",
-  passives: [cohesion({ radius: 110, maxAllies: 6 })],
+  // Royal ULTIMATE — Primal Roar: same-lane herd surges to peak cohesion +
+  // charges forward for the buff window. Fired from her HUD slot (signature
+  // system); long cooldown — it's a hero beat, not a spam.
+  signatureAbility: "primal_roar",
+  signatureCooldown: 20,
+  passives: [
+    cohesion({ radius: 110, maxAllies: 6 }),
+    // Royal cohesion AMPLIFIER (VISION §3) — additively boosts nearby herd-mates'
+    // per-ally cohesion (like Goliath's, wider). Absent by default → baseline; her
+    // death runs the aura cleanup → the amp vanishes and the herd's cohesion sags.
+    // This IS the "hook drops to baseline" half — zero extra code, pure data.
+    { kind: "aura_modifier", stat: "cohesion_perAlly", type: "flat", value: 5, range: 130 },
+  ],
 });
 
 export const units: Record<string, UnitModule> = {

@@ -4,6 +4,23 @@
 import type { AbilityDef } from '../../../types';
 
 export const utilityAbilities: Record<string, AbilityDef> = {
+  // Matriarch's Royal ULTIMATE — Primal Roar. A utility/buff signature (not
+  // damage): applies `herd_roar` to same-lane allies within `range`, so the
+  // herd surges to peak cohesion + charges forward for the effect's duration.
+  // The signature path applies it directly (no damage pipeline) and lane-scopes
+  // it; `targetCount` is high so a full gathered herd all catches the roar.
+  primal_roar: {
+    name: 'Primal Roar',
+    category: 'utility',
+    targeting: 'all_allies_in_range',
+    range: 140,
+    targetCount: 24,
+    appliesEffects: ['herd_roar'],
+    fx: { kind: 'shockwave' },
+    sfx: 'stampede',
+  },
+
+
   // Mendwing's passive heal cast. Dispatched by the heal_cast passive
   // handler (PassiveHandlers.ts) every `cooldown` seconds against the
   // lowest-HP in-range ally.

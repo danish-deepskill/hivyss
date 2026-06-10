@@ -26,6 +26,15 @@ export function getGroundY(route: Route, lane = 0): number {
 }
 
 /**
+ * Inverse of getGroundY for the land route — which battle lane a world-Y
+ * falls in (0 = upper, 1 = lower). Used to map a click to a lane (Royal
+ * control, sandbox placement). Picks the nearer lane ground line.
+ */
+export function laneFromY(y: number): number {
+  return Math.abs(y - getGroundY('land', 1)) < Math.abs(y - getGroundY('land', 0)) ? 1 : 0;
+}
+
+/**
  * Presentational depth cue for a battle `lane` — `{ scale, alpha }` to
  * draw the far (North/lane 0) row smaller + dimmer than the near
  * (South/lane 1) row, selling the stacking as depth rather than height.
@@ -33,4 +42,16 @@ export function getGroundY(route: Route, lane = 0): number {
  */
 export function laneDepth(lane = 0): { scale: number; alpha: number } {
   return LANE_DEPTH[lane] ?? LANE_DEPTH[0];
+}
+
+/**
+ * Depth cue for a FRACTIONAL lane (0..1) — interpolates scale + alpha between the
+ * two rows. Drives a unit mid lane-switch as it slides across the depth stack
+ * (grows/brightens toward the near row, shrinks/dims toward the far one). At an
+ * integer lane it returns that row's exact values, so settled units are unchanged.
+ */
+export function laneDepthLerp(lane: number): { scale: number; alpha: number } {
+  const t = lane < 0 ? 0 : lane > 1 ? 1 : lane;
+  const a = LANE_DEPTH[0], b = LANE_DEPTH[1];
+  return { scale: a.scale + (b.scale - a.scale) * t, alpha: a.alpha + (b.alpha - a.alpha) * t };
 }

@@ -1,12 +1,12 @@
 import Phaser from 'phaser';
-import { UNIT_DEFS } from '../units/registry';
+import { UNIT_DEFS, TIER_DEFS } from '../units/registry';
 import { createUnitCard } from '../ui/UnitCard';
 import { ABILITY_DEFS } from '../config/AbilityDefs';
 import { MAX_CHAMBERS, MAX_LARVAE, LARVA_SPAWN_RATE } from '../systems/IncubationManager';
 import type { Chamber } from '../systems/IncubationManager';
 import { MAX_CAPACITY, canDeploy } from '../systems/Capacity';
 import type { EventBus } from '../systems/EventBus';
-import type { EliteSlot } from '../types';
+import type { EliteSlot, RoyalStatus } from '../types';
 import { PHEROMONE_DEFS, PHEROMONE_ORDER } from '../config/PheromoneDefs';
 
 export class MenuUIScene extends Phaser.Scene {
@@ -33,11 +33,20 @@ export class MenuUIScene extends Phaser.Scene {
   // Abilities
   private abilityBtns: Record<string, { btn: HTMLButtonElement; cdBar: HTMLElement }> = {};
 
-  // Elite signature slots (one trigger button per live player Elite)
-  private eliteRow!: HTMLElement;
+  // Elite signature slots — silver mini-portraits beside the Royal, one per live
+  // player Elite (click to fire its signature). Lives inside the Royal panel.
+  private eliteGroup!: HTMLElement;          // divider + ELITE label + portraits (hidden when none)
   private eliteSlotContainer!: HTMLElement;
-  private eliteSlotBtns: HTMLButtonElement[] = [];
+  private eliteSlotEls: HTMLElement[] = [];
   private eliteSlots: EliteSlot[] = [];
+
+  // Royal profile (the keystone hero panel) — Dota-style 1:1 portrait of the
+  // actual procedural render, name + tier, HP bar with number, and the ult.
+  private royalProfile!: {
+    wrap: HTMLElement; hero: HTMLElement; portrait: HTMLElement; portraitImg: HTMLImageElement;
+    name: HTMLElement; tier: HTMLElement; hpFill: HTMLElement; hpNum: HTMLElement;
+    status: HTMLElement; roarBtn: HTMLButtonElement; roarLbl: HTMLElement; roarCd: HTMLElement;
+  };
 
   // Active deploy lane (0 = top, 1 = bottom). Units hatch into this lane;
   // Shift+deploy sends ONE unit to the other lane (a sticky toggle + override —
@@ -84,14 +93,20 @@ export class MenuUIScene extends Phaser.Scene {
     }
     panel.appendChild(this.buildLarvaMound());
     panel.appendChild(this.buildUnitSlots(previews));
-    panel.appendChild(this.buildEliteSlots());
+    panel.appendChild(this.buildRoyalProfile());
     panel.appendChild(this.buildPheromones());
     panel.appendChild(this.buildAbilities());
     panel.appendChild(this.buildLog());
 
     outer.appendChild(this.buildLaneIndicator());
     outer.appendChild(panel);
-    this.add.dom(640, 360, outer);
+    // Phaser's DOMElement re-applies pointerEvents:auto onto the wrapped node
+    // every render frame — overriding outer's authored pointer-events:none and
+    // silently swallowing every battlefield click (Royal control, any future
+    // canvas input). Force it off on the WRAPPER, exactly like SandboxHUDScene;
+    // the HUD panels keep their own pointer-events:auto so buttons still work.
+    const wrapper = this.add.dom(640, 360, outer);
+    wrapper.pointerEvents = 'none';
     this.refreshLaneHighlight(); // light both the HUD toggle + the left arrows
 
     // Keyboard: Tab flips the active lane; 1-9/0 deploy slots 1-10 into the
@@ -244,8 +259,9 @@ export class MenuUIScene extends Phaser.Scene {
       b.cdBar.style.width = (ablCdPct[key] ?? 100) + '%';
     });
 
-    // Elite signature slots
+    // Elite signature slots + the Royal profile
     this.renderEliteSlots(this.registry.get('elite.slots') ?? []);
+    this.renderRoyalProfile();
   }
 
   // --- DOM builders ---
@@ -440,53 +456,54 @@ export class MenuUIScene extends Phaser.Scene {
     return row;
   }
 
-  private buildEliteSlots(): HTMLElement {
-    const row = document.createElement('div');
-    row.style.cssText = 'display:none; gap:4px; align-items:center; padding:3px 8px; background:#0c0a06; border-bottom:1px solid #1a1408; width:100%; pointer-events:auto;';
-    const lbl = this.el('span', 'font-size:10px; color:#e0a020; letter-spacing:1px; margin-right:4px;', 'ELITE');
-    this.eliteSlotContainer = document.createElement('div');
-    this.eliteSlotContainer.style.cssText = 'display:flex; gap:4px; align-items:center; flex-wrap:wrap;';
-    row.append(lbl, this.eliteSlotContainer);
-    this.eliteRow = row;
-    return row;
-  }
-
+  // Render the live Elites as SILVER 1:1 portraits (smaller siblings of the gold
+  // Royal) into the Royal panel's cluster. Same procedural-render source as the
+  // deck cards + Royal portrait; a dark sweep recedes as the signature charges,
+  // a bright frame means "ready + a target in range" (click to fire).
   private renderEliteSlots(slots: EliteSlot[]): void {
-    this.eliteRow.style.display = slots.length ? 'flex' : 'none';
-    // Rebuild buttons only when the count changes (Elites deploy / die).
-    if (this.eliteSlotBtns.length !== slots.length) {
+    const previews: Record<string, string> = this.registry.get('previews') || {};
+    this.eliteGroup.style.display = slots.length ? 'flex' : 'none'; // hide label+divider when no Elites
+    // Rebuild portraits only when the count changes (Elites deploy / die).
+    if (this.eliteSlotEls.length !== slots.length) {
       this.eliteSlotContainer.replaceChildren();
-      this.eliteSlotBtns = slots.map((_, i) => {
-        const b = document.createElement('button');
-        b.style.cssText = 'position:relative; overflow:hidden; font-size:10px; padding:3px 8px; border-radius:3px; min-width:64px; text-align:center; pointer-events:auto;';
-        b.appendChild(document.createElement('span'));          // label
-        const cd = document.createElement('div');               // charge fill
-        cd.style.cssText = 'position:absolute; left:0; bottom:0; height:2px; background:#e0a020;';
-        b.appendChild(cd);
-        b.addEventListener('click', () => this.onEliteSlotClick(i));
-        this.eliteSlotContainer.appendChild(b);
-        return b;
+      this.eliteSlotEls = slots.map((_, i) => {
+        const d = document.createElement('div');
+        // Warm, lit backdrop so the bug render reads clearly (the silver FRAME
+        // carries the rank, not the backdrop). Brighter than the Royal's since
+        // the portrait is smaller — small art needs more contrast, not less.
+        d.style.cssText = 'position:relative; width:42px; height:42px; border:2px solid #6a7178; border-radius:4px; background:radial-gradient(circle at 50% 34%, #4a4034, #16120c); box-shadow:inset 0 0 6px #000; overflow:hidden; flex:0 0 auto; transition:border-color .1s, box-shadow .1s;';
+        const img = document.createElement('img');
+        img.style.cssText = 'position:absolute; left:50%; top:54%; transform:translate(-50%,-50%); width:36px; height:36px; object-fit:contain; image-rendering:pixelated;';
+        const lbl = document.createElement('span'); // name fallback when no preview
+        lbl.style.cssText = 'position:absolute; inset:0; display:none; align-items:center; justify-content:center; text-align:center; font-size:8px; color:#aeb6bd; padding:2px; line-height:1.1;';
+        const cd = document.createElement('div');    // cooldown overlay — recedes from the bottom
+        cd.style.cssText = 'position:absolute; left:0; right:0; bottom:0; height:0; background:rgba(0,0,0,0.6);';
+        d.append(img, lbl, cd);
+        d.addEventListener('click', () => this.onEliteSlotClick(i));
+        this.eliteSlotContainer.appendChild(d);
+        return d;
       });
     }
     slots.forEach((s, i) => {
-      const b = this.eliteSlotBtns[i];
-      const label = b.firstChild as HTMLSpanElement;
-      const cd = b.lastChild as HTMLElement;
-      if (!s.ready) {
-        // On cooldown — greyed; the bar charges toward ready.
-        label.textContent = s.name;
-        b.style.border = '1px solid #44402a'; b.style.background = '#14120c'; b.style.color = '#6a6048'; b.style.cursor = 'default'; b.style.fontWeight = 'normal';
-        cd.style.width = ((1 - s.cdFrac) * 100) + '%';
-      } else if (s.inRange) {
-        // Ready AND an enemy is in range — lit, clickable.
-        label.textContent = '⚡ ' + s.name;
-        b.style.border = '1px solid #e0a020'; b.style.background = '#2a2010'; b.style.color = '#ffcf50'; b.style.cursor = 'pointer'; b.style.fontWeight = 'bold';
-        cd.style.width = '0';
+      const d = this.eliteSlotEls[i];
+      const img = d.children[0] as HTMLImageElement;
+      const lbl = d.children[1] as HTMLElement;
+      const cd = d.children[2] as HTMLElement;
+      const pv = previews[s.key];
+      if (pv) {
+        if (img.getAttribute('src') !== pv) img.src = pv;
+        img.style.display = 'block'; lbl.style.display = 'none';
       } else {
-        // Ready but no target in range — dim (firing would whiff).
-        label.textContent = s.name;
-        b.style.border = '1px solid #6a5a30'; b.style.background = '#16140e'; b.style.color = '#9a8a55'; b.style.cursor = 'default'; b.style.fontWeight = 'normal';
-        cd.style.width = '0';
+        img.style.display = 'none'; lbl.style.display = 'flex'; lbl.textContent = s.name;
+      }
+      d.title = s.name + (s.ready ? (s.inRange ? ' — signature READY' : ' — no target in range') : ' — charging');
+      cd.style.height = (s.ready ? 0 : s.cdFrac * 100) + '%';
+      if (s.ready && s.inRange) {
+        d.style.borderColor = '#d2dae0'; d.style.cursor = 'pointer'; d.style.boxShadow = 'inset 0 0 6px #000, 0 0 7px #d2dae088';
+      } else if (s.ready) {
+        d.style.borderColor = '#7c848b'; d.style.cursor = 'default'; d.style.boxShadow = 'inset 0 0 6px #000';
+      } else {
+        d.style.borderColor = '#484d53'; d.style.cursor = 'default'; d.style.boxShadow = 'inset 0 0 6px #000';
       }
     });
     this.eliteSlots = slots;
@@ -494,8 +511,137 @@ export class MenuUIScene extends Phaser.Scene {
 
   private onEliteSlotClick(i: number): void {
     const s = this.eliteSlots[i];
-    if (!s || !s.ready || !s.inRange) return; // only a lit slot fires
+    if (!s || !s.ready || !s.inRange) return; // only a lit (ready + in-range) portrait fires
     this.eventBus.emit('triggerSignature', { unitId: s.id });
+  }
+
+  // Royal profile — the keystone hero panel (VISION §3), Dota-style: a 1:1
+  // framed PORTRAIT of the Matriarch's actual procedural render (same preview
+  // source as the deck cards, not an emoji), her name + tier, a green HP bar with
+  // number, and the Primal Roar ult. Click the portrait (or press R) to enter
+  // command mode, then click the field to move/focus her. One-of-a-kind — it's
+  // her own panel, not an ELITE signature slot.
+  private buildRoyalProfile(): HTMLElement {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:none; align-items:center; gap:10px; padding:5px 10px; background:linear-gradient(180deg,#16110a,#0b0906); border-top:1px solid #2e2410; border-bottom:1px solid #2e2410; width:100%; pointer-events:auto;';
+    wrap.appendChild(this.el('span', 'font-size:10px; color:#c8a030; letter-spacing:2px; margin-right:2px;', 'ROYAL'));
+
+    // Hero block — 1:1 portrait + name/HP/status. Click it to command.
+    const hero = document.createElement('div');
+    hero.style.cssText = 'display:flex; align-items:center; gap:9px; cursor:pointer;';
+
+    const portrait = document.createElement('div');
+    portrait.style.cssText = 'position:relative; width:54px; height:54px; border:2px solid #6b531c; border-radius:4px; background:radial-gradient(circle at 50% 32%, #2c2414, #0b0906); box-shadow:inset 0 0 8px #000; overflow:hidden; flex:0 0 auto; transition:border-color .1s, box-shadow .1s;';
+    const portraitImg = document.createElement('img');
+    portraitImg.style.cssText = 'position:absolute; left:50%; top:54%; transform:translate(-50%,-50%); width:48px; height:48px; object-fit:contain; image-rendering:pixelated;';
+    portrait.appendChild(portraitImg);
+
+    const info = document.createElement('div');
+    info.style.cssText = 'display:flex; flex-direction:column; gap:3px; min-width:150px;';
+    const nameRow = document.createElement('div');
+    nameRow.style.cssText = 'display:flex; align-items:center; gap:6px;';
+    const name = this.el('span', 'font-size:12px; color:#ffcf50; font-weight:bold; letter-spacing:0.5px;', 'Royal');
+    const tier = this.el('span', 'font-size:8px; color:#888; border:1px solid #444; border-radius:2px; padding:0 3px; line-height:12px;');
+    nameRow.append(name, tier);
+
+    const hpTrack = document.createElement('div');
+    hpTrack.style.cssText = 'position:relative; width:150px; height:11px; background:#080808; border:1px solid #000; border-radius:2px; overflow:hidden;';
+    const hpFill = this.el('div', 'height:100%; width:100%; background:linear-gradient(180deg,#5ad24a,#2f9a28); transition:width .1s;');
+    const hpNum = this.el('span', 'position:absolute; inset:0; text-align:center; font-size:9px; line-height:11px; color:#eaffea; text-shadow:0 1px 1px #000;');
+    hpTrack.append(hpFill, hpNum);
+
+    const status = this.el('span', 'font-size:9px; color:#9a8a55;');
+    info.append(nameRow, hpTrack, status);
+
+    hero.append(portrait, info);
+    hero.addEventListener('click', () => this.eventBus.emit('toggleRoyalSelect', {}));
+    wrap.appendChild(hero);
+
+    // Primal Roar — the Royal's OWN ultimate, kept right beside her (it's her
+    // ability, not a far-edge toolbar button).
+    const roarBtn = document.createElement('button');
+    roarBtn.style.cssText = 'position:relative; overflow:hidden; font-size:11px; padding:8px 16px; border-radius:4px; min-width:140px; text-align:center; pointer-events:auto; margin-left:12px; letter-spacing:0.5px;';
+    const roarLbl = document.createElement('span');
+    roarBtn.appendChild(roarLbl);
+    const roarCd = this.el('div', 'position:absolute; left:0; bottom:0; height:3px; background:#f0c040;');
+    roarBtn.appendChild(roarCd);
+    roarBtn.addEventListener('click', () => this.onRoyalRoar());
+    wrap.appendChild(roarBtn);
+
+    // Elite signature portraits — smaller SILVER 1:1 frames; one per live Elite,
+    // click to fire its signature. A silver ELITE label (parallel to the gold
+    // ROYAL one) + divider precede them. The whole group hides when none are out.
+    this.eliteGroup = document.createElement('div');
+    this.eliteGroup.style.cssText = 'display:none; align-items:center; gap:7px; margin-left:8px;';
+    this.eliteGroup.appendChild(this.el('div', 'width:1px; height:38px; background:#2e2410;'));
+    this.eliteGroup.appendChild(this.el('span', 'font-size:10px; color:#9aa3ab; letter-spacing:2px;', 'ELITE'));
+    this.eliteSlotContainer = document.createElement('div');
+    this.eliteSlotContainer.style.cssText = 'display:flex; gap:5px; align-items:center;';
+    this.eliteGroup.appendChild(this.eliteSlotContainer);
+    wrap.appendChild(this.eliteGroup);
+
+    this.royalProfile = { wrap, hero, portrait, portraitImg, name, tier, hpFill, hpNum, status, roarBtn, roarLbl, roarCd };
+    return wrap;
+  }
+
+  private renderRoyalProfile(): void {
+    const st = this.registry.get('royal.status') as RoyalStatus | undefined;
+    const selected: boolean = this.registry.get('royal.selected') ?? false;
+    const p = this.royalProfile;
+    if (!st || !st.present) { p.wrap.style.display = 'none'; return; }
+    p.wrap.style.display = 'flex';
+
+    // Portrait — the actual procedural render (same preview data URL the deck
+    // cards use). Set src only on change so it doesn't reload every frame.
+    const previews: Record<string, string> = this.registry.get('previews') || {};
+    const img = previews[st.key];
+    if (img && p.portraitImg.getAttribute('src') !== img) p.portraitImg.src = img;
+    p.portraitImg.style.display = img ? 'block' : 'none';
+
+    p.name.textContent = st.name;
+    const def = UNIT_DEFS[st.key];
+    const tdef = def ? TIER_DEFS[def.tier] : null;
+    p.tier.textContent = tdef ? tdef.label : '';
+    if (tdef) { p.tier.style.color = tdef.color; p.tier.style.borderColor = tdef.color; }
+
+    if (st.alive) {
+      p.hpFill.style.width = (st.hpFrac * 100) + '%';
+      p.hpNum.textContent = `${Math.ceil(st.hp)} / ${st.maxHp}`;
+      p.status.textContent = selected ? '● COMMANDING — click the field' : 'click her / portrait / R to command';
+      p.status.style.color = selected ? '#a0e070' : '#9a8a55';
+      p.portrait.style.borderColor = selected ? '#8fe060' : '#6b531c';
+      p.portrait.style.boxShadow = selected ? 'inset 0 0 8px #000, 0 0 8px #8fe06088' : 'inset 0 0 8px #000';
+      p.portraitImg.style.filter = 'none';
+    } else {
+      p.hpFill.style.width = '0%';
+      p.hpNum.textContent = st.respawnIn > 0 ? `RESPAWN ${st.respawnIn}s` : 'DOWN';
+      p.status.textContent = 'the herd is leaderless';
+      p.status.style.color = '#f06040';
+      p.portrait.style.borderColor = '#7a2418';
+      p.portrait.style.boxShadow = 'inset 0 0 8px #000';
+      p.portraitImg.style.filter = 'grayscale(1) brightness(0.55)';
+    }
+
+    const sig = st.sigName || 'Ultimate';
+    if (!st.alive) {
+      p.roarLbl.textContent = sig;
+      p.roarBtn.style.border = '1px solid #3a2c14'; p.roarBtn.style.background = '#120e08'; p.roarBtn.style.color = '#5a4c30'; p.roarBtn.style.cursor = 'default'; p.roarBtn.style.fontWeight = 'normal';
+      p.roarCd.style.width = '0';
+    } else if (st.sigReady) {
+      p.roarLbl.textContent = '⚡ ' + sig;
+      p.roarBtn.style.border = '1px solid #f0c040'; p.roarBtn.style.background = '#2a2010'; p.roarBtn.style.color = '#ffe080'; p.roarBtn.style.cursor = 'pointer'; p.roarBtn.style.fontWeight = 'bold';
+      p.roarCd.style.width = '0';
+    } else {
+      p.roarLbl.textContent = sig;
+      p.roarBtn.style.border = '1px solid #6a5a30'; p.roarBtn.style.background = '#16120a'; p.roarBtn.style.color = '#9a8a55'; p.roarBtn.style.cursor = 'default'; p.roarBtn.style.fontWeight = 'normal';
+      p.roarCd.style.width = ((1 - st.sigCdFrac) * 100) + '%';
+    }
+  }
+
+  private onRoyalRoar(): void {
+    const st = this.registry.get('royal.status') as RoyalStatus | undefined;
+    if (!st || !st.alive || !st.sigReady) return;
+    this.eventBus.emit('triggerSignature', { unitId: st.id });
   }
 
   private buildLog(): HTMLElement {

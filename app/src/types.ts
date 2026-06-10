@@ -296,12 +296,31 @@ export type SfxKey = 'jaw' | 'gore' | 'clack' | 'needle' | 'ram' | 'stampede';
 // is per-HUD (the data is shared, the look is not).
 export interface EliteSlot {
   id: number;        // unit id — echoed back on click to fire THIS Elite
+  key: string;       // unit key — for the portrait preview (the real procedural draw)
   name: string;
   ready: boolean;    // signature off cooldown
   cdFrac: number;    // 0..1 cooldown remaining (drives the fill bar)
   firable: boolean;  // carries a signature ability at all
   inRange: boolean;  // an enemy is in the signature's range (would connect)
 }
+// RoyalStatus — the player's Royal state published to the HUD (registry
+// 'royal.status'), driving the Royal profile panel: alive/down, HP, respawn
+// countdown, and ult (signature) readiness. Computed by GameManager.getRoyalStatus().
+export interface RoyalStatus {
+  present: boolean;   // a Royal exists in this run at all (else hide the panel)
+  alive: boolean;
+  key: string;        // unit key — for the portrait preview lookup (the real draw)
+  name: string;
+  hp: number;
+  maxHp: number;
+  hpFrac: number;     // 0..1
+  respawnIn: number;  // seconds until the next lineage (0 when alive)
+  id: number;         // unit id to fire the ult (-1 when down)
+  sigName: string;    // ult display name (Primal Roar)
+  sigReady: boolean;  // ult off cooldown
+  sigCdFrac: number;  // 0..1 cooldown remaining
+}
+
 export type UnitState = 'march' | 'attack';
 export type Side = 'player' | 'enemy';
 
@@ -327,6 +346,15 @@ export interface PheromoneZone {
    *  SandboxScene), NOT in resolve. For a trail blob this is its fade timer. */
   remaining: number;
 }
+
+// --- Royal command (MOBA-lite click control) ---
+// The player's direct order to the controllable Royal (VISION §3): walk to a
+// spot, or focus (chase + attack) a specific enemy. One active order at a time
+// — a new click replaces the old. Only caste 'royal' carries one today; the
+// field is generic so any future directly-commanded unit reuses the seam.
+export type RoyalOrder =
+  | { kind: 'move'; x: number }
+  | { kind: 'focus'; target: IUnit };
 
 export interface CombatContext {
   particles: IParticleManager | null;
@@ -508,6 +536,16 @@ export interface IUnit extends WorldEntity {
   pheromoneKind?: PheromoneKind;
   /** x of the last trail blob dropped — the deposit-spacing tracker. */
   _lastDepositX?: number;
+  /** Player's direct click-order (MOBA-lite Royal control); null = autonomous.
+   *  Read by resolveRoyalOrder each frame to override target + march. */
+  order?: RoyalOrder | null;
+  /** Visual lane position (float) while mid lane-switch — eases toward `_laneTarget`.
+   *  `lane` (the combat row) is round(_laneVisual), so it flips at the midpoint:
+   *  enemies engage her by physical position during a cross. Drives the depth slide. */
+  _laneVisual?: number;
+  /** Destination lane of a Royal lane-switch (where `_laneVisual` is heading).
+   *  Equals `lane` when settled; set by commandRoyalClick. */
+  _laneTarget?: number;
   /** Player-triggered signature ability key (Elite/Royal active). */
   signatureAbility?: string;
   /** Signature cooldown length (seconds). */

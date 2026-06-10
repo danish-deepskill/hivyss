@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { DEFAULT_WORLD_W } from '../config/Constants';
 import { drawBiomeBackground } from './BiomeBackground';
 import { drawPheromoneTrail } from './PheromoneTrail';
+import { laneFromY, getGroundY } from '../config/RouteMatrix';
+import { UNIT_DEFS } from '../units/registry';
 import { ABILITY_DEFS } from '../config/AbilityDefs';
 import { GameManager } from '../systems/GameManager';
 import { capUsed, MAX_CAPACITY } from '../systems/Capacity';
@@ -24,6 +26,7 @@ export class WorldScene extends Phaser.Scene {
   private worldW: number = DEFAULT_WORLD_W;
   private viewport!: ViewportController;
   private pheromoneLayer!: Phaser.GameObjects.Graphics;
+  private royalLayer!: Phaser.GameObjects.Graphics;
 
   constructor() {
     super('WorldScene');
@@ -39,12 +42,19 @@ export class WorldScene extends Phaser.Scene {
     this.pheromoneLayer = this.add.graphics();
     this.pheromoneLayer.setDepth(50);
 
+    // Royal control affordance — a ring under the controllable Royal + her
+    // current order marker. Above the scent layer, under the units.
+    this.royalLayer = this.add.graphics();
+    this.royalLayer.setDepth(51);
+
     // Create game manager (owns all systems, entities, and game state)
     this.gm = new GameManager(this, data.deck, data.startWave, this.worldW, data.customWaves, data.runBuffs, data.hiveProfile, data.hiveSeed);
 
     // Store shared data on registry for HUDScene + MenuUIScene
     this.registry.set('worldW', this.worldW);
-    this.registry.set('deckKeys', data.deck);
+    // Hide royal-caste units from the deploy bar — the Royal is auto-spawned
+    // on-field (GameManager) and click-controlled, never incubated.
+    this.registry.set('deckKeys', data.deck.filter(k => UNIT_DEFS[k]?.caste !== 'royal'));
     this.registry.set('previews', this.gm.generateUnitPreviews());
     this.registry.set('eventBus', this.gm.events);
 
@@ -70,11 +80,14 @@ export class WorldScene extends Phaser.Scene {
       const result = this.gm.castPheromone(evt.kind, evt.lane);
       if (result.message) this.gm.events.emit('logMessage', { message: result.message });
     };
+    // Royal profile click (or R key) → toggle command mode.
+    const onToggleRoyalSelect = () => this.gm.toggleRoyalSelect();
     this.gm.events.on('deployUnit', onDeploy);
     this.gm.events.on('useAbility', onAbility);
     this.gm.events.on('cancelIncubation', onCancel);
     this.gm.events.on('triggerSignature', onSignature);
     this.gm.events.on('castPheromone', onPheromone);
+    this.gm.events.on('toggleRoyalSelect', onToggleRoyalSelect);
 
     // Cleanup on shutdown
     this.events.once('shutdown', () => {
@@ -84,6 +97,7 @@ export class WorldScene extends Phaser.Scene {
       this.gm.events.off('cancelIncubation', onCancel);
       this.gm.events.off('triggerSignature', onSignature);
       this.gm.events.off('castPheromone', onPheromone);
+      this.gm.events.off('toggleRoyalSelect', onToggleRoyalSelect);
     });
 
     // ESC — toggle pause overlay
@@ -97,9 +111,23 @@ export class WorldScene extends Phaser.Scene {
       }
     });
 
+    // R — toggle Royal command mode (then a left-click on the field orders her).
+    this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.R).on('down', () => {
+      this.gm?.toggleRoyalSelect();
+    });
+
     // Suppress browser right-click menu so right-drag pan fires
     // cleanly on the canvas.
     this.input.mouse?.disableContextMenu();
+
+    // Left-click the battlefield → Royal control (select her / order her).
+    // Same scene-level Phaser pointerdown the sandbox uses for placement —
+    // pointer.worldX/Y carries the camera transform, and clicks on the DOM HUD
+    // never reach the canvas, so no manual filtering. Right-drag stays the pan.
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      if (p.button !== 0 || !this.gm?.running) return;
+      this.gm.commandRoyalClick(p.worldX, laneFromY(p.worldY));
+    });
 
     // Camera + pan/zoom controller. Right-drag so left-click stays
     // available for any future unit-selection UX without colliding
@@ -171,16 +199,53 @@ export class WorldScene extends Phaser.Scene {
       this.registry.set('wave.stage', this.gm.waves.stage);
       this.registry.set('game.running', this.gm.running);
       this.registry.set('elite.slots', this.gm.getEliteSlots());
+      this.registry.set('royal.status', this.gm.getRoyalStatus());
+      this.registry.set('royal.selected', this.gm.royalSelected);
 
       // Repaint the scent-trail from the live zones (deposited + decayed in tick).
       this.pheromoneLayer.clear();
       drawPheromoneTrail(this.pheromoneLayer, this.gm.pheromoneZones);
+
+      // Royal control affordance (who you control + the active order).
+      this.drawRoyalControl();
     }
 
     if (!this.gm.running) return;
 
     // Tick game logic
     this.gm.tick(dt);
+  }
+
+  /**
+   * Draw the Royal control affordance — a ring marking who you command, plus a
+   * marker for the active order (a beacon at the move spot, or a red ring on the
+   * focused enemy). Presentation-only; repainted each frame from live state.
+   */
+  private drawRoyalControl(): void {
+    const g = this.royalLayer;
+    g.clear();
+    const r = this.gm.playerRoyal;
+    if (!r || r.dead) return;
+    const selected = this.gm.royalSelected;
+
+    // Control ring — bright when you're commanding her (selected), a faint dot
+    // otherwise so you can still spot her without it shouting.
+    g.lineStyle(selected ? 2.5 : 1.5, 0x60e0ff, selected ? 0.95 : 0.3);
+    g.strokeEllipse(r.x + r.unitW / 2, getGroundY('land', r.lane), r.unitW * 1.1, r.unitW * 0.42);
+
+    // Order markers only matter while she's under command.
+    const order = r.order;
+    if (!selected || !order) return;
+    if (order.kind === 'move') {
+      const my = getGroundY('land', r.lane);
+      g.lineStyle(2, 0x60e0ff, 0.7);
+      g.strokeEllipse(order.x, my, 14, 6);
+      g.lineBetween(order.x, my - 11, order.x, my);
+    } else if (!order.target.dead) {
+      const t = order.target;
+      g.lineStyle(2, 0xff5050, 0.9);
+      g.strokeEllipse(t.x + t.unitW / 2, getGroundY('land', t.lane), t.unitW * 1.25, t.unitW * 0.5);
+    }
   }
 
   private drawBackground(): void {

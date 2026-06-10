@@ -9,6 +9,9 @@ document.fonts.load('16px "Press Start 2P"').finally(() => {
 
   // Debug console (dev only)
   if (import.meta.env.DEV) {
+    // Dev-only handle for poking game state from the browser console /
+    // automated checks (window.__game.scene.getScene('WorldScene').gm ...).
+    (window as unknown as { __game: Phaser.Game }).__game = game;
     game.events.once('ready', () => {
       import('./systems/DebugConsole').then(({ createDebugOverlay }) => {
         createDebugOverlay(game.canvas.parentElement!);

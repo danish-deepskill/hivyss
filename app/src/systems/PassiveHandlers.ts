@@ -1,6 +1,7 @@
 import type { IUnit, PassiveDef, PassiveKind } from '../types';
 import type { CombatPipeline } from './CombatPipeline';
 import { addModifier, removeModifiersBySource, applyModifiers } from './ModifierSystem';
+import { hasActiveEffect } from './EffectSystem';
 import { lookupPredicate } from './PassivePredicates';
 import { runSelectorInRange } from './Targeting';
 import { lookupAbility } from '../config/combat/abilities';
@@ -205,6 +206,11 @@ const cohesionHandler: PassiveHandler = {
       const ax = ally.x + ally.unitW / 2;
       if (Math.abs(ax - ux) < radius) count++;
     }
+
+    // Primal Roar (Matriarch's ultimate): while roaring, the unit fights as if
+    // FULLY massed — cohesion surges to its cap regardless of real packing, so
+    // even a scattered herd hits at peak for the roar window.
+    if (hasActiveEffect(u, 'herd_roar')) count = passive.maxAllies;
 
     const effective = Math.min(count, passive.maxAllies) * perAlly;
     const sourceTag = `cohesion:${u.id}:${passive.stat}`;
