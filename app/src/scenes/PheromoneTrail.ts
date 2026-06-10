@@ -7,8 +7,9 @@ import type { PheromoneZone } from '../types';
  * Render the pheromone deposit-fade trail. Shared by the sandbox and the
  * real run loop so both show identical scent. Each scent-blob is a
  * translucent ground disc + ring at its lane's ground line; overlapping
- * blobs read as one continuous trail. Pure — no scene state; the caller
- * owns the layer and clears it each frame before calling.
+ * blobs read as one continuous trail — fill only, no ring, so overlaps
+ * blend into smooth scent instead of a mesh of stroked edges. Pure — no
+ * scene state; the caller owns the layer and clears it each frame.
  */
 export function drawPheromoneTrail(g: Phaser.GameObjects.Graphics, zones: PheromoneZone[]): void {
   for (const z of zones) {
@@ -16,7 +17,5 @@ export function drawPheromoneTrail(g: Phaser.GameObjects.Graphics, zones: Pherom
     const zy = getGroundY('land', z.lane);
     g.fillStyle(def.color, 0.18);
     g.fillCircle(z.x, zy, z.radius);
-    g.lineStyle(2, def.color, 0.7);
-    g.strokeCircle(z.x, zy, z.radius);
   }
 }
