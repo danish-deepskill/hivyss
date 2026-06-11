@@ -211,14 +211,14 @@ export class SandboxHUDScene extends Phaser.Scene {
 
     const select = document.createElement('select');
     select.className = 'sb-hud__preset-select';
-    ([['wild', 'Wild'], ['sunCarapace', 'Sun Carapace']] as const).forEach(([val, text]) => {
+    ([['wild', 'Wild'], ['sunCarapace', 'Sun Carapace'], ['fetidPool', 'Fetid Pool']] as const).forEach(([val, text]) => {
       const opt = document.createElement('option');
       opt.value = val;
       opt.textContent = text;
       select.appendChild(opt);
     });
     select.addEventListener('change', () => {
-      this.eventBus.emit('sandboxSelectBiome', { biome: select.value as 'wild' | 'sunCarapace' });
+      this.eventBus.emit('sandboxSelectBiome', { biome: select.value as 'wild' | 'sunCarapace' | 'fetidPool' });
     });
 
     wrap.append(lbl, select);

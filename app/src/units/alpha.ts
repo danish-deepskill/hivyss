@@ -5,7 +5,8 @@
 // the baseline cohesion + Goliath's amplifier; α trimmed to 4 soldiers per the budget.)
 // Built: Pack Cohesion (hook) + both Elite signatures (Goliath Stampede, Maulhorn Ram,
 // each w/ FX + body animation) + Quillback (α's ranged anti-air) + Goliath's cohesion-
-// amplifier aura. To build: the Matriarch's Royal ultimate (needs Royal system).
+// amplifier aura + the Matriarch's full Royal kit (click-control via RoyalLifecycle,
+// Primal Roar ultimate, death stakes, lane-switch). α is roster-complete.
 import type { UnitDef, UnitModule, PassiveDef, CohesionConfig } from "../types";
 import { PALETTES } from "../config/Palettes";
 import { charge, ram } from "./motions";
@@ -244,9 +245,10 @@ const goliathDef = aDef({
 
 // Matriarch — α's ROYAL (T3 capstone): the herd queen. Vast, slow, regal; the
 // ultimate cohesion anchor (widest radius + highest cap — the herd is strongest
-// massed around her). Her Royal ULTIMATE + the direct-control paradigm are
-// future work (Royal system not built); for now she's a powerful anchor with a
-// basic attack. NOT a re-tag of Goliath — a distinct, grander unit + draw.
+// massed around her). The CONTROLLABLE hero (RoyalLifecycle: click-select →
+// move/focus, lane-switch, death → leaderless → respawn) with the Primal Roar
+// ultimate below. NOT a re-tag of Goliath — a distinct queen silhouette
+// (banded egg-gaster, coronet, vestigial wings).
 const matriarchDef = aDef({
   name: "Matriarch",
   ico: "\u{1F41C}",

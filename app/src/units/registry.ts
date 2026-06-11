@@ -14,6 +14,7 @@ import { drawBasicBody } from "./renderUtils";
 
 import { units as starterUnits } from "./normal";
 import { units as alphaUnits } from "./alpha"; // α Primal — the canonical alpha
+import { units as betaUnits } from "./beta"; // β Swarm — numbers / sacrifice
 import { units as archiveUnits } from "./archive"; // retired legacy "military alpha"
 import { units as workerUnits } from "./worker"; // universal worker caste (Scout)
 
@@ -21,6 +22,7 @@ import { units as workerUnits } from "./worker"; // universal worker caste (Scou
 const UNITS: Record<string, UnitModule> = {
   ...starterUnits,
   ...alphaUnits,
+  ...betaUnits,
   ...archiveUnits,
   ...workerUnits,
 };
@@ -49,6 +51,7 @@ export const TIER_DEFS: Record<TierKey, TierDef> = {
 // `def.geneline !== 'normal'` to preserve the "untagged" visual.
 export const GENELINE_DEFS: Partial<Record<GeneLine, GeneLineDef>> = {
   alpha: { symbol: 'α', name: 'Alpha', color: '#c03030' },
+  beta: { symbol: 'β', name: 'Beta', color: '#86a832' },
   normal: { symbol: '\u2014', name: 'Normal', color: '#888888' },
   archive: { symbol: '\u2298', name: 'Archive', color: '#777777' },
 };

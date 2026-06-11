@@ -1,12 +1,12 @@
 // Typed event bus — decouples systems from each other.
 // Any system can emit or listen without knowing about other systems.
 
-import type { PheromoneKind } from '../types';
+import type { PheromoneKind, EliteSlot } from '../types';
 
 export interface GameEvents {
   enemyKilled: { unit: { key: string; reward: number; x: number; y: number } };
   unitSpawned: { key: string; side: 'player' | 'enemy' };
-  unitDied: { key: string; side: 'player' | 'enemy'; x: number; y: number };
+  unitDied: { key: string; side: 'player' | 'enemy'; x: number; y: number; lane: number };
   waveStart: { wave: number };
   waveCleared: { wave: number };
   incubationStart: { key: string; chamberIndex: number };
@@ -22,6 +22,8 @@ export interface GameEvents {
   cancelIncubation: { index: number };
   triggerSignature: { unitId: number };
   toggleRoyalSelect: {};
+  deployGatherer: {};
+  matureHive: {};
   castPheromone: { kind: PheromoneKind; lane: number };
   logMessage: { message: string };
   // Sandbox events (SandboxHUDScene ↔ SandboxScene)
@@ -46,7 +48,7 @@ export interface GameEvents {
   // so the HUD button row can reflect keyboard-driven selection.
   sandboxSelectPheromoneActive: { kind: PheromoneKind | null };
   // Biome (environment) selection (SandboxHUDScene → SandboxScene).
-  sandboxSelectBiome: { biome: 'wild' | 'sunCarapace' };
+  sandboxSelectBiome: { biome: 'wild' | 'sunCarapace' | 'fetidPool' };
   // Elite-signature trigger (SandboxHUDScene → SandboxScene). With
   // `unitId` → fires that one Elite's signature (a slot click); without →
   // fires every ready player Elite (the E hotkey "fire all").
@@ -54,9 +56,7 @@ export interface GameEvents {
   // Elite-slot state push (SandboxScene → SandboxHUDScene). Fixed-length
   // array (= MAX_ELITES_PER_SIDE); null = an empty slot. Drives the HUD's
   // per-Elite active-ability slots (name + cooldown + firable).
-  sandboxEliteSlots: {
-    slots: Array<{ id: number; name: string; ready: boolean; cdFrac: number; firable: boolean; inRange: boolean } | null>;
-  };
+  sandboxEliteSlots: { slots: Array<EliteSlot | null> };
 }
 
 type EventKey = keyof GameEvents;

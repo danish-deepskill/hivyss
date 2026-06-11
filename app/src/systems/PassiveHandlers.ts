@@ -5,6 +5,7 @@ import { hasActiveEffect } from './EffectSystem';
 import { lookupPredicate } from './PassivePredicates';
 import { runSelectorInRange } from './Targeting';
 import { lookupAbility } from '../config/combat/abilities';
+import { dispatchSpawn } from './CombatDispatch';
 
 /**
  * Per-frame passive engine — the "tick band" registry.
@@ -188,6 +189,14 @@ const cohesionHandler: PassiveHandler = {
   tick(u, passive, env) {
     if (passive.kind !== 'cohesion') return;
 
+    // Frenzy Musk (α's signature): while surging, the bank is SPENT — the
+    // frozen frenzy modifier carries the (doubled) snapshot and live cohesion
+    // tracking suspends. It resumes naturally the frame the surge expires.
+    if (hasActiveEffect(u, 'frenzy_surge')) {
+      removeModifiersBySource(u, `cohesion:${u.id}:${passive.stat}`);
+      return;
+    }
+
     // Read radius + perAlly through the modifier stack so an *amplifier*
     // aura (e.g. Goliath's, which adds a `cohesion_perAlly` modifier to
     // nearby allies) can boost a unit's cohesion. With no amplifier present
@@ -227,8 +236,30 @@ const cohesionHandler: PassiveHandler = {
 };
 
 /**
- * Registration order: self-modifier → cohesion → aura → heal-cast. The
- * driver calls `pipeline.resolveFrame()` once after all handlers run, so
+ * Spawner (β Broodmother): periodically BIRTHS units at the carrier via the
+ * spawn dispatcher (substrate-installed; no-op in tests, so spawner units
+ * simply don't multiply there). The brood emerges slightly behind the
+ * mother — she leads, the spawn follows.
+ */
+const spawnerHandler: PassiveHandler = {
+  kind: 'spawner',
+  sweep: 'alive',
+  tick(u, passive, env) {
+    if (passive.kind !== 'spawner') return;
+    u.spawnTimer = (u.spawnTimer ?? 0) + env.dt;
+    if (u.spawnTimer < passive.interval) return;
+    u.spawnTimer = 0;
+    const behind = u.side === 'player' ? -1 : 1;
+    const cx = u.x + u.unitW / 2;
+    for (let i = 0; i < passive.count; i++) {
+      dispatchSpawn(passive.unitKey, u.side, cx + behind * (10 + i * 12), u.lane);
+    }
+  },
+};
+
+/**
+ * Registration order: self-modifier → cohesion → aura → heal-cast → spawner.
+ * The driver calls `pipeline.resolveFrame()` once after all handlers run, so
  * queued heals land before the same-frame attack pass.
  */
 export const PASSIVE_HANDLERS: readonly PassiveHandler[] = [
@@ -236,4 +267,5 @@ export const PASSIVE_HANDLERS: readonly PassiveHandler[] = [
   cohesionHandler,
   auraModifierHandler,
   healCastHandler,
+  spawnerHandler,
 ];

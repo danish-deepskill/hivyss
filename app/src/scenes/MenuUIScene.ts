@@ -6,8 +6,10 @@ import { MAX_CHAMBERS, MAX_LARVAE, LARVA_SPAWN_RATE } from '../systems/Incubatio
 import type { Chamber } from '../systems/IncubationManager';
 import { MAX_CAPACITY, canDeploy } from '../systems/Capacity';
 import type { EventBus } from '../systems/EventBus';
-import type { EliteSlot, RoyalStatus } from '../types';
+import type { EliteSlot, RoyalStatus, PheromoneKind } from '../types';
 import { PHEROMONE_DEFS, PHEROMONE_ORDER } from '../config/PheromoneDefs';
+import { FORAGE_ENABLED } from '../config/ForageDefs';
+import { PHEROMONE_VYSS_COST } from '../config/VyssDefs';
 
 export class MenuUIScene extends Phaser.Scene {
   private eventBus!: EventBus;
@@ -22,6 +24,18 @@ export class MenuUIScene extends Phaser.Scene {
   private larvaeTimer!: HTMLElement;
   private capFill!: HTMLElement;
   private capNum!: HTMLElement;
+  private vyssNum!: HTMLElement;
+  private phaseLbl!: HTMLElement;
+  private matureBtn!: HTMLButtonElement;
+
+  // WORKERS deploy cards (end of the roster bar): the Scout card carries a
+  // pheromone SELECTOR (mini-dots pick the command it couriers), the Gatherer
+  // deploys the forage worker, the Builder slot is the caste's future job.
+  private selectedPheromone: PheromoneKind = 'rally';
+  private scoutCard!: HTMLDivElement;
+  private scoutCost!: HTMLElement;
+  private pherDots: Array<{ dot: HTMLButtonElement; kind: PheromoneKind }> = [];
+  private gathererCard!: HTMLDivElement;
 
   // Larva mound
   private larvaCounter!: HTMLElement;
@@ -94,7 +108,6 @@ export class MenuUIScene extends Phaser.Scene {
     panel.appendChild(this.buildLarvaMound());
     panel.appendChild(this.buildUnitSlots(previews));
     panel.appendChild(this.buildRoyalProfile());
-    panel.appendChild(this.buildPheromones());
     panel.appendChild(this.buildAbilities());
     panel.appendChild(this.buildLog());
 
@@ -157,10 +170,47 @@ export class MenuUIScene extends Phaser.Scene {
     const ablCanCast: Record<string, boolean> = this.registry.get('abl.canCast') ?? {};
     const ablCdPct: Record<string, number> = this.registry.get('abl.cooldownPct') ?? {};
 
-    // Resource bar
+    // Resource bar — income shows the HONEST rate: passive floor + the actual
+    // forage deposits (rolling window) + the worker count, not just the floor.
+    const forageRate: number = this.registry.get('forage.rate') ?? 0;
+    const forageWorkers: number = this.registry.get('forage.workers') ?? 0;
+    const vyssCount: number = this.registry.get('vyss.count') ?? 0;
     this.nectarFill.style.width = nectarPct + '%';
     this.nectarNum.textContent = String(Math.floor(nectar));
-    this.incomeLbl.textContent = '+' + income + '/s';
+    this.incomeLbl.textContent = FORAGE_ENABLED
+      ? `+${(income + forageRate).toFixed(1)}/s 🌼${forageWorkers}`
+      : '+' + income + '/s';
+    this.vyssNum.textContent = String(vyssCount);
+
+    // Hive maturation readout + MATURE button — phases read as a STORY
+    // (EARLY/MID/LATE PHASE), not numbers.
+    const phaseName: string = this.registry.get('hive.phaseName') ?? 'Early';
+    const matureCost: { nectar: number; larvae: number; vyss: number } | null = this.registry.get('hive.matureCost') ?? null;
+    const canMature: boolean = this.registry.get('hive.canMature') ?? false;
+    if (matureCost) {
+      this.phaseLbl.textContent = `${phaseName.toUpperCase()} PHASE`;
+      this.matureBtn.style.display = '';
+      this.matureBtn.textContent = `▲ MATURE ${matureCost.nectar}⬡${matureCost.larvae > 0 ? ` +${matureCost.larvae}🐛` : ""}${matureCost.vyss > 0 ? ` +${matureCost.vyss}✦` : ""}`;
+      this.matureBtn.title = `Unlocks: ${this.registry.get('hive.nextPerks') ?? ''}`;
+      const off = !canMature || !running;
+      this.matureBtn.disabled = off;
+      this.matureBtn.style.opacity = off ? '0.45' : '1';
+    } else {
+      this.matureBtn.style.display = 'none'; // fully mature
+      this.phaseLbl.textContent = `${phaseName.toUpperCase()} PHASE ★`;
+    }
+
+    // WORKER cards — scout gated by the SELECTED command's vyss price,
+    // gatherer by nectar + a larva. Same .disabled read as the deck cards.
+    this.scoutCard.classList.toggle(
+      'disabled',
+      vyssCount < PHEROMONE_VYSS_COST[this.selectedPheromone] || !running,
+    );
+    const gathererCost = UNIT_DEFS['gatherer']?.cost ?? 30;
+    this.gathererCard.classList.toggle(
+      'disabled',
+      nectar < gathererCost || larvaCount <= 0 || !running,
+    );
     this.larvaeNum.textContent = larvaCount + '/' + MAX_LARVAE;
     if (larvaCount < MAX_LARVAE) {
       this.larvaeTimer.textContent = Math.ceil(LARVA_SPAWN_RATE - larvaTimer) + 's';
@@ -240,15 +290,19 @@ export class MenuUIScene extends Phaser.Scene {
     //   .cap-blocked = would exceed hive capacity (red — telegraphs the actual blocker)
     // Cap-blocked is the most important warning: the cap bar tells you WHAT,
     // the card tells you WHY a specific pick is unusable.
+    const deployTierCap: number = this.registry.get('hive.tierCap') ?? 99;
     this.deckKeys.forEach(key => {
       const d = UNIT_DEFS[key];
       if (!d) return;
       const card = this.cardEls[key];
       if (!card) return;
+      // Maturation lock outranks the other states — the card is phase-gated.
+      const tierLocked = d.tier > deployTierCap;
       const wouldExceedCap = !canDeploy(d, capUsedNow, capMax);
       const cantAfford = nectar < d.cost || !canQueue;
-      card.classList.toggle('disabled', cantAfford && !wouldExceedCap);
-      card.classList.toggle('cap-blocked', wouldExceedCap);
+      card.classList.toggle('disabled', tierLocked || (cantAfford && !wouldExceedCap));
+      card.classList.toggle('cap-blocked', !tierLocked && wouldExceedCap);
+      card.title = tierLocked ? `Tier ${d.tier} is phase-locked — MATURE the hive` : '';
     });
 
     // Abilities
@@ -292,11 +346,17 @@ export class MenuUIScene extends Phaser.Scene {
     this.larvaeNum = this.el('span', 'font-size:13px; color:#c0b888; min-width:30px; text-align:right;', '3/10');
     this.larvaeTimer = this.el('span', 'font-size:9px; color:#555;');
 
+    // Corpses — the tactical currency (commands). Fed by deaths on the field.
+    const sep2 = document.createElement('div');
+    sep2.style.cssText = 'width:1px; height:14px; background:#222; margin:0 4px;';
+    const vyssLbl = this.el('span', 'font-size:9px; color:#667; letter-spacing:0.5px;', 'VYSS');
+    this.vyssNum = this.el('span', 'font-size:13px; color:#c8c8d8; min-width:24px; text-align:right;', '0');
+
     const spacer = document.createElement('div');
     spacer.style.cssText = 'flex:1;';
     const escHint = this.el('span', 'font-size:9px; color:#444; letter-spacing:1px;', 'ESC PAUSE');
 
-    row1.append(this.stageLbl, nectarLbl, nectarTrack, this.nectarNum, this.incomeLbl, sep, larvaeLbl, this.larvaeNum, this.larvaeTimer, spacer, escHint);
+    row1.append(this.stageLbl, nectarLbl, nectarTrack, this.nectarNum, this.incomeLbl, sep, larvaeLbl, this.larvaeNum, this.larvaeTimer, sep2, vyssLbl, this.vyssNum, spacer, escHint);
 
     // Row 2 — capacity bar (shorter, slim, distinct cyan/teal)
     const row2 = document.createElement('div');
@@ -312,6 +372,14 @@ export class MenuUIScene extends Phaser.Scene {
     this.capNum = this.el('span', 'font-size:11px; color:#40c0e0; min-width:48px; text-align:right;', '0 / ' + MAX_CAPACITY);
 
     row2.append(capLbl, capTrack, this.capNum);
+
+    // Hive maturation — the tech-up arc: the phase readout + the MATURE
+    // button (spend to unlock the next tier band / the Royal's ultimate).
+    this.phaseLbl = this.el('span', 'font-size:10px; color:#c8a030; letter-spacing:1px; margin-left:16px;', 'PHASE 1/3');
+    this.matureBtn = document.createElement('button');
+    this.matureBtn.style.cssText = 'font-size:10px; padding:2px 10px; margin-left:6px; border-radius:3px; border:1px solid #c8a030; background:#1a1404; color:#f0c040; cursor:pointer; pointer-events:auto; font-weight:bold;';
+    this.matureBtn.onclick = () => this.eventBus.emit('matureHive', {});
+    row2.append(this.phaseLbl, this.matureBtn);
 
     bar.append(row1, row2);
     return bar;
@@ -371,7 +439,98 @@ export class MenuUIScene extends Phaser.Scene {
       this.cardEls[key] = div;
     });
 
+    // WORKERS — the worker caste's own deploy portraits at the end of the
+    // roster: Scout (couriers the SELECTED pheromone — the mini-dots are the
+    // command picker), Gatherer (the forage worker), Builder (future job slot).
+    const div = this.el('div', 'width:1px; height:64px; background:#222; margin:0 6px; align-self:center;');
+    slots.appendChild(div);
+    slots.appendChild(this.buildWorkerCards(previews));
+
     return slots;
+  }
+
+  /** The WORKERS card cluster (scout + gatherer + builder placeholder). */
+  private buildWorkerCards(previews: Record<string, string>): HTMLElement {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex; gap:3px; align-items:flex-start;';
+
+    // --- Scout: deploys a courier carrying the SELECTED pheromone into the
+    // active lane. The dots row under the card picks the command (sticky);
+    // the card's cost line shows that command's vyss price.
+    const scoutCol = document.createElement('div');
+    scoutCol.style.cssText = 'display:flex; flex-direction:column; gap:2px; align-items:center;';
+    const scout = document.createElement('div');
+    scout.className = 'ucard';
+    const scoutPv = previews['scout'];
+    scout.innerHTML = `
+      <div class="utier" style="color:#40a0d0">W</div>
+      ${scoutPv ? `<img class="uico-img" src="${scoutPv}" alt="Scout">` : '<div class="uico">🐜</div>'}
+      <div class="uname">Scout</div>
+      <div class="ucost-row"><span class="ucost"></span></div>
+    `;
+    this.scoutCost = scout.querySelector('.ucost') as HTMLElement;
+    scout.addEventListener('click', () => {
+      this.eventBus.emit('castPheromone', { kind: this.selectedPheromone, lane: this.activeLane });
+    });
+    const dots = document.createElement('div');
+    dots.style.cssText = 'display:flex; gap:3px;';
+    this.pherDots = PHEROMONE_ORDER.map(kind => {
+      const def = PHEROMONE_DEFS[kind];
+      const hex = '#' + def.color.toString(16).padStart(6, '0');
+      const dot = document.createElement('button');
+      dot.title = `${def.name} — ${PHEROMONE_VYSS_COST[kind]}✦`;
+      dot.textContent = def.name[0];
+      dot.style.cssText = `width:20px; height:16px; font-size:9px; line-height:1; border-radius:3px; border:1px solid ${hex}; color:${hex}; background:#10141a; cursor:pointer; pointer-events:auto; padding:0;`;
+      dot.addEventListener('click', () => this.selectPheromone(kind));
+      return { dot, kind };
+    });
+    this.pherDots.forEach(p => dots.appendChild(p.dot));
+    scoutCol.append(scout, dots);
+    this.scoutCard = scout;
+
+    // --- Gatherer: the forage worker (nectar + a larva, instant). Only
+    // meaningful while the forage economy is on.
+    const gatherer = document.createElement('div');
+    gatherer.className = 'ucard';
+    if (!FORAGE_ENABLED) gatherer.style.display = 'none';
+    const gPv = previews['gatherer'];
+    const gCost = UNIT_DEFS['gatherer']?.cost ?? 30;
+    gatherer.innerHTML = `
+      <div class="utier" style="color:#40a0d0">W</div>
+      ${gPv ? `<img class="uico-img" src="${gPv}" alt="Gatherer">` : '<div class="uico">🍯</div>'}
+      <div class="uname">Gatherer</div>
+      <div class="ucost-row"><span class="ucost">${gCost}n +🐛</span></div>
+    `;
+    gatherer.addEventListener('click', () => this.eventBus.emit('deployGatherer', {}));
+    this.gathererCard = gatherer;
+
+    // --- Builder: the caste's third job — visible, locked until built.
+    const builder = document.createElement('div');
+    builder.className = 'ucard disabled';
+    builder.innerHTML = `
+      <div class="utier" style="color:#40a0d0">W</div>
+      <div class="uico">🔨</div>
+      <div class="uname">Builder</div>
+      <div class="ucost-row"><span class="utag">SOON</span></div>
+    `;
+
+    wrap.append(scoutCol, gatherer, builder);
+    this.selectPheromone(this.selectedPheromone); // initial highlight + cost
+    return wrap;
+  }
+
+  /** Pick the command the next Scout couriers (sticky until changed). */
+  private selectPheromone(kind: PheromoneKind): void {
+    this.selectedPheromone = kind;
+    this.scoutCost.textContent = `${PHEROMONE_VYSS_COST[kind]}✦ ${PHEROMONE_DEFS[kind].name}`;
+    for (const p of this.pherDots) {
+      const def = PHEROMONE_DEFS[p.kind];
+      const hex = '#' + def.color.toString(16).padStart(6, '0');
+      const on = p.kind === kind;
+      p.dot.style.background = on ? hex : '#10141a';
+      p.dot.style.color = on ? '#0a0a12' : hex;
+      p.dot.style.fontWeight = on ? 'bold' : 'normal';
+    }
   }
 
   private buildAbilities(): HTMLElement {
@@ -382,7 +541,7 @@ export class MenuUIScene extends Phaser.Scene {
     Object.entries(ABILITY_DEFS).forEach(([key, def]) => {
       const btn = document.createElement('button');
       btn.className = 'abl-btn';
-      btn.innerHTML = `${def.icon} ${def.name}<br><small style="font-size:9px;color:#888">${def.desc} (\u2B21${def.cost})</small><div class="abl-cd" style="width:0"></div>`;
+      btn.innerHTML = `${def.icon} ${def.name}<br><small style="font-size:9px;color:#888">${def.desc} (${def.cost}\u2620)</small><div class="abl-cd" style="width:0"></div>`;
       btn.onclick = () => this.eventBus.emit('useAbility', { key });
 
       container.appendChild(btn);
@@ -435,25 +594,6 @@ export class MenuUIScene extends Phaser.Scene {
       return a;
     });
     return wrap;
-  }
-
-  // Pheromone command row (Rally / Charge / Retreat). Interim delivery: clicking
-  // casts the command onto the player army's front (GameManager.castPheromone);
-  // click-to-target + Scout deposit-fade is the deferred upgrade (VISION §5).
-  private buildPheromones(): HTMLElement {
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex; gap:4px; align-items:center; padding:3px 8px; background:#080c10; border-bottom:1px solid #0e1a22; width:100%; pointer-events:auto;';
-    row.appendChild(this.el('span', 'font-size:10px; color:#40a0d0; letter-spacing:1px; margin-right:4px;', 'CMD'));
-    PHEROMONE_ORDER.forEach(kind => {
-      const def = PHEROMONE_DEFS[kind];
-      const hex = '#' + def.color.toString(16).padStart(6, '0');
-      const btn = document.createElement('button');
-      btn.textContent = def.name;
-      btn.style.cssText = `font-size:10px; padding:3px 9px; border-radius:3px; border:1px solid ${hex}; background:#10141a; color:${hex}; cursor:pointer; pointer-events:auto;`;
-      btn.onclick = () => this.eventBus.emit('castPheromone', { kind, lane: this.activeLane });
-      row.appendChild(btn);
-    });
-    return row;
   }
 
   // Render the live Elites as SILVER 1:1 portraits (smaller siblings of the gold

@@ -20,6 +20,7 @@
 
 import type { WorldEntity, Side, ComponentTag, AbilityDef, IUnit } from '../types';
 import { hasAllComponents } from './EntityComponents';
+import { lookupAbility } from '../config/combat/abilities';
 
 /** Structural contract every selector needs from an entity. */
 export interface SelectorEntity extends WorldEntity {
@@ -231,4 +232,26 @@ export function resolveImpactTarget(locked: IUnit | null | undefined, nearest: I
 export function signatureWouldWhiff(ability: AbilityDef, caster: IUnit, alive: IUnit[]): boolean {
   return ability.category === 'damage'
     && runSelectorInRange(ability.targeting, caster, ability, alive).length === 0;
+}
+
+/**
+ * HUD "would connect" check — an enemy sits within the unit's signature range,
+ * same lane, center-to-center. Drives the lit state of Elite signature slots.
+ * Distinct from signatureWouldWhiff (which is lane-blind + category-gated and
+ * decides whether a CAST consumes cooldown) — this is the stricter visual cue.
+ */
+export function signatureHasTarget(u: IUnit, units: readonly IUnit[]): boolean {
+  if (!u.signatureAbility) return false;
+  const ability = lookupAbility(u.signatureAbility);
+  // Utility/buff signatures (Tide, Spawn-Wave, Primal Roar) aren't enemy-gated
+  // — they always "have a target" (self/allies), so their slots stay firable.
+  if (ability.category !== 'damage') return true;
+  const range = ability.range ?? 0;
+  if (range <= 0) return false;
+  const ux = u.x + u.unitW / 2;
+  for (const e of units) {
+    if (e.side === u.side || e.dead || e.lane !== u.lane) continue;
+    if (Math.abs((e.x + e.unitW / 2) - ux) < range) return true;
+  }
+  return false;
 }

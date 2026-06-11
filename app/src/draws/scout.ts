@@ -36,6 +36,18 @@ const draw: DrawFunction = (g, u, cx, uy) => {
   g.fillStyle(primary, 0.5);
   g.fillCircle(cx - f * w * 0.24, cy - h * 0.28, w * 0.14);
 
+  // Carried load on the back while hauling home (Forage sets resources.carry:
+  // 1 = nectar gold, 2 = corpse chitin). Kill the carrier, lose the load.
+  const carry = u.resources?.carry ?? 0;
+  if (carry > 0) {
+    const main = carry === 2 ? 0x9a9aa8 : 0xf0c040;
+    const glint = carry === 2 ? 0xd8d8e4 : 0xffe890;
+    g.fillStyle(main, 1);
+    g.fillCircle(cx - f * w * 0.2, cy - h * 0.34, w * 0.17);
+    g.fillStyle(glint, 0.9);
+    g.fillCircle(cx - f * w * 0.24, cy - h * 0.4, w * 0.07);
+  }
+
   // Long sensory antennae (the scout signature).
   g.lineStyle(1.2, primary, 1);
   const hx = cx + f * w * 0.36, hy = cy - h * 0.16;

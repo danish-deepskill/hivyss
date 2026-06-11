@@ -21,6 +21,39 @@ export const utilityAbilities: Record<string, AbilityDef> = {
   },
 
 
+  // β Broodlord's Elite signature — SPAWN-WAVE: births a clutch of Swarmlings
+  // on demand (generative power is what makes it an ELITE, never a soldier).
+  // Pure utility: no damage pipeline, just the spawn payload at the caster.
+  spawn_wave: {
+    name: 'Spawn-Wave',
+    category: 'utility',
+    targeting: 'self',
+    spawns: { key: 'swarmling', count: 4 },
+    fx: { kind: 'shockwave' },
+  },
+
+  // β Broodmother's Royal ULTIMATE — BROOD SURGE: a violent mass birthing;
+  // the tide arrives all at once. The swarm IS the ultimate.
+  brood_surge: {
+    name: 'Brood Surge',
+    category: 'utility',
+    targeting: 'self',
+    spawns: { key: 'swarmling', count: 7 },
+    fx: { kind: 'shockwave' },
+    sfx: 'stampede',
+  },
+
+  // β Swarmlord's Elite signature — TIDE: CONSUME the nearby swarm (same-
+  // geneline soldiers vanish — eaten: no corpses, no death triggers) and
+  // permanently grow flat atk per body eaten. Sacrifice as a verb, literal.
+  tide: {
+    name: 'Tide',
+    category: 'utility',
+    targeting: 'self',
+    sacrifice: { radius: 90, perUnitAtk: 6 },
+    sfx: 'gore',
+  },
+
   // Mendwing's passive heal cast. Dispatched by the heal_cast passive
   // handler (PassiveHandlers.ts) every `cooldown` seconds against the
   // lowest-HP in-range ally.

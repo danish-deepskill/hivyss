@@ -26,4 +26,13 @@ export const TRAIT_DESC: Record<string, string> = {
   rally: '+20% ATK to 5 nearest allies in range',
   // AOE / chain
   lightning: 'Chain lightning — hits 3 foes, 25% stun, 4th hit = 2x dmg',
+  // β Swarm — cheap, dying, productive
+  swarmling: 'The tide — cheapest body in the game; also the brood-spawn output',
+  maggotling: 'Death → spore burst: poisons everything nearby',
+  burster: 'Suicide runner — explodes on death, knocking the line back',
+  hivespitter: 'Acid lobber (35% poison); death → acid rupture',
+  carrionling: 'Permanently +ATK for every swarm-ally that dies nearby',
+  swarmlord: 'TIDE: eats nearby swarm soldiers, growing +ATK per body',
+  broodlord: 'SPAWN-WAVE: births 4 Swarmlings on demand',
+  broodmother: 'β Royal — passively broods Swarmlings; ult = mass birthing',
 };

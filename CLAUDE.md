@@ -25,7 +25,7 @@
 - Cross-system events go through typed `EventBus`, not Phaser `scene.events`
 - Units are pooled via `UnitPool` — never `new Unit()` or `destroy()` in gameplay code
 - Game logic lives in `systems/` managers, not in Scene classes
-- Currency is "nectar" everywhere (code and UI)
+- Two currencies (amended 2026-06-11): **nectar** = the macro currency (units, workers, tech), earned by forage gatherers + a +1/s floor (`Forage`/`ForageDefs`); **vyss** = the battle-scoped tactical currency (pheromones + hive abilities) — the essence of fallen vyssids: deaths drop corpse pickups, gatherers scavenge them home into vyss (`VyssEconomy`/`VyssDefs`). Vyss never buys UNITS; the one tech exception is hive MATURATION (a bounded twice-per-battle sink — the hive grows by consuming the fallen), so teching requires engaging the war.
 - Units are called "vyssids" in lore, "units" in code
 
 ## Phaser Graphics API

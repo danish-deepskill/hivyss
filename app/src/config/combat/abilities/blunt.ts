@@ -44,6 +44,22 @@ export const bluntAbilities: Record<string, AbilityDef> = {
     sfx: 'stampede',
   },
 
+  // β Burster — the suicide runner POPS: a hard concussive death-blast that
+  // punts the line back (blunt's default knockback rides along). Its body IS
+  // the ammunition; the unit's basic attack is an afterthought.
+  death_blast: {
+    name: 'Death Blast',
+    category: 'damage',
+    dmgType: 'blunt',
+    targeting: 'all_enemies_in_range',
+    range: 46,
+    targetCount: 5,
+    trigger: 'onDeath',
+    skipsResistance: true,
+    deathDamage: 50,
+    fx: { kind: 'shockwave' },
+  },
+
   // Maulhorn's Elite signature — a focused SINGLE-TARGET ram: slams the nearest
   // enemy in front with the hardest knockback in the roster. No shockwave (that's
   // Goliath's AOE) — just the ram body motion + a hard knockback hit.

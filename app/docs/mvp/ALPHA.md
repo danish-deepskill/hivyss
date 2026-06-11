@@ -51,7 +51,7 @@ The counter (AOE/displacement) and the hook (cohesion) are **the same tension** 
 | 5 | T1 | **Quillback** | soldier | **ranged anti-air** (spits spines) — α's only ranged unit | the picket — the herd's one answer to air it otherwise can't touch |
 | 6 | T2 | **Goliath** | **Elite** | anchor + cohesion **amplifier** + **Stampede** signature | radiates *and amplifies* the core aura; Stampede = cohesion-scaled AOE burst |
 | 7 | T2 | **Maulhorn** | **Elite** | **Ram Charge** signature — single-target ×2, knockback 100 | weaponizes displacement; clears space for the herd to advance |
-| 8 | T3 | **Matriarch** | **Royal** | herd-queen capstone (ultimate TBD) | the heart — biggest cohesion radius; the pack forms around her |
+| 8 | T3 | **Matriarch** | **Royal** | herd-queen capstone — click-controlled hero + **Primal Roar** ultimate (BUILT) | the heart — biggest cohesion radius + amplifier aura; the pack forms around her |
 
 **Pyramid 2/3/2/1** = 5 soldiers + 2 Elites + 1 Royal + the universal worker. Restructure notes vs the original design: the cohesion **amplifier** folded onto Goliath (the anchor that gathers the herd also makes it hit harder); **Carapex → Quillback** (α needed a ranged anti-air answer more than a second amplifier carrier); **Matriarch** is the new Royal capstone (her ultimate is blocked on the Royal control system).
 
@@ -78,8 +78,8 @@ So the roles *create* the decisions: you mass behind the Hornshell, build moment
 - **Goretusk** ✅ — its T1 "twist" is a **tight-wedge cohesion** (`cohesion({ radius: 45, perAlly: 15 })`): tighter radius, +15%/ally → up to +60% atk when clumped. Pure data, no custom logic (TIER_CONTRACT-clean). *(A flat-speed "momentum" toggle was tried and cut — speed only matters on the approach, so it was a non-decision; the tight-wedge cohesion IS the identity.)*
 - **Goliath cohesion amplifier** ✅ — an `aura_modifier` on `cohesion_perAlly`; the cohesion handler reads perAlly through `applyModifiers`, so the anchor amplifies nearby allies' cohesion (the reusable amplify/disrupt seam).
 - **Quillback** ✅ — `attackRange:'ranged'` + land route → reaches the air lane (α's anti-air); reuses `needle_shot`.
-- **Pheromones** (Charge/Rally/Retreat) 🟡 — live in the sandbox as zones; the worker-scout *emission* layer is still to build (orthogonal to α, shared).
-- **Matriarch ultimate** ❌ — blocked on the Royal control/trigger system (not built).
+- **Pheromones** (Charge/Rally/Retreat) ✅ — the deposit-fade courier model (VISION §5) in both the sandbox and the real loop: a Scout couriers the command laying a fading scent-trail; intercept is the counterplay. (Click-targeted delivery still open.)
+- **Matriarch ultimate + Royal control** ✅ — built 2026-06-11 (`RoyalLifecycle`): on-field from the bell, click-select → click-move/focus, **Primal Roar** (lane-radius cohesion surge + charge via the `herd_roar` presence-flag effect), death → leaderless → next-lineage respawn, speed-scaled lane-switch, HUD profile.
 - Everything else (deploy, damage, melee, capacity) = built.
 
 ---

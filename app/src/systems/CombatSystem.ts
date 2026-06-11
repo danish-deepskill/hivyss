@@ -12,7 +12,7 @@ import { CombatPipeline } from './CombatPipeline';
 import { updateEffects, hasActiveEffect, applyEffect } from './EffectSystem';
 import { setDotDispatcher } from '../config/combat/effects/dispatch';
 import { setStunFxDispatcher, setStaggerFxDispatcher } from '../config/combat/effects/cc';
-import { applyModifiers } from './ModifierSystem';
+import { applyModifiers, addModifier } from './ModifierSystem';
 import { getResource, addResource } from './ResourceSystem';
 import { runSelectorInRange, resolveImpactTarget, signatureWouldWhiff } from './Targeting';
 import { resolveRoyalOrder, ROYAL_ARRIVE } from './RoyalControl';
@@ -22,6 +22,7 @@ import {
   makeDotDispatcher,
   dispatchCastFx,
   dispatchImpactFx,
+  dispatchSpawn,
 } from './CombatDispatch';
 import {
   applyHealPhase,
@@ -195,7 +196,9 @@ export class CombatSystem {
       ).filter(t => (t as IUnit).lane === dyingUnit.lane);
       for (const t of targets) {
         this.pipeline.queueAbility(dyingUnit, t as IUnit, deathAbilityName, {
-          baseDamageOverride: 65,
+          // Per-ability death damage (β's spore/blast/acid each carry their
+          // own); absent → the legacy 65 (death_bomb's original tuning).
+          baseDamageOverride: ability.deathDamage ?? 65,
         });
       }
     });
@@ -274,6 +277,44 @@ export class CombatSystem {
         this.pipeline.queueAbility(u, t as IUnit, u.signatureAbility, {});
       }
     }
+
+    // Generative payload (β): the cast BIRTHS units around the caster —
+    // Broodlord's Spawn-Wave, Broodmother's Brood Surge. Substrate-installed
+    // dispatcher; no-op in tests.
+    if (ability.spawns) {
+      const scx = u.x + u.unitW / 2;
+      for (let i = 0; i < ability.spawns.count; i++) {
+        const offset = (i - (ability.spawns.count - 1) / 2) * 14;
+        dispatchSpawn(ability.spawns.key, u.side, scx + offset, u.lane);
+      }
+    }
+
+    // Sacrifice payload (β Swarmlord's Tide): CONSUME same-geneline soldier
+    // allies in radius — they vanish (eaten: no corpses, no death triggers) —
+    // and permanently grow flat atk per body. Sacrifice ≠ death, by design.
+    if (ability.sacrifice) {
+      const scx = u.x + u.unitW / 2;
+      let eaten = 0;
+      for (const ally of alive) {
+        if (ally === u || ally.side !== u.side || ally.dead) continue;
+        if (ally.lane !== u.lane || ally.geneline !== u.geneline) continue;
+        if (ally.caste === 'elite' || ally.caste === 'royal' || ally.caste === 'worker') continue;
+        if (Math.abs((ally.x + ally.unitW / 2) - scx) > ability.sacrifice.radius) continue;
+        ally.kill();
+        eaten++;
+        ctx.particles?.burst(ally.x + ally.unitW / 2, ally.y + ally.unitH / 2, 0x7aa030, 8);
+      }
+      if (eaten > 0) {
+        addModifier(u, {
+          stat: 'atk',
+          type: 'flat',
+          value: eaten * ability.sacrifice.perUnitAtk,
+          source: `tide:${u.id}`,
+        });
+        ctx.particles?.float(scx, u.y - 16, `FEAST ×${eaten}`, 0x9adb3a, true);
+      }
+    }
+
     if (ability.fx) {
       dispatchCastFx({
         ability,
@@ -442,6 +483,16 @@ export class CombatSystem {
       // engage — a foe in range would pin her in the attack branch and the move
       // would never run (fighting preempts marching for every unit).
       const effTarget = order.target ?? ((isWorker || order.disengage || cmd === 'rally' || cmd === 'retreat') ? null : target);
+
+      // Frenzy Musk (α's signature pheromone): cohesion carriers in the zone
+      // CASH their banked pack-bonus into a frozen, doubled surge (the effect
+      // snapshots on apply; the cohesion handler suppresses live tracking for
+      // its duration). One-shot per visit — re-applies only after expiry.
+      if (cmd === 'frenzy' && !isWorker
+        && u.passives?.some(p => p.kind === 'cohesion')
+        && !hasActiveEffect(u, 'frenzy_surge')) {
+        applyEffect(u, 'frenzy_surge', { source: u });
+      }
 
       if (effTarget) {
         this.tickAttackSwing(u, () => {
@@ -627,8 +678,8 @@ export class CombatSystem {
             }
             // else HOLD — no movement.
           }
-        } else if (cmd === 'charge') {
-          // Advance forward at boosted speed.
+        } else if (cmd === 'charge' || cmd === 'frenzy') {
+          // Advance forward at boosted speed (frenzy IS a charge surge).
           u.x += u.facing * spd * 1.5 * 60 * dt;
         } else if (cmd === 'retreat') {
           // Fall back — negative velocity (NOT a facing flip).
@@ -900,11 +951,28 @@ export class CombatSystem {
     }
     if (this.audio) this.audio.unitDeath();
 
+    // Carrion feeding (\u03b2 Carrionling): same-geneline allies with a deathFeed
+    // config grow on this death \u2014 each nearby fallen swarm-mate permanently
+    // feeds them flat atk (stacked source-tagged modifiers, capped at max).
+    const dyingCx = u.x + u.unitW / 2;
+    for (const ally of ctx.allAlive as IUnit[]) {
+      const feed = ally.deathFeed;
+      if (!feed || ally.dead || ally === u) continue;
+      if (ally.side !== u.side || ally.geneline !== u.geneline || ally.lane !== u.lane) continue;
+      if (Math.abs((ally.x + ally.unitW / 2) - dyingCx) > feed.radius) continue;
+      const tag = `feed:${ally.id}`;
+      const stacks = ally.modifiers?.filter(m => m.source === tag).length ?? 0;
+      if (stacks >= feed.max) continue;
+      addModifier(ally, { stat: 'atk', type: 'flat', value: feed.perDeath, source: tag });
+      if (ally.resources) ally.resources['feed'] = stacks + 1; // the draw gorges on this
+      ctx.particles?.float(ally.x + ally.unitW / 2, ally.y - 12, 'FEED', 0x9adb3a);
+    }
+
+    // Every death announces itself \u2014 the corpse economy (GameManager layer)
+    // drops a scavengeable pickup from this. Kill stats ride enemyKilled.
+    this.events.emit('unitDied', { key: u.key, side: u.side, x: u.x, y: u.y, lane: u.lane });
     if (u.side === 'enemy') {
       this.events.emit('enemyKilled', { unit: { key: u.key, reward: u.reward, x: u.x, y: u.y } });
-      if (ctx.particles) {
-        ctx.particles.float(u.x + u.unitW / 2, u.y - 18, `+${u.reward}\u2B21`, DMG_COLORS.nectar);
-      }
     }
   }
 

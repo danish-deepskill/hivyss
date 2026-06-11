@@ -11,6 +11,11 @@ export const SPD_MULT = 1.0; // global speed multiplier — 1.0 = neutral; the r
 // (spd 0.43) takes ~3s; faster Royals cross quicker. A strategy knob, not physics.
 export const LANE_CROSS_REACH = 1.3;
 export const BASE_HP = 1000;
-export const MAX_NECTAR = 300;
+// Nectar wallet cap — raised for the forage era: rich-bloom deposits land in
+// ~90n bursts and maturation tech requires BANKING; a tight cap punishes saving.
+export const MAX_NECTAR = 500;
+// Opening nectar — THE opening-build dial under forage: eco-open (2 gatherers)
+// vs aggro-open (fodder rush) both spend from this.
+export const START_NECTAR = 80;
 export const MAX_CAPACITY = 20;
 export const DEFAULT_WORLD_W = 2560; // default battlefield width — override via BattleSceneData.worldW

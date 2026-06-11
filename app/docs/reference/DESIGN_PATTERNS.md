@@ -153,7 +153,7 @@ Pool creates Unit (once) → spawn(def, side, x) → init() → active gameplay 
 dead=true → despawn() → deactivate() → sits inactive → spawn() again → ...
 ```
 
-**Exception:** `SandboxScene` creates units directly with `new Unit()` — this is fine for a debug scene.
+**No exceptions:** the sandbox is pooled too — every unit spawn goes through `BattleCore.createUnit` (§6.1). (The old "SandboxScene may `new Unit()`" carve-out is retired.)
 
 ---
 
@@ -167,7 +167,9 @@ Each game system is a standalone class with its own state and update loop. GameM
 **Systems:**
 | Manager | Responsibility |
 |---|---|
-| `GameManager` | Orchestrator — owns all systems, runs game loop |
+| `BattleCore` | **The battle substrate** — units (pool + spatial index), CombatSystem, pheromone zones, courier spawn, Elite-slot derivation (§6.1) |
+| `GameManager` | Composition root for the REAL battle — layers economy/incubation/waves/abilities/Royal/win-loss over BattleCore |
+| `RoyalLifecycle` | The controllable Royal (VISION §3): spawn-at-bell, click command mode, leaderless window, respawn |
 | `CombatSystem` | Unit targeting, damage resolution pipeline, death triggers, effect application |
 | `WaveManager` | Wave scheduling, enemy queue, stage progression |
 | `EconomyManager` | Nectar income, spending, balance |
@@ -180,6 +182,37 @@ Each game system is a standalone class with its own state and update loop. GameM
 | `SaveManager` | LocalStorage persistence |
 
 **Do not** add game logic directly to Scene classes. Scenes are thin — they create managers and wire UI.
+
+### 6.1 Battle Substrate (BattleCore) — one battle, two drivers
+
+**Status:** Implemented (2026-06-11)
+**Files:** `systems/BattleCore.ts`, `systems/GameManager.ts`, `scenes/SandboxScene.ts`
+
+Everything every battle has — the unit roster (pooled + spatially indexed), the
+combat sim, the pheromone zone field, courier deploy, Elite-slot derivation,
+the per-lane render-depth sandwich — lives in **one** `BattleCore`. Exactly two
+drivers compose over it:
+
+- **`GameManager`** (the real run): + economy, incubation, waves/AI, player
+  abilities, `RoyalLifecycle`, win/loss. Scenes keep their API via thin
+  delegates (`gm.units`, `gm.combat`, `gm.pheromoneZones`, `gm.playerRoyal`).
+- **`SandboxScene`** (the lab): + free placement, presets, fight/reset.
+
+The standard tick shape both drivers follow:
+```
+core.tickZones(dt) → core.resolve(dt, bases, particles, wall, audio) → core.postResolve()
+```
+
+**Do not:**
+- Add battle state (units / zones / combat wiring) to a driver — put it in
+  BattleCore so BOTH front-ends get it. Before this seam, every combat feature
+  was wired twice and the stacks drifted (the sandbox had FX + unit depth the
+  real battle lacked).
+- Spawn units anywhere but `core.createUnit` / `core.spawnCourier` (the pool +
+  spatial index + depth assignment live there). The old "sandbox may
+  `new Unit()`" exception (§5) is retired — the sandbox is pooled now.
+- Presentation stays with the driver: particles, audio, FxDirector, HUD
+  publishing. The substrate is sim + bookkeeping only.
 
 ---
 

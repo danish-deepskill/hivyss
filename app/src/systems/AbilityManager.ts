@@ -5,7 +5,9 @@ import { applyEffect } from './EffectSystem';
 import { DEFAULT_WORLD_W, SBW } from '../config/Constants';
 import { LANE } from '../config/Layout';
 const GND = LANE.land.groundY;
-import { EconomyManager } from './EconomyManager';
+// Wallet — the shape both EconomyManager (nectar) and VyssEconomy (corpses)
+// satisfy. Hive abilities spend VYSS (the tactical currency).
+export interface AbilityWallet { canAfford(cost: number): boolean; spend(cost: number): boolean }
 import { BaseStructure } from '../entities/BaseStructure';
 import { EventBus } from './EventBus';
 
@@ -35,15 +37,15 @@ export class AbilityManager {
     if (this.slowActive > 0) this.slowActive = Math.max(0, this.slowActive - dt);
   }
 
-  canCast(key: string, economy: EconomyManager): boolean {
+  canCast(key: string, wallet: AbilityWallet): boolean {
     const def = ABILITY_DEFS[key as PlayerAbilityKey];
-    return this.cooldowns[key] <= 0 && economy.canAfford(def.cost);
+    return this.cooldowns[key] <= 0 && wallet.canAfford(def.cost);
   }
 
-  castNuke(economy: EconomyManager, units: IUnit[], enemyBase: BaseStructure, particles: IParticleManager | null): boolean {
+  castNuke(wallet: AbilityWallet, units: IUnit[], enemyBase: BaseStructure, particles: IParticleManager | null): boolean {
     const def = ABILITY_DEFS.nuke;
-    if (!this.canCast('nuke', economy)) return false;
-    economy.spend(def.cost);
+    if (!this.canCast('nuke', wallet)) return false;
+    wallet.spend(def.cost);
     this.cooldowns.nuke = def.cooldown;
 
     const enemies = units.filter(u => u.side === 'enemy' && !u.dead);
@@ -53,7 +55,6 @@ export class AbilityManager {
       if (u.dead && particles) {
         particles.burst(u.x + u.unitW / 2, u.y + u.unitH / 2, u.primary, 14);
         this.events.emit('enemyKilled', { unit: { key: u.key, reward: u.reward, x: u.x, y: u.y } });
-        particles.float(u.x + u.unitW / 2, u.y - 18, `+${u.reward}\u2B21`, 0xf0c040);
       }
       if (particles) {
         particles.float(u.x + u.unitW / 2, u.y - 6, `-${def.damage}`, 0xffee44);
@@ -66,10 +67,10 @@ export class AbilityManager {
     return true;
   }
 
-  castWall(economy: EconomyManager, playerBase: BaseStructure, particles: IParticleManager | null): boolean {
+  castWall(wallet: AbilityWallet, playerBase: BaseStructure, particles: IParticleManager | null): boolean {
     const def = ABILITY_DEFS.wall;
-    if (!this.canCast('wall', economy)) return false;
-    economy.spend(def.cost);
+    if (!this.canCast('wall', wallet)) return false;
+    wallet.spend(def.cost);
     this.cooldowns.wall = def.cooldown;
     this.wallActive = def.duration!;
     playerBase.shielded = true;
@@ -79,10 +80,10 @@ export class AbilityManager {
     return true;
   }
 
-  castSlow(economy: EconomyManager, units: IUnit[], particles: IParticleManager | null): boolean {
+  castSlow(wallet: AbilityWallet, units: IUnit[], particles: IParticleManager | null): boolean {
     const def = ABILITY_DEFS.slow;
-    if (!this.canCast('slow', economy)) return false;
-    economy.spend(def.cost);
+    if (!this.canCast('slow', wallet)) return false;
+    wallet.spend(def.cost);
     this.cooldowns.slow = def.cooldown;
     this.slowActive = def.duration!;
     units.filter(u => u.side === 'enemy' && !u.dead).forEach(u => {
@@ -94,10 +95,10 @@ export class AbilityManager {
     return true;
   }
 
-  castRepair(economy: EconomyManager, playerBase: BaseStructure, particles: IParticleManager | null): boolean {
+  castRepair(wallet: AbilityWallet, playerBase: BaseStructure, particles: IParticleManager | null): boolean {
     const def = ABILITY_DEFS.repair;
-    if (!this.canCast('repair', economy)) return false;
-    economy.spend(def.cost);
+    if (!this.canCast('repair', wallet)) return false;
+    wallet.spend(def.cost);
     this.cooldowns.repair = def.cooldown;
     playerBase.setHp(playerBase.hp + def.healAmount!);
     playerBase.flash(0.4);

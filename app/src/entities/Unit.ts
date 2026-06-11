@@ -121,6 +121,10 @@ export class Unit extends Phaser.GameObjects.Container {
 
   // Mendwing passive-heal cooldown (plain field, not an effect).
   healTimer: number;
+  // Spawner-passive brood accumulator (β Broodmother).
+  spawnTimer: number;
+  // Carrion-feed config (β Carrionling) — applied by the death phase.
+  deathFeed?: { perDeath: number; radius: number; max: number };
 
   components: Set<ComponentTag>;
 
@@ -204,6 +208,8 @@ export class Unit extends Phaser.GameObjects.Container {
     this.backswingTimer = 0;
     this.poiseAccum = 0;
     this.healTimer = 0;
+    this.spawnTimer = 0;
+    this.deathFeed = undefined;
     this.caste = undefined;
     this.phaseThreshold = undefined;
     this.sfx = undefined;
@@ -315,6 +321,8 @@ export class Unit extends Phaser.GameObjects.Container {
 
     this.poiseAccum = 0;
     this.healTimer = 0;
+    this.spawnTimer = 0;
+    this.deathFeed = def.deathFeed;
 
     // Battle-scope reset. `persistent` is NOT cleared.
     this.activeEffects.length = 0;
@@ -422,6 +430,8 @@ export class Unit extends Phaser.GameObjects.Container {
     if (hasActiveEffect(this, 'slow')) s *= 0.45;
     // Primal Roar charge — the herd surges forward 1.5× while roaring.
     if (hasActiveEffect(this, 'herd_roar')) s *= 1.5;
+    // Frenzy surge carries its charge beyond the zone (the cash-out momentum).
+    else if (hasActiveEffect(this, 'frenzy_surge')) s *= 1.3;
     return s;
   }
 
@@ -632,6 +642,7 @@ export class Unit extends Phaser.GameObjects.Container {
       state: this.state, atkCd: this.atkCd, atkRate: this.atkRate,
       trait: this.trait, hp: this.hp, maxHp: this.maxHp,
       burrowed: this.burrowed,
+      resources: this.resources,
       ...this.swingProgress(),
     };
     // Signature body motion (rear/lunge/squash/lean) — offsets + transforms the

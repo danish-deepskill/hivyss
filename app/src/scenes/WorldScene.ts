@@ -2,8 +2,12 @@ import Phaser from 'phaser';
 import { DEFAULT_WORLD_W } from '../config/Constants';
 import { drawBiomeBackground } from './BiomeBackground';
 import { drawPheromoneTrail } from './PheromoneTrail';
+import { setCastFxDispatcher } from '../systems/CombatDispatch';
+import { FxDirector } from '../systems/FxDirector';
+import { registerCoreFx } from '../systems/FxRenderers';
 import { laneFromY, getGroundY } from '../config/RouteMatrix';
 import { UNIT_DEFS } from '../units/registry';
+import { FORAGE_ENABLED } from '../config/ForageDefs';
 import { ABILITY_DEFS } from '../config/AbilityDefs';
 import { GameManager } from '../systems/GameManager';
 import { capUsed, MAX_CAPACITY } from '../systems/Capacity';
@@ -27,6 +31,8 @@ export class WorldScene extends Phaser.Scene {
   private viewport!: ViewportController;
   private pheromoneLayer!: Phaser.GameObjects.Graphics;
   private royalLayer!: Phaser.GameObjects.Graphics;
+  private bloomLayer!: Phaser.GameObjects.Graphics;
+  private fxDirector!: FxDirector;
 
   constructor() {
     super('WorldScene');
@@ -46,6 +52,29 @@ export class WorldScene extends Phaser.Scene {
     // current order marker. Above the scent layer, under the units.
     this.royalLayer = this.add.graphics();
     this.royalLayer.setDepth(51);
+
+    // Nectar blooms (the forage economy) — repainted each frame from Forage
+    // state: petals scale with the remaining pool, rich blooms are clusters,
+    // the priority ring marks the standing G-order, raids flash red.
+    if (FORAGE_ENABLED) {
+      this.bloomLayer = this.add.graphics();
+      this.bloomLayer.setDepth(49); // under the scent layer + units
+    }
+
+    // FX director — one-shot ability FX (Stampede / Primal Roar shockwaves)
+    // above the units, same wiring as the sandbox. Until this, cast-FX only
+    // had a renderer in the sandbox — invisible in real runs.
+    const fxLayer = this.add.graphics();
+    fxLayer.setDepth(64);
+    this.fxDirector = new FxDirector(fxLayer);
+    registerCoreFx(this.fxDirector);
+    setCastFxDispatcher((s) => this.fxDirector.play({
+      kind: s.ability.fx?.kind ?? '',
+      x: s.x,
+      y: s.y,
+      color: 0xc8a070,   // dust tan (blunt); per-dmgType palette later
+      magnitude: s.magnitude,
+    }));
 
     // Create game manager (owns all systems, entities, and game state)
     this.gm = new GameManager(this, data.deck, data.startWave, this.worldW, data.customWaves, data.runBuffs, data.hiveProfile, data.hiveSeed);
@@ -71,9 +100,15 @@ export class WorldScene extends Phaser.Scene {
       const result = this.gm.cancelIncubation(evt.index);
       if (result.message) this.gm.events.emit('logMessage', { message: result.message });
     };
-    // Elite signature slot fired from the HUD → trigger THAT Elite's signature.
+    // Elite/Royal signature slot fired from the HUD → trigger THAT unit's
+    // signature (routes through the maturation gate for the Royal ultimate).
     const onSignature = (evt: { unitId: number }) => {
-      if (this.gm.running && evt.unitId != null) this.gm.combat.requestSignature(evt.unitId);
+      if (this.gm.running && evt.unitId != null) this.gm.requestSignature(evt.unitId);
+    };
+    // MATURE button → spend to advance the hive phase.
+    const onMature = () => {
+      const result = this.gm.matureHive();
+      if (result.message) this.gm.events.emit('logMessage', { message: result.message });
     };
     // Pheromone command button → cast it on the player army's front.
     const onPheromone = (evt: { kind: PheromoneKind; lane: number }) => {
@@ -82,12 +117,19 @@ export class WorldScene extends Phaser.Scene {
     };
     // Royal profile click (or R key) → toggle command mode.
     const onToggleRoyalSelect = () => this.gm.toggleRoyalSelect();
+    // Gatherer deploy button → send a forage worker (its bloom picks the lane).
+    const onDeployGatherer = () => {
+      const result = this.gm.deployGatherer();
+      if (result.message) this.gm.events.emit('logMessage', { message: result.message });
+    };
     this.gm.events.on('deployUnit', onDeploy);
     this.gm.events.on('useAbility', onAbility);
     this.gm.events.on('cancelIncubation', onCancel);
     this.gm.events.on('triggerSignature', onSignature);
     this.gm.events.on('castPheromone', onPheromone);
     this.gm.events.on('toggleRoyalSelect', onToggleRoyalSelect);
+    this.gm.events.on('deployGatherer', onDeployGatherer);
+    this.gm.events.on('matureHive', onMature);
 
     // Cleanup on shutdown
     this.events.once('shutdown', () => {
@@ -98,6 +140,8 @@ export class WorldScene extends Phaser.Scene {
       this.gm.events.off('triggerSignature', onSignature);
       this.gm.events.off('castPheromone', onPheromone);
       this.gm.events.off('toggleRoyalSelect', onToggleRoyalSelect);
+      this.gm.events.off('deployGatherer', onDeployGatherer);
+      this.gm.events.off('matureHive', onMature);
     });
 
     // ESC — toggle pause overlay
@@ -116,17 +160,23 @@ export class WorldScene extends Phaser.Scene {
       this.gm?.toggleRoyalSelect();
     });
 
+    // G — toggle GATHER mode (then a left-click picks the priority bloom;
+    // empty field = auto). Mutually exclusive with Royal command mode.
+    this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.G).on('down', () => {
+      this.gm?.toggleGatherMode();
+    });
+
     // Suppress browser right-click menu so right-drag pan fires
     // cleanly on the canvas.
     this.input.mouse?.disableContextMenu();
 
-    // Left-click the battlefield → Royal control (select her / order her).
-    // Same scene-level Phaser pointerdown the sandbox uses for placement —
-    // pointer.worldX/Y carries the camera transform, and clicks on the DOM HUD
-    // never reach the canvas, so no manual filtering. Right-drag stays the pan.
+    // Left-click the battlefield → mode-routed command (G-mode: gather
+    // priority; otherwise Royal control). Same scene-level Phaser pointerdown
+    // the sandbox uses — pointer.worldX/Y carries the camera transform, and
+    // clicks on the DOM HUD never reach the canvas. Right-drag stays the pan.
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       if (p.button !== 0 || !this.gm?.running) return;
-      this.gm.commandRoyalClick(p.worldX, laneFromY(p.worldY));
+      this.gm.commandFieldClick(p.worldX, laneFromY(p.worldY));
     });
 
     // Camera + pan/zoom controller. Right-drag so left-click stays
@@ -176,7 +226,7 @@ export class WorldScene extends Phaser.Scene {
       // Capacity (MenuUIScene) — derived per-frame from live units + chambers
       const playerCapUsed = capUsed(this.gm.units, 'player', this.gm.incubation.chambers);
       this.registry.set('cap.used', playerCapUsed);
-      this.registry.set('cap.max', MAX_CAPACITY);
+      this.registry.set('cap.max', this.gm.maxCapacity); // grows with the hive phase
 
       // Incubation (MenuUIScene)
       this.registry.set('inc.chambers', this.gm.incubation.chambers);
@@ -189,7 +239,8 @@ export class WorldScene extends Phaser.Scene {
       const ablCanCast: Record<string, boolean> = {};
       const ablCdPct: Record<string, number> = {};
       Object.keys(ABILITY_DEFS).forEach(k => {
-        ablCanCast[k] = this.gm.abilities.canCast(k, this.gm.economy);
+        // Hive abilities spend the CORPSE wallet (the tactical currency).
+        ablCanCast[k] = this.gm.abilities.canCast(k, this.gm.vyss);
         ablCdPct[k] = this.gm.abilities.getCooldownPercent(k);
       });
       this.registry.set('abl.canCast', ablCanCast);
@@ -201,6 +252,20 @@ export class WorldScene extends Phaser.Scene {
       this.registry.set('elite.slots', this.gm.getEliteSlots());
       this.registry.set('royal.status', this.gm.getRoyalStatus());
       this.registry.set('royal.selected', this.gm.royalSelected);
+      this.registry.set('vyss.count', Math.floor(this.gm.vyss.vyss));
+      this.registry.set('gather.mode', this.gm.gatherMode);
+      if (this.gm.maturation) {
+        this.registry.set('hive.phaseName', this.gm.maturation.phaseName);
+        this.registry.set('hive.tierCap', this.gm.maturation.tierCap);
+        this.registry.set('hive.matureCost', this.gm.maturation.nextCost);
+        this.registry.set('hive.nextPerks', this.gm.maturation.nextPerks);
+        this.registry.set('hive.canMature', this.gm.maturation.canMature(this.gm.economy, this.gm.incubation, this.gm.vyss));
+      }
+      if (this.gm.forage) {
+        this.registry.set('forage.rate', this.gm.forage.rate);
+        this.registry.set('forage.workers', this.gm.forage.workerCount);
+        this.drawBlooms();
+      }
 
       // Repaint the scent-trail from the live zones (deposited + decayed in tick).
       this.pheromoneLayer.clear();
@@ -208,6 +273,9 @@ export class WorldScene extends Phaser.Scene {
 
       // Royal control affordance (who you control + the active order).
       this.drawRoyalControl();
+
+      // One-shot ability FX (cast shockwaves etc).
+      this.fxDirector.update(dt);
     }
 
     if (!this.gm.running) return;
@@ -245,6 +313,59 @@ export class WorldScene extends Phaser.Scene {
       const t = order.target;
       g.lineStyle(2, 0xff5050, 0.9);
       g.strokeEllipse(t.x + t.unitW / 2, getGroundY('land', t.lane), t.unitW * 1.25, t.unitW * 0.5);
+    }
+  }
+
+  /**
+   * Repaint the nectar blooms from live Forage state: a flower (or 3-flower
+   * cluster when rich) whose petals SHRINK + fade as the pool drains; a gold
+   * ring marks the standing priority (G-order); a red flash marks a raid.
+   */
+  private drawBlooms(): void {
+    const g = this.bloomLayer;
+    g.clear();
+    const forage = this.gm.forage;
+    if (!forage) return;
+    // Corpse pickups — fallen chitin husks, fading as they decay. Scavenge
+    // targets for G-mode; bigger yields draw bigger husks.
+    for (const c of forage.corpsePickups) {
+      const cy = getGroundY('land', c.lane);
+      const a = Math.max(0.15, Math.min(1, c.decay / 6)); // fade out over the last seconds
+      const r = 2.5 + Math.min(4, c.yield * 0.4);
+      g.fillStyle(0x8a8a96, 0.55 * a);
+      g.fillEllipse(c.x, cy - 2, r * 2.2, r * 1.1);
+      g.lineStyle(1.2, 0xc8c8d8, 0.8 * a);
+      g.lineBetween(c.x - r, cy - 2 - r * 0.5, c.x + r, cy - 2 + r * 0.3);
+      g.lineBetween(c.x - r * 0.7, cy - 2 + r * 0.4, c.x + r * 0.7, cy - 2 - r * 0.6);
+    }
+    for (const b of forage.blooms) {
+      const by = getGroundY('land', b.lane);
+      const fill = Math.max(0.35, b.pool / b.maxPool); // wilt toward 35% size
+      const heads = b.rich ? [-7, 0, 7] : [0];          // cluster = one object, three flowers
+      // priority ring — the standing gather order
+      if (forage.priorityId === b.id) {
+        g.lineStyle(1.5, 0xf0c040, 0.85);
+        g.strokeEllipse(b.x, by + 1, 26, 9);
+      }
+      // raid flash
+      if (b.flash > 0) {
+        g.fillStyle(0xff3020, 0.25 * b.flash);
+        g.fillCircle(b.x, by - 8, 16);
+      }
+      for (const ox of heads) {
+        const hx = b.x + ox;
+        const hy = by - 9 - (ox === 0 ? 1 : 0);
+        g.lineStyle(1.5, 0x4a7a30, 0.9);
+        g.lineBetween(hx, by, hx, hy);
+        const r = (b.rich ? 3.4 : 3.0) * fill;
+        g.fillStyle(0xf0c040, 0.5 + 0.45 * fill);
+        for (let p = 0; p < 5; p++) {
+          const a = (p / 5) * Math.PI * 2;
+          g.fillCircle(hx + Math.cos(a) * r, hy + Math.sin(a) * r, r * 0.75);
+        }
+        g.fillStyle(0xffe890, 0.55 + 0.45 * fill);
+        g.fillCircle(hx, hy, r * 0.7);
+      }
     }
   }
 

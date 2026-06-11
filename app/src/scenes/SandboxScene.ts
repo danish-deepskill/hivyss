@@ -7,14 +7,12 @@ const GND = LANE.land.groundY;
 // Lane midline — the single-lane land ground. Clicks above this Y go to
 // lane 0 (upper), below to lane 1 (lower). Also where the divider draws.
 const LANE_MIDLINE_Y = LANE.land.groundY;
-import { UNIT_DEFS, drawUnit } from '../units/registry';
-import { lookupAbility } from '../config/combat/abilities';
+import { UNIT_DEFS } from '../units/registry';
 import { ENEMY_DEFS } from '../config/EnemyDefs';
-import { resolveColors } from '../config/Palettes';
-import { Unit, resetUid } from '../entities/Unit';
+import { resetUid } from '../entities/Unit';
 import { BaseStructure } from '../entities/BaseStructure';
 import { BaseEntity } from '../entities/BaseEntity';
-import { CombatSystem } from '../systems/CombatSystem';
+import { BattleCore } from '../systems/BattleCore';
 import { setCastFxDispatcher } from '../systems/CombatDispatch';
 import { FxDirector } from '../systems/FxDirector';
 import { registerCoreFx } from '../systems/FxRenderers';
@@ -24,8 +22,9 @@ import { AudioManager } from '../systems/AudioManager';
 import { HpHud } from '../systems/HpHud';
 import { ViewportController } from '../systems/ViewportController';
 import { saveUserPreset, type Placement } from '../systems/SandboxPresets';
+import { renderPreviewTexture } from '../ui/UnitPreviews';
 import type { EffectBearer } from '../config/combat/effects/types';
-import type { RenderUnit, Side, UnitDef, PheromoneZone, PheromoneKind } from '../types';
+import type { Side, PheromoneKind, EliteSlot } from '../types';
 import { PHEROMONE_DEFS } from '../config/PheromoneDefs';
 import { drawBiomeBackground } from './BiomeBackground';
 
@@ -62,11 +61,12 @@ export class SandboxScene extends Phaser.Scene {
   // pointer crosses the midline and the side actually changes.
   private ghostSide!: Side | null;
 
-  // Live-battle state
-  private units!: Unit[];
+  // Live-battle state — the substrate (units/combat/zones) is BattleCore,
+  // the same module the real run loop composes; the sandbox is just a
+  // different DRIVER over it (free placement, fight/reset, no economy).
+  private core!: BattleCore;
   private running!: boolean;
   private elapsed!: number;
-  private combat!: CombatSystem;
   private particles!: ParticleManager;
   private fxDirector!: FxDirector;
   private audio!: AudioManager;
@@ -88,10 +88,9 @@ export class SandboxScene extends Phaser.Scene {
   private ghostInvalidOutline!: Phaser.GameObjects.Graphics;
   private placementSprites!: Phaser.GameObjects.Image[];
 
-  // Pheromone command state. `pheromoneZones` is the live array passed
-  // to combat.resolve each frame; `selectedPheromone` is the active
-  // kind (keys 1/2/3) or null (null = normal unit-placement mode).
-  private pheromoneZones!: PheromoneZone[];
+  // Pheromone command state — the live zone array is core.pheromoneZones;
+  // `selectedPheromone` is the active kind (keys 1/2/3) or null (null =
+  // normal unit-placement mode).
   private selectedPheromone!: PheromoneKind | null;
   private pheromoneLayer!: Phaser.GameObjects.Graphics;  // zone fills/rings, under units
   private pheromoneGhost!: Phaser.GameObjects.Graphics;   // follow-cursor preview circle
@@ -99,7 +98,7 @@ export class SandboxScene extends Phaser.Scene {
   // Background biome — the selectable environment (Wild / Sun Carapace). The
   // background is redrawn on switch; bgObjects tracks everything drawBackground
   // created so it can be cleared first.
-  private biomeKey!: 'wild' | 'sunCarapace';
+  private biomeKey!: 'wild' | 'sunCarapace' | 'fetidPool';
   private bgObjects!: Phaser.GameObjects.GameObject[];
 
   constructor() {
@@ -113,12 +112,10 @@ export class SandboxScene extends Phaser.Scene {
     this.placements = [];
     this.selectedUnitKey = null;
     this.ghostSide = null;
-    this.units = [];
     this.running = false;
     this.elapsed = 0;
     this.ghostSprite = null;
     this.placementSprites = [];
-    this.pheromoneZones = [];
     this.selectedPheromone = null;
     this.biomeKey = 'wild';
     this.bgObjects = [];
@@ -130,10 +127,11 @@ export class SandboxScene extends Phaser.Scene {
     this.eventBus = new EventBus();
     this.registry.set('sandbox.eventBus', this.eventBus);
 
-    // Combat pipeline + rendering helpers. worldW now matches a real
-    // run (DEFAULT_WORLD_W = 2560), so CombatSystem wall checks align
-    // with the expanded arena and combat pacing feels like playtest.
-    this.combat = new CombatSystem(this, new EventBus(), DEFAULT_WORLD_W);
+    // The battle substrate (units/pool/combat/zones) — the SAME BattleCore
+    // the real run loop uses, so combat features exist here automatically.
+    // worldW matches a real run (DEFAULT_WORLD_W) so pacing feels like
+    // playtest. Combat events go to a throwaway bus (no economy listening).
+    this.core = new BattleCore(this, new EventBus(), DEFAULT_WORLD_W);
     this.particles = new ParticleManager(this);
     this.audio = new AudioManager();
 
@@ -181,7 +179,7 @@ export class SandboxScene extends Phaser.Scene {
     this.enemyBaseStructure.setHp(SANDBOX_BASE_HP);
     this.playerBaseEntity = new BaseEntity(this.playerBaseStructure, SBW);
     this.enemyBaseEntity = new BaseEntity(this.enemyBaseStructure, DEFAULT_WORLD_W - SBW);
-    this.combat.setBaseEntities(this.playerBaseEntity, this.enemyBaseEntity);
+    this.core.combat.setBaseEntities(this.playerBaseEntity, this.enemyBaseEntity);
 
     this.playerHpBar = this.add.graphics();
     this.enemyHpBar = this.add.graphics();
@@ -238,7 +236,7 @@ export class SandboxScene extends Phaser.Scene {
       this.selectPheromone(evt.kind);
     };
     // HUD biome dropdown — switch the background environment + redraw.
-    const onSelectBiome = (evt: { biome: 'wild' | 'sunCarapace' }) => {
+    const onSelectBiome = (evt: { biome: 'wild' | 'sunCarapace' | 'fetidPool' }) => {
       this.biomeKey = evt.biome;
       this.drawBackground();
     };
@@ -246,7 +244,7 @@ export class SandboxScene extends Phaser.Scene {
     // one Elite (a slot click); without → fire all ready (the E hotkey).
     // Fire one Elite's signature from its HUD slot (mid-fight only).
     const onTriggerSignature = (evt: { unitId?: number }) => {
-      if (this.running && evt.unitId != null) this.combat.requestSignature(evt.unitId);
+      if (this.running && evt.unitId != null) this.core.combat.requestSignature(evt.unitId);
     };
 
     this.eventBus.on('sandboxSelectUnit', onSelect);
@@ -260,7 +258,7 @@ export class SandboxScene extends Phaser.Scene {
     this.eventBus.on('sandboxTriggerSignature', onTriggerSignature);
 
     if (import.meta.env.DEV) {
-      HpHud.attachSource(() => this.units);
+      HpHud.attachSource(() => this.core.units);
     }
 
     this.events.once('shutdown', () => {
@@ -517,7 +515,7 @@ export class SandboxScene extends Phaser.Scene {
   // ---------------------------------------------------------------
 
   /**
-   * Keyboard selection: 1/R = rally, 2/C = charge, 3/T = retreat,
+   * Keyboard selection: 1/R = rally, 2/C = charge, 3/T = retreat, 4/F = frenzy,
    * 0/Esc = clear. (Esc also clears the unit selection via the HUD; we
    * additionally clear the local pheromone selection.) Selecting a
    * pheromone clears any active unit-placement ghost so the two modes
@@ -529,6 +527,7 @@ export class SandboxScene extends Phaser.Scene {
       case '1': case 'r': kind = 'rally'; break;
       case '2': case 'c': kind = 'charge'; break;
       case '3': case 't': kind = 'retreat'; break;
+      case '4': case 'f': kind = 'frenzy'; break;
       case '0': case 'escape': kind = null; break;
       default: return;  // not a pheromone key — ignore
     }
@@ -561,7 +560,7 @@ export class SandboxScene extends Phaser.Scene {
    */
   private placePheromone(kind: PheromoneKind, x: number, y: number): void {
     const def = PHEROMONE_DEFS[kind];
-    this.pheromoneZones.push({
+    this.core.pheromoneZones.push({
       kind,
       x,
       radius: def.radius,
@@ -581,16 +580,7 @@ export class SandboxScene extends Phaser.Scene {
    */
   private deployScout(kind: PheromoneKind, x: number, y: number): void {
     if (!this.running) return;
-    const side = this.sideForX(x);
-    const lane = this.laneForY(y);
-    const baseDef = side === 'enemy' ? ENEMY_DEFS['escout'] : UNIT_DEFS['scout'];
-    if (!baseDef) return;
-
-    const scout = new Unit(this, { ...baseDef, _key: 'scout' }, side, x, lane);
-    scout.primary = PHEROMONE_DEFS[kind].color; // tint the scout to its command
-    scout.pheromoneKind = kind; // courier: the sim lays a fading trail as it runs
-    scout.setDepth(60 + lane);
-    this.units.push(scout);
+    this.core.spawnCourier(kind, this.sideForX(x), x, this.laneForY(y));
   }
 
   /** Cursor-follow preview circle for the selected pheromone. */
@@ -615,10 +605,10 @@ export class SandboxScene extends Phaser.Scene {
     g.strokeCircle(pointer.worldX, zy, def.radius);
   }
 
-  /** Rebuild the persistent zone layer from `pheromoneZones`. */
+  /** Rebuild the persistent zone layer from the live zones. */
   private drawPheromoneZones(): void {
     this.pheromoneLayer.clear();
-    drawPheromoneTrail(this.pheromoneLayer, this.pheromoneZones);
+    drawPheromoneTrail(this.pheromoneLayer, this.core.pheromoneZones);
   }
 
   private emitPlacementCount(): void {
@@ -637,46 +627,16 @@ export class SandboxScene extends Phaser.Scene {
    * live Elite units (real cooldowns, firable, drops out on death).
    */
   private emitEliteSlots(): void {
-    type Slot = { id: number; name: string; ready: boolean; cdFrac: number; firable: boolean; inRange: boolean };
-    const slots: Array<Slot | null> = [];
-    if (this.running) {
-      for (const u of this.units) {
-        if (u.side !== 'player' || u.dead) continue;
-        if (UNIT_DEFS[u.key]?.caste !== 'elite') continue;
-        const frac = u.signatureCooldown > 0 ? u.sigCd / u.signatureCooldown : 0;
-        slots.push({
-          id: u.id,
-          name: u.unitName,
-          ready: u.canSignature(),
-          cdFrac: frac < 0 ? 0 : frac > 1 ? 1 : frac,
-          firable: !!u.signatureAbility,
-          inRange: this.signatureHasTarget(u),
-        });
-      }
-    } else {
-      for (const p of this.placements) {
-        if (p.side !== 'player') continue;
-        if (UNIT_DEFS[p.unitKey]?.caste !== 'elite') continue;
-        slots.push({ id: -1, name: UNIT_DEFS[p.unitKey]?.name ?? p.unitKey, ready: false, cdFrac: 0, firable: false, inRange: false });
-      }
-    }
+    // In-fight: the shared substrate derivation (live cooldowns, in-range,
+    // drops dead Elites). Pre-fight: preview slots from the placements.
+    const slots: Array<EliteSlot | null> = this.running
+      ? [...this.core.getEliteSlots('player')]
+      : this.placements
+          .filter(p => p.side === 'player' && UNIT_DEFS[p.unitKey]?.caste === 'elite')
+          .map(p => ({ id: -1, key: p.unitKey, name: UNIT_DEFS[p.unitKey]?.name ?? p.unitKey, ready: false, cdFrac: 0, firable: false, inRange: false }));
     while (slots.length < MAX_ELITES_PER_SIDE) slots.push(null);
     slots.length = MAX_ELITES_PER_SIDE; // clamp defensively
     this.eventBus.emit('sandboxEliteSlots', { slots });
-  }
-
-  /** True if an enemy is within the unit's signature-ability range (same lane)
-   *  — i.e. firing the signature would actually connect. */
-  private signatureHasTarget(u: Unit): boolean {
-    if (!u.signatureAbility) return false;
-    const range = lookupAbility(u.signatureAbility).range ?? 0;
-    if (range <= 0) return false;
-    const ux = u.x + u.unitW / 2;
-    for (const e of this.units) {
-      if (e.side === u.side || e.dead || e.lane !== u.lane) continue;
-      if (Math.abs((e.x + e.unitW / 2) - ux) < range) return true;
-    }
-    return false;
   }
 
   /**
@@ -738,7 +698,7 @@ export class SandboxScene extends Phaser.Scene {
   // ---------------------------------------------------------------
 
   private clearPheromoneZones(): void {
-    this.pheromoneZones = [];
+    this.core.pheromoneZones = [];
     this.pheromoneLayer.clear();
   }
 
@@ -790,8 +750,7 @@ export class SandboxScene extends Phaser.Scene {
     resetUid();
     this.running = false;
     this.elapsed = 0;
-    this.units.forEach((u: Unit) => u.kill());
-    this.units = [];
+    this.core.clear();
     this.clearPheromoneZones();
     this.resetBases();
     this.rerenderAllPlacementSprites();
@@ -808,25 +767,18 @@ export class SandboxScene extends Phaser.Scene {
     resetUid();
 
     this.clearPlacementSprites();
-    this.units.forEach((u: Unit) => u.kill());
-    this.units = [];
+    this.core.clear();
 
     for (const p of this.placements) {
       const baseDef = p.side === 'enemy'
         ? ENEMY_DEFS['e' + p.unitKey]
         : UNIT_DEFS[p.unitKey];
       if (!baseDef) continue;
-      const lane = p.lane ?? 0;
-      const unit = new Unit(this, { ...baseDef, _key: p.unitKey }, p.side, p.x, lane);
-      // Render units ABOVE the pheromone zone layer (depth 50) so the
-      // painted zones read as ground markings under the herd. +lane so the
-      // near (South) row draws over the far (North) row where they overlap.
-      unit.setDepth(60 + lane);
-      this.units.push(unit);
+      this.core.createUnit(p.unitKey, p.side, baseDef, p.x, p.lane ?? 0);
     }
 
     // Fresh fight — clear any zones + FX left from a prior run.
-    this.pheromoneZones = [];
+    this.core.pheromoneZones = [];
     this.fxDirector.reset();
     this.drawPheromoneZones();
 
@@ -856,23 +808,20 @@ export class SandboxScene extends Phaser.Scene {
     this.playerBaseStructure.update(dt);
     this.enemyBaseStructure.update(dt);
 
-    // Pheromone trail — fading scent-blobs the courier Scouts lay in the sim.
-    // Decay the fade BEFORE resolve appends this frame's fresh blobs.
-    const hadTrail = this.pheromoneZones.length > 0;
-    if (hadTrail) {
-      this.pheromoneZones = this.pheromoneZones.filter((z) => (z.remaining -= dt) > 0);
-    }
-
-    this.combat.resolve(
-      this.units, dt,
+    // The substrate step: decay the scent-trail fade BEFORE resolve appends
+    // this frame's fresh blobs, then combat, then reap the dead to the pool.
+    const hadTrail = this.core.pheromoneZones.length > 0;
+    this.core.tickZones(dt);
+    this.core.resolve(
+      dt,
       this.playerBaseStructure, this.enemyBaseStructure,
       this.particles, 0, this.audio,
-      this.pheromoneZones,
     );
+    this.core.postResolve();
 
     // The trail changes every frame (deposit + fade) — redraw while active,
     // and clear once when the last blob is gone.
-    if (this.pheromoneZones.length > 0) this.drawPheromoneZones();
+    if (this.core.pheromoneZones.length > 0) this.drawPheromoneZones();
     else if (hadTrail) this.pheromoneLayer.clear();
 
     this.fxDirector.update(dt);
@@ -881,11 +830,6 @@ export class SandboxScene extends Phaser.Scene {
     this.enemyBaseEntity.syncDead();
 
     this.redrawHpBars();
-
-    this.units = this.units.filter((u: Unit) => {
-      if (u.dead) { u.kill(); return false; }
-      return true;
-    });
 
     // Refresh Elite-signature slots (live cooldowns + drop dead Elites).
     this.emitEliteSlots();
@@ -926,38 +870,14 @@ export class SandboxScene extends Phaser.Scene {
     });
 
     UNIT_KEYS.forEach((key: string) => {
-      const playerDef = UNIT_DEFS[key];
-      // Player units face right (east) in live spawns; enemies face
-      // left (west). Bake the facing into the preview so the pre-
-      // fight ghost + placement sprite match the live Unit's facing
-      // and don't flip on FIGHT.
-      this.generateOnePreview(playerDef, `_sb_preview_${key}`, 1);
+      // Player units face right (east) in live spawns; enemies face left
+      // (west). Bake the facing into the preview so the pre-fight ghost +
+      // placement sprite match the live Unit's facing and don't flip on
+      // FIGHT. Shared renderer — same draw the HUD + brood cards use.
+      renderPreviewTexture(this, UNIT_DEFS[key], `_sb_preview_${key}`, { facing: 1 });
       const enemyDef = ENEMY_DEFS['e' + key];
-      if (enemyDef) this.generateOnePreview(enemyDef, `_sb_preview_e${key}`, -1);
+      if (enemyDef) renderPreviewTexture(this, enemyDef, `_sb_preview_e${key}`, { facing: -1 });
     });
-  }
-
-  private generateOnePreview(def: UnitDef, texKey: string, facing: number): void {
-    const pad = 10;
-    const pw = def.w + pad * 2;
-    const ph = def.h + pad * 2 + 10;
-    const g = this.add.graphics();
-    const renderUnit: RenderUnit = {
-      w: def.w, h: def.h,
-      ...resolveColors(def),
-      palette: def.palette,
-      facing, bob: 0,
-      state: 'march' as const, atkCd: 0, atkRate: def.atkRate,
-      trait: def.trait, hp: def.hp, maxHp: def.hp,
-      burrowed: false, windup: 0, recover: 0,
-    };
-    drawUnit(g, renderUnit, pw / 2, pad);
-    g.generateTexture(texKey, pw, ph);
-    g.destroy();
-    // Pixel-perfect upscale for roster thumbnails + placement ghost
-    // + pre-fight placement sprites at 1.5× camera zoom × 1.2× scale.
-    // Default LINEAR blurs; NEAREST matches the game's pixel-art look.
-    this.textures.get(texKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
   }
 
   // ---------------------------------------------------------------

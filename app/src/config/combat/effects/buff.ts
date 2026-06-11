@@ -1,8 +1,36 @@
 // Buff effect definitions. Declarative; hook bodies wire as consumers arrive.
 
 import type { EffectDef } from './types';
+import type { IUnit } from '../../../types';
+import { addModifier, removeModifiersBySource } from '../../../systems/ModifierSystem';
 
 export const buffEffects: Record<string, EffectDef> = {
+  // Frenzy Musk's cash-in (α's signature pheromone). On apply, SNAPSHOT the
+  // unit's live cohesion bonus and add it AGAIN as a frozen surge modifier
+  // (≈2× while it lasts); the cohesion handler suppresses live tracking for
+  // the duration — the bank is SPENT, it doesn't follow the pack mid-surge.
+  // On expire the surge lifts and cohesion resumes naturally next frame.
+  frenzy_surge: {
+    name: 'frenzy_surge',
+    duration: 4,
+    stackable: false,
+    onHostDeath: 'cancel',
+    onApply(target) {
+      const u = target as IUnit;
+      const banked = u.modifiers
+        ?.filter(m => m.source.startsWith(`cohesion:${u.id}:`))
+        .reduce((sum, m) => sum + m.value, 0) ?? 0;
+      if (banked <= 0) return; // nothing massed = nothing to cash
+      // ×2: the surge REPLACES the (suppressed) live bank, so the frozen
+      // modifier carries the full cash-out premium itself.
+      addModifier(u, { stat: 'atk', type: 'flat', value: banked * 2, source: `frenzy:${u.id}` });
+    },
+    onExpire(target) {
+      const u = target as IUnit;
+      removeModifiersBySource(u, `frenzy:${u.id}`);
+    },
+  },
+
   // Primal Roar (Matriarch's ultimate) — a PRESENCE-FLAG buff with no logic of
   // its own (the same shape as `slow`). Consumers react to its presence: the
   // cohesion handler treats a roaring α unit as fully massed (peak atk surge),

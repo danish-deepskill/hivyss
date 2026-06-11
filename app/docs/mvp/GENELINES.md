@@ -29,6 +29,20 @@ Lore-grounded (HIVYSS.md §7 theme table + §6 decision-loops). They differ by *
 - δ is the only geneline with **ranged + artillery** (α/β/γ are melee-bound) — and the only one reaching **T4**.
 - **α/β/γ are the shallow Skin starters (T0-3); δ is the deeper Veins geneline (T0-4).** That depth gradient is the MVP demonstrating the full game's "depth = tier" structure in miniature.
 
+### 1.0 Route verticality — a RESERVED axis [RULING 2026-06-11]
+
+The air/land/tunnel route system is built, but the MVP-4 rosters stay
+**grounded on purpose**: with 24 genelines to fill, air and tunnel are
+*identity corners* for future genelines (an air geneline = a different way to
+play; a tunnel geneline = the underminer, shipped together with its
+counterplay content — tunnel is binary-uninteractive until tunnel-watch/
+buildings exist). Do NOT spend them as one-off roster filler. The single
+pencilled exception: **β's Bloatfly** (carrion fly over the Fetid Pool — a
+cheap dying flyer death-bursting spores from above) as β's second-wave air
+unit, the most thematically inevitable air unit in the game. Until then,
+verticality appears via the Normal/wild substrate (which is what α's
+Quillback anti-air answers).
+
 ### 1.1 Counter-triangle — emergent LEAN, **not** a rigid RPS [LOCKED as a principle]
 
 Do **not** engineer rock-paper-scissors. Counters **emerge from the archetypes**, and a clean cycle falls out on its own:
@@ -88,13 +102,25 @@ Do **not** engineer rock-paper-scissors. Counters **emerge from the archetypes**
 |1|Quillback|soldier|**ranged anti-air** (spits spines) — α's only ranged unit|✅ (was Carapex) |
 |2|**Goliath**|**Elite**|**Stampede** (cohesion-scaled AOE, ≤4×0.5, no kb, shockwave, `charge`) + **cohesion-amplifier aura**|✅ full |
 |2|**Maulhorn**|**Elite**|**Ram Charge** — single-target ×2, knockback 100, no FX, `ram` anim (recoil)|✅ full |
-|3|**Matriarch**|**Royal**|herd-queen capstone; ultimate TBD|🟡 unit built, ultimate blocked on Royal system |
+|3|**Matriarch**|**Royal**|herd-queen capstone; click-controlled hero + **Primal Roar** ultimate|✅ full (Royal system built 2026-06-11) |
 
-Pyramid **2/2/2/1** (T0/T1/T2/T3) = **the base skeleton** (1 Royal + 2 Elites + **4 soldiers** = 7) — *trimmed 2026-06-03* from 5 soldiers: **Goretusk cut** (its tight-wedge cohesion overlapped the baseline cohesion + Goliath's amplifier — redundant role; cutting it lands α on the skeleton and honors the "fewer, medium units, not swarm-spam" re-frame). **BUILT:** Pack Cohesion (+ the herd heat-glow), both Elite signatures — each with a *distinct* body animation (Goliath `charge`/forward-settle vs Maulhorn `ram`/recoil-bounce), *distinct* FX (AOE shockwave vs none), and damage shape (AOE-chip vs single-nuke); **Quillback** (ranged anti-air, was Carapex); Goliath's **cohesion-amplifier aura** (the amplifier folded onto the anchor). **TO BUILD:** just the Matriarch's Royal ultimate (needs the Royal control/trigger system). The low-cohesion-cap re-frame below has been **applied** (cap 4).
+Pyramid **2/2/2/1** (T0/T1/T2/T3) = **the base skeleton** (1 Royal + 2 Elites + **4 soldiers** = 7) — *trimmed 2026-06-03* from 5 soldiers: **Goretusk cut** (its tight-wedge cohesion overlapped the baseline cohesion + Goliath's amplifier — redundant role; cutting it lands α on the skeleton and honors the "fewer, medium units, not swarm-spam" re-frame). **BUILT:** Pack Cohesion (+ the herd heat-glow), both Elite signatures — each with a *distinct* body animation (Goliath `charge`/forward-settle vs Maulhorn `ram`/recoil-bounce), *distinct* FX (AOE shockwave vs none), and damage shape (AOE-chip vs single-nuke); **Quillback** (ranged anti-air, was Carapex); Goliath's **cohesion-amplifier aura** (the amplifier folded onto the anchor); **the Matriarch's full Royal kit** (2026-06-11 — click-control, Primal Roar ultimate, death stakes/respawn, lane-switch, queen redesign). **α is roster-complete.** The low-cohesion-cap re-frame below has been **applied** (cap 4).
 
 **Re-frame (2026-05-31):** α is the **OFFENSE/rush** — a *medium aggressive pack*, **not a swarm**. The current build (cheap **Chitling** fodder + cohesion cap **5**) leans swarm-ish and collides with β. Re-tune toward **fewer, medium-statured aggressive units + a LOW cohesion cap (~3-4)** so cohesion rewards *committing a strike force as one*, not spamming bodies. Framing: *"the charge hits hardest when the herd commits together."* (β owns NUMBERS; γ owns big-durable — α must own neither.)
 
-### β Swarm — *cheap + productive death* — **[PROPOSED]**
+### β Swarm — *cheap + productive death* — **[BUILT 2026-06-11]** (`units/beta.ts`)
+
+**BUILT:** the full 8-unit roster below (every body individually authored —
+the design bar), the **generative spawn engine** (spawn dispatcher + `spawner`
+passive: Broodmother broods free Swarmlings; Broodlord's Spawn-Wave; Brood
+Surge ult), **Tide** (sacrifice — eaten allies fire no death triggers, drop no
+corpses, BY DESIGN), **deathFeed** (Carrionling visibly gorges), the three
+death-effects (spore/blast/acid) with the **poison DOT wired** game-wide, the
+Broodmother's swarm aura, and the **Fetid Pool biome**. Capacity character:
+deployed Swarmlings cap 0.5, SPAWNED units cap 0 (the tide is a parallel
+economy). **Kit still to come (sequenced late per VISION §10):** Death-bloom
+pheromone · Spore Storm · Brood Pit; the Bloatfly air unit is second-wave
+(§1.0). β is sandbox + enemy content until the geneline picker lands.
 
 | T | Unit | Caste | Role / signature |
 |--|--|--|--|
@@ -108,6 +134,18 @@ Pyramid **2/2/2/1** (T0/T1/T2/T3) = **the base skeleton** (1 Royal + 2 Elites + 
 |3|**Broodmother**|**Royal**|the queen — passively spawns Swarmlings + a swarm buff; ultimate = a brood surge |
 
 *The "many" is **spawned**, not deployed: Broodmother (passive) + Broodlord (on-demand) birth free Swarmlings, Stukov-style. **No soldier is a spawner** — that's T4+ generative logic (the original "Brooder T1 spawner" was the mis-tier).*
+
+> **RULING 2026-06-11 — γ's WIN CONDITION (solved inside hold/degrade, budget-safe):**
+> a turtle in a base-race needs a designed path to victory, and γ's must NOT
+> become "advancing structures" (that corner is reserved for a future
+> creeping-hive geneline). γ wins by **(1) reflect-attrition** — Thornback-class
+> reflection means the enemy's own offense breaks on the wall ("you lose by
+> hitting me"), and **(2) never-die accumulation** — an army that doesn't shrink
+> eventually outnumbers one that bleeds; the push happens when the spent enemy
+> wave can no longer answer the intact wall walking forward. Calcifier's shatter
+> is the lone crack-opener note. Side-effect to embrace: γ matchups STARVE the
+> corpse economy on both sides (nothing dies) — the wall fight is also a
+> command-layer drought, which is γ's tempo made systemic.
 
 ### γ Fortress — *armor as a degrading resource / walls* — **[PROPOSED]**
 
@@ -123,6 +161,14 @@ Pyramid **2/2/2/1** (T0/T1/T2/T3) = **the base skeleton** (1 Royal + 2 Elites + 
 |3|**Regina** *(name TBD)*|**Royal**|the citadel-queen — fortress aura + **repairs allies' armor**; ultimate = total fortification |
 
 *Repair lives in the **Royal** (ally-affecting = T4+), not a soldier — the old "Bulwark repairs allies' armor" soldier was the same mis-tier as β's spawner.*
+
+> **RULING 2026-06-11 — "BREAK FORMATION" made mechanical (budget-safe):** δ's
+> stated weakness needs a mechanism, not words, and it must not be a new system.
+> **Formation rank bonuses BREAK when the unit is displaced** — knockback
+> (blunt's default effect, already wired) is the formation-breaker. This gives
+> the melee trio their gap-story for free: α's Maulhorn ram and β's Burster
+> death-blast become anti-δ tools the moment δ exists; γ remains δ's worst
+> matchup BY DESIGN (the triangle's outside check). No new mechanic spent.
 
 ### δ Military — *formation + command + ranged* — **[PROPOSED — re-home + tier-up `units/archive.ts`]**
 *The **Veins boss geneline**, designed **up** from the trio: **no T0 fodder** (a professional army), soldiers **T1–T3**, **Elites at T3** (vs the trio's T2), and the only **T4** — Centurion, δ's Royal *and* the run-end boss. Fitting archived units re-home here **retiered to Veins depth**; the berserk **Ravager** doesn't fit δ's *disciplined* framework → it stays archived / re-homes elsewhere.*

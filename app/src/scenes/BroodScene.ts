@@ -1,12 +1,11 @@
 import Phaser from 'phaser';
-import { UNIT_DEFS, TIER_DEFS, GENELINE_DEFS, drawUnit } from '../units/registry';
-import { resolveColors } from '../config/Palettes';
+import { UNIT_DEFS, TIER_DEFS, GENELINE_DEFS } from '../units/registry';
 import { SaveManager } from '../systems/SaveManager';
 import { createRunState } from '../systems/RunState';
 import type { RunMode } from '../systems/RunState';
 import { createUnitCard } from '../ui/UnitCard';
+import { previewDataURL } from '../ui/UnitPreviews';
 import { TRAIT_DESC } from '../config/TraitDesc';
-import type { RenderUnit } from '../types';
 
 const MAX_DECK_SIZE = 10;
 const RUN_DECK_SIZE = 3;
@@ -18,7 +17,7 @@ const RUN_GENELINE = 'alpha';
 const RUN_ROYAL = 'matriarch';
 // Starting brood is capped to low tiers — you begin with fodder/soldiers and
 // ACQUIRE the higher-tier Elites over the run (VISION: start thin, roster grows).
-const RUN_MAX_TIER = 1;
+const RUN_MAX_TIER = 3;
 
 interface BroodSceneData {
   mode?: 'run';
@@ -178,38 +177,15 @@ export class BroodScene extends Phaser.Scene {
   }
 
   private generatePreviews(): Record<string, string> {
+    // Shared preview renderer — 2× upscale + symmetric padding for the
+    // larger card thumbnails (same procedural draw as the battle HUD).
     const previews: Record<string, string> = {};
     const TEX_SCALE = 2;
-
+    const pad = Math.round(11 * TEX_SCALE);
     this.pool.forEach(key => {
       const def = UNIT_DEFS[key];
-      const pad = Math.round(11 * TEX_SCALE);
-      const uw = Math.round(def.w * TEX_SCALE);
-      const uh = Math.round(def.h * TEX_SCALE);
-      const pw = uw + pad * 2;
-      const ph = uh + pad * 2;
-
-      const g = this.add.graphics();
-      const renderUnit: RenderUnit = {
-        w: uw, h: uh,
-        ...resolveColors(def),
-        palette: def.palette,
-        facing: 1, bob: 0, state: 'march' as const,
-        atkCd: 0, atkRate: def.atkRate,
-        trait: def.trait, hp: def.hp, maxHp: def.hp,
-        burrowed: false, windup: 0, recover: 0,
-      };
-      drawUnit(g, renderUnit, pw / 2, pad);
-
-      const texKey = '_deckprev_' + key;
-      g.generateTexture(texKey, pw, ph);
-      g.destroy();
-
-      const src = this.textures.get(texKey).getSourceImage() as HTMLCanvasElement;
-      previews[key] = src.toDataURL();
-      this.textures.remove(texKey);
+      previews[key] = previewDataURL(this, key, def, { scale: TEX_SCALE, padTop: pad, padBottom: pad });
     });
-
     return previews;
   }
 

@@ -4,7 +4,7 @@
 >
 > **Pairs with:** `REQUIREMENTS.md` (what the MVP includes), `lore/HIVYSS.md` §8-11 (the full design).
 >
-> **Status:** Audited 2026-05-31; combat/caste rows updated 2026-06-02 (Elite trigger, 2-lane, pheromones, FX + unit-animation systems, α=8). Re-audit when systems land.
+> **Status:** Audited 2026-05-31; combat/caste rows updated 2026-06-02 (Elite trigger, 2-lane, pheromones, FX + unit-animation systems, α=8); **re-audited 2026-06-11** — Royal v1 (control + ultimate + death stakes + lane-switch), deposit-fade pheromone couriers, and the BattleCore battle-substrate refactor all landed. Re-audit when systems land.
 
 **Legend:** ✅ Built · 🟡 Foundation/partial · 📐 Designed in lore (not built) · 💡 Idea/sketch
 
@@ -29,7 +29,7 @@
 | Single combat mode + win/lose | ✅ | `gm.won`, `gameOver{winner}`, GameOverScene |
 | **2-lane structure** | ✅ | built (`LANE_VERTICAL_SPAN`/`laneDepth`; cohesion is per-lane). Routes (height) ≠ lanes (the 2 rows). Lock 1-vs-2 still OPEN |
 | **4 battle modes** (HivevHive/Siege/Defense/Clash) | 📐 | only ONE generic win/lose mode exists |
-| **Pheromone command** (Rally/Charge/Retreat) | 🟡 | built in the sandbox as zones; worker-scout *emission* layer still 📐 |
+| **Pheromone command** (Rally/Charge/Retreat) | ✅ | **deposit-fade courier model (VISION §5)** in BOTH the sandbox + real loop: a Scout couriers the command laying a fading scent-trail (intercept = counterplay); shared trail render. Click-TARGETED delivery (pick the destination) still 📐 — the real-loop courier auto-runs its lane |
 | **Spires** (turrets) + **worker-built walls** | 📐 | not built (the *wall ability* exists; worker-walls don't) |
 
 ## Caste & control (§8)
@@ -38,18 +38,21 @@
 |---|---|---|
 | Caste *data tag* on units | ✅ | `UnitDef.caste` field only |
 | **Soldier** (auto-fight) | ✅ | = the default built unit behavior |
-| **Worker** (gather / build / pheromone scouts) | 📐 | not built — zero worker units |
-| **Elite** (player-triggered signature ability) | ✅ | trigger system + HUD slots built (cooldown + in-range gating); α signatures Goliath Stampede + Maulhorn Ram shipped. Enemy-AI trigger still 📐 |
-| **Royal** (4-mode queen/avatar/hero, WASD control) | 📐 | not built |
-| Royal Special Bar (charge → ultimate) | 📐 | not built |
-| Player control surface (5 categories) | 🟡 | **deploy + hive abilities + pheromones + Elite signatures** built (sandbox) |
+| **Worker** (gather / build / pheromone scouts) | 🟡 | **Scout pheromone-courier built** (non-combatant, killable, lays the deposit-fade trail). Gatherer + builder jobs still 📐 |
+| **Elite** (player-triggered signature ability) | ✅ | trigger system + HUD slots built (cooldown + in-range gating, silver portrait slots); α signatures Goliath Stampede + Maulhorn Ram shipped. Enemy-AI trigger still 📐 |
+| **Royal** (controllable hero) | ✅ | **thin v1 built 2026-06-11** (`RoyalLifecycle`): on-field from the bell, click-to-select then click-to-move/focus (MOBA-lite), Primal Roar ultimate, death → leaderless debuff → next-lineage respawn, speed-scaled lane-switch, Dota-style HUD profile. The full 4-mode + 5-facet package stays 📐 (post-MVP per VISION §10) |
+| Royal Special Bar (charge → ultimate) | 🟡 | the ultimate exists on a signature COOLDOWN (Primal Roar); the charge-bar model itself 📐 |
+| Player control surface (5 categories) | ✅ | **deploy + hive abilities + pheromone couriers + Elite signatures + Royal control** — all live in the REAL loop (not just sandbox) |
 
 ## Economy & production
 
 | Mechanic | Status | Notes |
 |---|---|---|
-| Nectar economy | ✅ | `EconomyManager` |
-| Incubation (larva → hatch on timer) | ✅ | `IncubationManager` |
+| Nectar economy | ✅ | `EconomyManager` — **forage era (2026-06-11):** the passive ramp is replaced by BUILT income: gatherer workers harvest seeded, depletable nectar BLOOMS (center-biased reseeds) over a +1/s floor. `Forage`/`ForageDefs` |
+| **VYSS economy** (tactical currency) | ✅ | **NEW 2026-06-11** — vyss = the essence of fallen vyssids: deaths drop physical corpse pickups; gatherers scavenge them home into vyss ✦ (G-mode stance w/ full fallback chain); vyss funds the COMMAND layer only (pheromones + hive abilities). `VyssEconomy`/`VyssDefs` |
+| **Hive maturation** (VISION §2.1) | ✅ | **NEW 2026-06-11** — Early/Mid/Late phases by SPENDING (▲MATURE): each phase raises the deploy tier cap, GROWS hive capacity (12→16→20), steps the passive floor (1→2→3⬡/s); Late awakens the Royal's ultimate. `Maturation`/`MaturationDefs` (per-phase pheromone/ability unlocks = declared future hook). AI not phase-gated (v1) |
+| Worker gather command (G-mode) | ✅ | G → click a bloom (prioritize) / a corpse (scavenge) / empty (auto); mutually exclusive with Royal command mode |
+| Incubation (larva → hatch on timer) | ✅ | `IncubationManager` — gatherers also consume a larva (instant, no chamber) |
 | Larva quality (weak/normal/strong + mutation chance) | 📐 | not built |
 | Gene / vyss-egg / chamber tuning (reproduction loop) | 📐 | not built |
 
@@ -87,7 +90,7 @@ Step movement · event encounters (ambush/discovery/…) · **faction reputation
 
 | Mechanic | Status | Notes |
 |---|---|---|
-| Main Hivyss (Greek genelines) | 🟡 | 2 of 24 built (Normal 11 + α 8) |
+| Main Hivyss (Greek genelines) | 🟡 | **3 of 24 built** (Normal 11 + α 7 + **β 8** + the universal workers). β added 2026-06-11 w/ the generative spawn engine + Fetid Pool biome; α gained its signature pheromone **Frenzy Musk** (cash cohesion → charge surge) |
 | Husk (Coptic) / Dark Realm (Phoenician) / Primordials (Archaic) | 📐 | maps generated, no content |
 | Corruption axis (0-5) | 📐 | not built |
 | 5 endings (iceberg) | 📐 | not built |
@@ -106,11 +109,11 @@ So the MVP-mechanic question = **"built core + which 📐 systems do we pull in?
 **LOCKED MVP mechanic frame (2026-05-31):**
 - **In (built):** deploy · nectar/capacity · routes (air/land/tunnel) · 4 hive abilities · run/wave loop · AI v1 · single win/lose mode
 - **In (to build):**
-  - **Worker caste (base/universal)** — the agency foundation. Does TWO jobs: (a) **pheromone scout** — places/carries Rally/Charge/Retreat zones (vulnerable, killable → positioning matters); (b) **nectar gatherer** — active economy (gather + protect) vs passive trickle. Universal unit, shared across genelines (not α-specific). *Specialist/build workers (Engineer, etc.) stay deferred.*
-  - **Pheromone command** — Rally/Charge/Retreat, emitted **via worker-scouts** (lore-native, not free placement). The active-agency layer.
+  - **Worker caste (base/universal)** — the agency foundation. Does TWO jobs: (a) **pheromone scout** — ✅ BUILT (the deposit-fade courier; vulnerable, killable → positioning matters); (b) **nectar gatherer** — active economy (gather + protect) vs passive trickle, still to build. Universal unit, shared across genelines (not α-specific). *Specialist/build workers (Engineer, etc.) stay deferred.*
+  - **Pheromone command** — ✅ BUILT: Rally/Charge/Retreat emitted **via worker-scout couriers** (lore-native deposit-fade, both loops). Click-targeted delivery still open.
   - **2-lane** — committed, but **sequenced**: built AFTER α's fun is validated in 1-lane first (doesn't block α design). *(UPDATE 2026-06-02: 2-lane was actually built ahead of this sequencing; the 1-vs-2 LOCK is still OPEN and α's fun is still untested — see `SESSION_HANDOFF.md §0`. The "add 2nd lane" step below is therefore already done, out of order.)*
   - **Elite signature** — player-triggered ability on the geneline's **Elite-caste units** (α: Goliath + Maulhorn, both T2). *(Not a "T4 per geneline" thing — the only MVP T4 is δ's Centurion, which is a Royal. See `REQUIREMENTS §5`.)*
   - **Gene acquisition** — the meta loop (build AFTER the fight is proven fun).
-- **Defer (post-MVP):** Royal-hero · **specialist/build workers** (spires/walls) · hive-building · factions · mutation/evolution · other realms
+- **Defer (post-MVP):** the FULL 4-mode Royal package *(the thin controllable Royal is BUILT — VISION expanded it into the MVP 2026-06-03)* · **specialist/build workers** (spires/walls) · hive-building · factions · mutation/evolution · other realms
 
 **Build order** (per the priority discussion): mechanic-frame decision ✅ → **α roster design** (next) → build α + pheromones → feel-layer on α → playtest (1-lane) → add 2nd lane → acquisition.

@@ -174,7 +174,22 @@ export interface CohesionConfig {
   maxAllies: number;
 }
 
-export type PassiveKind = 'self_modifier' | 'aura_modifier' | 'heal_cast' | 'cohesion';
+/**
+ * Spawner (β Swarm) — the unit periodically BIRTHS other units (Broodmother's
+ * passive brood). Generative power is T4+/Royal-tier per the self-vs-ally rule;
+ * spawning routes through the spawn dispatcher (CombatDispatch), so it's a
+ * no-op in tests and works in both battle drivers.
+ */
+export interface SpawnerConfig {
+  /** Unit key to birth (the player/enemy mirror is resolved by side). */
+  unitKey: string;
+  /** Seconds between broods. */
+  interval: number;
+  /** Units per brood. */
+  count: number;
+}
+
+export type PassiveKind = 'self_modifier' | 'aura_modifier' | 'heal_cast' | 'cohesion' | 'spawner';
 
 /**
  * A single always-on passive behavior, discriminated by `kind`. Variant
@@ -194,7 +209,8 @@ export type PassiveDef =
   | ({ kind: 'self_modifier' } & SelfModifierConfig)
   | ({ kind: 'aura_modifier' } & AuraModifierConfig)
   | ({ kind: 'heal_cast' } & PassiveHealConfig)
-  | ({ kind: 'cohesion' } & CohesionConfig);
+  | ({ kind: 'cohesion' } & CohesionConfig)
+  | ({ kind: 'spawner' } & SpawnerConfig);
 
 export interface UnitDef {
   name: string;
@@ -225,6 +241,16 @@ export interface UnitDef {
    *  units that share an attack (the whole herd line is on jaw_strike) can still
    *  have distinct voices. Presentation-only; omit = use the ability's recipe. */
   sfx?: SfxKey;
+  /** Corpse-economy yield on death — overrides the tier default
+   *  (VYSS_TIER_YIELD). Bigger vyssids are bigger tactical windfalls. */
+  vyssYield?: number;
+  /**
+   * Carrion feeding (β Carrionling): each same-geneline ally death within
+   * `radius` permanently feeds this unit `perDeath` flat atk, up to `max`
+   * stacks. EVENT-driven (the death phase applies it), so it lives as a
+   * UnitDef field like deathAbility — NOT in the per-frame passive band.
+   */
+  deathFeed?: { perDeath: number; radius: number; max: number };
   geneline: GeneLine;
   unlock?: string;
   foreswing?: number;      // [sec] wind-up time before damage lands (default: 30% of 1/atkRate)
@@ -330,7 +356,9 @@ export type Side = 'player' | 'enemy';
 //   rally   → mass toward the zone center (cohesion spikes)
 //   charge  → advance forward at boosted speed (attacks AND pushes)
 //   retreat → fall back (scatter to dodge incoming AOE)
-export type PheromoneKind = 'rally' | 'charge' | 'retreat';
+//   frenzy  → α's SIGNATURE: charge movement + cohesion carriers CASH their
+//             banked pack-bonus into a doubled, frozen surge (frenzy_surge)
+export type PheromoneKind = 'rally' | 'charge' | 'retreat' | 'frenzy';
 
 export interface PheromoneZone {
   kind: PheromoneKind;
@@ -507,6 +535,10 @@ export interface IUnit extends WorldEntity {
 
   /** Mendwing passive-heal cooldown accumulator (plain field, not an effect). */
   healTimer: number;
+  /** Spawner-passive brood accumulator (β Broodmother). */
+  spawnTimer?: number;
+  /** Carrion-feed config (copied from the def); applied by the death phase. */
+  deathFeed?: { perDeath: number; radius: number; max: number };
 
   _spawned?: boolean;
   /**
@@ -726,6 +758,18 @@ export interface AbilityDef {
    * play time via pitch-by-body-size, so one key fits every caster.
    */
   sfx?: SfxKey;
+  /** Death-trigger damage for `deathAbility` casts (the dispatcher's
+   *  baseDamageOverride). Absent → the legacy 65 (death_bomb's tuning). */
+  deathDamage?: number;
+  /** Generative payload (β): the cast BIRTHS units at the caster via the
+   *  spawn dispatcher — Broodlord's Spawn-Wave, Broodmother's Brood Surge. */
+  spawns?: { key: string; count: number };
+  /**
+   * Sacrifice payload (β Swarmlord's Tide): CONSUME same-geneline soldier
+   * allies within `radius` (they vanish — eaten, no corpses, no death
+   * triggers) and permanently gain `perUnitAtk` flat atk per body.
+   */
+  sacrifice?: { radius: number; perUnitAtk: number };
 }
 
 // DamageEvent — envelope flowing through the 7-phase pipeline. Any

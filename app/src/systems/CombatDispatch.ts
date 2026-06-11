@@ -91,6 +91,25 @@ export function dispatchDeathTrigger(dyingUnit: IUnit, deathAbilityName: string)
   _deathTriggerDispatcher(dyingUnit, deathAbilityName);
 }
 
+// --- Unit spawn (gameplay) ---------------------------------------------------
+/**
+ * Generative-spawn seam (β Swarm's "the many is SPAWNED, not deployed").
+ * The sim requests a birth (spawner passive, spawn-wave signatures); the
+ * battle substrate (BattleCore) installs the real creator, resolving the
+ * player/enemy def mirror + the pool. NO-OP default keeps tests deterministic
+ * (spawner units simply don't multiply there).
+ */
+export type SpawnDispatcher = (key: string, side: 'player' | 'enemy', x: number, lane: number) => void;
+let _spawnDispatcher: SpawnDispatcher = () => {};
+
+export function setSpawnDispatcher(fn: SpawnDispatcher): void {
+  _spawnDispatcher = fn;
+}
+
+export function dispatchSpawn(key: string, side: 'player' | 'enemy', x: number, lane: number): void {
+  _spawnDispatcher(key, side, x, lane);
+}
+
 // --- DOT dispatcher factory (gameplay) -------------------------------------
 /**
  * DOT dispatcher factory. Builds the closure CombatSystem registers

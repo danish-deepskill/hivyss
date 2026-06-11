@@ -25,10 +25,17 @@ export const PHEROMONE_DEFS: Record<PheromoneKind, PheromoneDef> = {
   rally:   { name: 'Rally',   color: 0x40c0ff, radius: 90,  duration: 8 },
   charge:  { name: 'Charge',  color: 0xff8030, radius: 110, duration: 6 },
   retreat: { name: 'Retreat', color: 0xc060ff, radius: 90,  duration: 7 },
+  // α's SIGNATURE pheromone (GENELINES kit: "cash cohesion into a charge
+  // surge"). Cohesion carriers in the zone SPEND their banked pack-bonus:
+  // it's snapshotted, doubled, and frozen for the surge while the live
+  // tracking suppresses — peak power now vs. the standing bank. Distinct
+  // from Primal Roar (which SETS cohesion to max regardless of formation):
+  // Frenzy rewards what you actually massed at cast time.
+  frenzy:  { name: 'Frenzy',  color: 0xe02838, radius: 100, duration: 6 },
 };
 
-/** Stable ordering for HUD button rows / keyboard binding (1/2/3). */
-export const PHEROMONE_ORDER: PheromoneKind[] = ['rally', 'charge', 'retreat'];
+/** Stable ordering for HUD button rows / keyboard binding (1/2/3/4). */
+export const PHEROMONE_ORDER: PheromoneKind[] = ['rally', 'charge', 'retreat', 'frenzy'];
 
 // --- Deposit-fade trail (VISION §5) — the courier Scout lays scent as it runs ---
 // A Scout carrying a command drops a small fading scent-blob every TRAIL_SPACING
