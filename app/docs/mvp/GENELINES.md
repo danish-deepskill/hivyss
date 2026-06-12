@@ -29,19 +29,46 @@ Lore-grounded (HIVYSS.md §7 theme table + §6 decision-loops). They differ by *
 - δ is the only geneline with **ranged + artillery** (α/β/γ are melee-bound) — and the only one reaching **T4**.
 - **α/β/γ are the shallow Skin starters (T0-3); δ is the deeper Veins geneline (T0-4).** That depth gradient is the MVP demonstrating the full game's "depth = tier" structure in miniature.
 
-### 1.0 Route verticality — a RESERVED axis [RULING 2026-06-11]
+### 1.0 RESERVED corners — don't spend a future geneline's identity on the MVP-4 [RULING 2026-06-11]
 
-The air/land/tunnel route system is built, but the MVP-4 rosters stay
-**grounded on purpose**: with 24 genelines to fill, air and tunnel are
-*identity corners* for future genelines (an air geneline = a different way to
-play; a tunnel geneline = the underminer, shipped together with its
-counterplay content — tunnel is binary-uninteractive until tunnel-watch/
-buildings exist). Do NOT spend them as one-off roster filler. The single
-pencilled exception: **β's Bloatfly** (carrion fly over the Fetid Pool — a
-cheap dying flyer death-bursting spores from above) as β's second-wave air
-unit, the most thematically inevitable air unit in the game. Until then,
-verticality appears via the Normal/wild substrate (which is what α's
-Quillback anti-air answers).
+With 24 genelines to fill, mechanics are a *portfolio*: every clever flourish
+bolted onto the MVP-4 is a corner a later geneline can never own. The reserved
+corners below are off-limits as MVP-4 roster filler. The rule for each is the
+same — the MVP-4 may *use the substrate*, but must not claim the *identity
+mechanic* or the *naming*.
+
+**Route verticality (air / tunnel).** The air/land/tunnel route system is built,
+but the MVP-4 rosters stay **grounded on purpose**: an air geneline = a
+different way to play; a tunnel geneline = the underminer (shipped with its
+counterplay content — tunnel is binary-uninteractive until tunnel-watch /
+buildings exist). The single pencilled exception: **β's Bloatfly** (carrion fly
+over the Fetid Pool — a cheap dying flyer death-bursting spores from above) as
+β's *second-wave* air unit. Until then, verticality appears via the Normal/wild
+substrate (which is what α's Quillback anti-air answers).
+
+**Acid / corrosion → reserved for the future ACID geneline.** What it owns is a
+MECHANIC, not a damage type: **corrosion = armor destruction** (melt the armor
+*stat*, corrosion stacks, acid-pool terrain hazards), plus the word "acid."
+β Swarm legitimately deals `toxic` damage (two genelines sharing a damage type
+is as fine as two sharing melee) — but β's toxic is **biological ROT**: pure
+DOT + AOE death-effects, **never armor-melt**. β's flavor is therefore
+**spore / bile / rot**, NOT acid (Hivespitter de-acidified 2026-06-11:
+`bile_spit` / `bile_rupture`, "Bile Lobber"). Poison is a *universal wired
+effect* (any geneline may apply it) — β being its first user doesn't claim it.
+
+**Necromancy / reanimation → reserved for the future NECRO geneline.** It owns
+**REANIMATION** — the dead THEMSELVES return with identity, and commanding
+ENEMY corpses (turning their fallen against them). β's "productive death" is
+**FECUNDITY**, a categorically different thing: deaths fertilize *fresh generic*
+Swarmlings (birth from rot), never raising the actual fallen, never touching
+enemy corpses. The line β must hold: **spawn new bodies, never resurrect old
+ones.** ⚠ **β's signature pheromone *Death-bloom* (deaths inside → extra
+spawns) is UNBUILT and brushes this line** — keep it strictly birth-from-decay
+(a flower blooming from a corpse), OR re-point β's pheromone at the *swarm/tide*
+half of its identity (a frenzy-pheromone) to keep maximum daylight from necro.
+Decision deferred to build time. (Note: vyss "essence of the fallen" is
+*universal substrate* like nectar — every geneline harvests it — so it isn't
+the necro corner.)
 
 ### 1.1 Counter-triangle — emergent LEAN, **not** a rigid RPS [LOCKED as a principle]
 
@@ -90,7 +117,7 @@ Do **not** engineer rock-paper-scissors. Counters **emerge from the archetypes**
 | **Hive ability** | Tremor | Spore Storm | Fortify | Artillery Strike |
 | **Building** | Spawning Mound | Brood Pit | Wall + Spire | Bunker |
 
-*Pheromone glosses — **Frenzy Musk:** cash cohesion → charge surge · **Death-bloom:** deaths inside spill extra spawns · **Bastion-scent:** root + armor/regen · **Volley-mark:** δ units focus-fire the spot. (α concrete; β/γ/δ **[PROPOSED]**.)*
+*Pheromone glosses — **Frenzy Musk:** cash cohesion → charge surge · **Death-bloom:** deaths inside spill extra spawns *(⚠ keep birth-from-decay, not reanimation — necro line, §1.0; or re-point to a swarm/frenzy pheromone)* · **Bastion-scent:** root + armor/regen · **Volley-mark:** δ units focus-fire the spot. (α concrete; β/γ/δ **[PROPOSED]**.)*
 
 ### α Primal — *Pack Cohesion* — **[LARGELY BUILT]** (`units/alpha.ts`) — updated 2026-06-02
 

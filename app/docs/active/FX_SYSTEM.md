@@ -103,6 +103,29 @@ Unit.redraw() ─reads effect state→ persistent status visuals   (separate, un
 5. Grow the **primitive vocabulary** (projectile, slash arc, burst) as
    abilities need them.
 
+## Known debt — flagged, not hidden (2026-06-11, the Fire Bite work)
+
+Two pragmatic shortcuts taken while wiring Cinderfly's Fire Bite + the burn
+overlay. Both **followed an existing pattern instead of building the better
+one** — fine for the scope, recorded so they're not lost:
+
+1. **FX-field naming asymmetry.** The dispatch model has two seams (cast +
+   impact); the data model now has `AbilityDef.fx` (cast) + `AbilityDef.impactFx`
+   (impact). Giving the impact seam its own field was the *correct*
+   disambiguation (signatures reading `fx` would double-fire per-hit), but the
+   names are asymmetric. **Clean fix:** rename `fx` → `castFx` so it reads
+   `castFx`/`impactFx`. Deferred only to avoid churning every existing `fx` use.
+
+2. **Effect visuals are inline in `Unit.redraw()`, not a registry.** The burn
+   overlay was added alongside the existing inline overlays (slow tint,
+   dmgFlash, enrage sheen, cohesion/phase-2 halos) in `entities/Unit.ts`. The
+   docs describe a designed-but-unbuilt **`EffectVisualSystem`** — a registry
+   `effect → (g, u, t) => void`, the same shape as `FxRenderers` /
+   `PASSIVE_HANDLERS`. **Trigger to build it:** when effect-visuals reach ~3-4
+   (burn is #1 of the *status*-effect kind), stop adding inline blocks and
+   build the registry, migrating slow/burn/enrage/dmgFlash into entries. Each
+   new inline overlay is one more thing that refactor reclaims.
+
 ## Open design questions (resolve before the cases they gate — not before)
 
 These are honestly **unsolved**, not hidden. Each is fine to defer *only* until
