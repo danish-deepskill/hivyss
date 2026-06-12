@@ -31,4 +31,50 @@ export function registerCoreFx(director: FxDirector): void {
     g.lineStyle(3, 0xffe6b0, fade * 0.95);
     g.strokeEllipse(fx.x, fx.y, r * 1.78, ry * 1.78);
   });
+
+  registerFireburst(director);
+}
+
+// --- Fireburst (Cinderfly's Fire Bite) ----------------------------------
+// A BITE, not an explosion: two curved flame fang-arcs (upper + lower) that
+// SNAP shut at the hit, then a small hot flash + a few sparks. Small and
+// quick — it's a basic melee chomp, not a blast. The burn SPLASH is carried
+// by the victims' own burn DOT, not by this FX.
+const FIREBURST_DURATION = 0.3;   // snappy chomp
+const JAW_R = 11;                  // fang-arc radius (small — a bite)
+
+function registerFireburst(director: FxDirector): void {
+  director.register('fireburst', FIREBURST_DURATION, (fx, t, g) => {
+    const snap = Math.min(1, t / 0.35);            // 0→1 jaws closing
+    const gape = (1 - snap) * (1 - snap) * 9;       // px apart → 0 (eased)
+    const flare = Math.max(0, (t - 0.28) / 0.72);  // 0 until closed, then 0→1
+    const fade = 1 - t * t;
+    const hot = 0xffd848, mid = 0xff7a18, deep = 0xd83008;
+
+    // Upper fang — concave-down crescent above the hit, descending as it shuts.
+    const uy = fx.y - JAW_R - gape;
+    g.lineStyle(3.2, mid, fade * 0.85);
+    g.beginPath(); g.arc(fx.x, uy, JAW_R, 0.22 * Math.PI, 0.78 * Math.PI, false); g.strokePath();
+    g.lineStyle(1.4, hot, fade);
+    g.beginPath(); g.arc(fx.x, uy, JAW_R, 0.3 * Math.PI, 0.7 * Math.PI, false); g.strokePath();
+
+    // Lower fang — concave-up crescent below, rising as it shuts.
+    const ly = fx.y + JAW_R + gape;
+    g.lineStyle(3.2, mid, fade * 0.85);
+    g.beginPath(); g.arc(fx.x, ly, JAW_R, 1.22 * Math.PI, 1.78 * Math.PI, false); g.strokePath();
+    g.lineStyle(1.4, hot, fade);
+    g.beginPath(); g.arc(fx.x, ly, JAW_R, 1.3 * Math.PI, 1.7 * Math.PI, false); g.strokePath();
+
+    // The chomp flash + a few sparks spitting out (only once the jaws meet).
+    if (flare > 0) {
+      g.fillStyle(deep, fade * (1 - flare) * 0.45); g.fillCircle(fx.x, fx.y, 5 + flare * 4);
+      g.fillStyle(hot, fade * (1 - flare) * 0.9);   g.fillCircle(fx.x, fx.y, 2.5 + flare * 2);
+      g.fillStyle(hot, fade * (1 - flare));
+      for (let i = 0; i < 3; i++) {
+        const a = i * 2.1 + fx.x;
+        const d = flare * 11;
+        g.fillCircle(fx.x + Math.cos(a) * d, fx.y + Math.sin(a) * d * 0.7, 1.2);
+      }
+    }
+  });
 }

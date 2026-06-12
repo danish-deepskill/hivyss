@@ -30,7 +30,7 @@ export const TRAIT_DESC: Record<string, string> = {
   swarmling: 'The tide — cheapest body in the game; also the brood-spawn output',
   maggotling: 'Death → spore burst: poisons everything nearby',
   burster: 'Suicide runner — explodes on death, knocking the line back',
-  hivespitter: 'Acid lobber (35% poison); death → acid rupture',
+  hivespitter: 'Bile lobber (35% poison); death → bile rupture',
   carrionling: 'Permanently +ATK for every swarm-ally that dies nearby',
   swarmlord: 'TIDE: eats nearby swarm soldiers, growing +ATK per body',
   broodlord: 'SPAWN-WAVE: births 4 Swarmlings on demand',

@@ -97,3 +97,23 @@ export function drawUnit(
   const fn = DRAW_MAP[u.trait] || drawBasicBody;
   fn(g, u, cx, uy);
 }
+
+// Which geneline does a hive belong to, given its deck/roster keys? The hive
+// IS the Royal's lineage, so the Royal's geneline wins; failing that (low-tier
+// AI rosters carry no Royal), the dominant non-'normal' geneline; else
+// 'normal'. Tolerates 'e'-prefixed enemy mirror keys (UNIT_DEFS is keyed by
+// the player id). One helper feeds both hives — see GameManager.
+export function hiveGenelineOf(keys: readonly string[]): GeneLine {
+  const defOf = (k: string): UnitDef | undefined =>
+    UNIT_DEFS[k] ?? UNIT_DEFS[k.replace(/^e/, '')];
+  const royal = keys.map(defOf).find(d => d?.caste === 'royal');
+  if (royal) return royal.geneline;
+  const counts = new Map<GeneLine, number>();
+  for (const k of keys) {
+    const d = defOf(k);
+    if (d && d.geneline !== 'normal') counts.set(d.geneline, (counts.get(d.geneline) ?? 0) + 1);
+  }
+  let best: GeneLine = 'normal', bestN = 0;
+  for (const [gl, n] of counts) if (n > bestN) { best = gl; bestN = n; }
+  return best;
+}

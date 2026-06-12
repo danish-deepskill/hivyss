@@ -3,8 +3,8 @@ import { hexToInt, lerpColor, shadedBlob, getStrike } from '../../units/renderUt
 
 // Hivespitter — squat living artillery. A fat gourd body planted on stubby
 // braced legs, a long spit-TUBE raised at an angle, and a throat-sac that
-// visibly INFLATES through the windup and slaps flat on the spit. The acid
-// drip at the muzzle never quite stops.
+// visibly INFLATES through the windup and slaps flat on the spit. The bile
+// drip at the muzzle never quite stops (greenish digestive fluid, not acid).
 const draw: DrawFunction = (g, u, cx, uy) => {
   const f = u.facing, w = u.w, h = u.h;
   const green = hexToInt(u.primary), dark = hexToInt(u.secondary);
@@ -41,7 +41,7 @@ const draw: DrawFunction = (g, u, cx, uy) => {
   g.lineBetween(tx, ty, mx, my);
   g.lineStyle(w * 0.05, lerpColor(dark, 0x000000, 0.3));
   g.lineBetween(mx - f * w * 0.04, my + h * 0.04, mx, my);
-  // Muzzle drip — a hanging acid bead (always), a glob on the way out (strike).
+  // Muzzle drip — a hanging bile bead (always), a glob on the way out (strike).
   g.fillStyle(0xb8e040, 0.9);
   g.fillCircle(mx, my + h * 0.06 + Math.sin(u.bob) * 0.6, w * 0.035);
   if (s.impact > 0.01) {

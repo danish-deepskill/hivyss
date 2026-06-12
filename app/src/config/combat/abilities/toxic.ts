@@ -1,16 +1,19 @@
-// Toxic damage abilities — β Swarm's death-effect arsenal. Both are DEATH
-// triggers (deathAbility casts): the dispatcher fires them lane-scoped around
-// the dying unit with `deathDamage` as the override damage, and toxic's
-// default effect (poison, now wired) rides along per the 3-state convention.
+// Toxic damage abilities — β Swarm's death-effect arsenal: biological ROT
+// (spore / bile), NOT chemical acid. Corrosion / armor-melt is reserved for
+// the future acid geneline (GENELINES §1.0) — β's toxic is pure DOT + AOE,
+// never armor destruction. The death triggers (deathAbility casts) fire
+// lane-scoped around the dying unit with `deathDamage` as the override, and
+// toxic's default effect (poison = the rot spreading) rides along.
 
 import type { AbilityDef } from '../../../types';
 import { linearDamageTiersWithEffect } from './_tierTables';
 
 export const toxicAbilities: Record<string, AbilityDef> = {
-  // Hivespitter's basic attack — a lobbed acid glob. Toxic's default effect
-  // (poison) rides along at 35% per hit, so sustained spitting stacks the DOT.
-  acid_spit: {
-    name: 'Acid Spit',
+  // Hivespitter's basic attack — a lobbed glob of BILE (digestive swarm-fluid,
+  // not chemical acid). Toxic's default effect (poison) rides along at 35% per
+  // hit, so sustained spitting stacks the rot DOT.
+  bile_spit: {
+    name: 'Bile Spit',
     category: 'damage',
     dmgType: 'toxic',
     targeting: 'nearest_enemy_in_range',
@@ -33,11 +36,11 @@ export const toxicAbilities: Record<string, AbilityDef> = {
     deathDamage: 14,
   },
 
-  // Hivespitter — death → its acid gland ruptures: harder burst, wider splash,
-  // the same poison ride-along (the "lingering pool" is the DOT it leaves in
-  // everyone caught).
-  acid_pool: {
-    name: 'Acid Rupture',
+  // Hivespitter — death → its bile gland ruptures: harder burst, wider splash,
+  // the same poison ride-along (the "lingering pool" is the rot DOT it leaves
+  // in everyone caught).
+  bile_rupture: {
+    name: 'Bile Rupture',
     category: 'damage',
     dmgType: 'toxic',
     targeting: 'all_enemies_in_range',

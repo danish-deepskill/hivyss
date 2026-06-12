@@ -1,4 +1,4 @@
-import type { UnitDef, Side } from '../types';
+import type { UnitDef, Side, CasteKey } from '../types';
 import { MAX_CAPACITY } from '../config/Constants';
 
 export { MAX_CAPACITY };
@@ -16,6 +16,7 @@ interface CapBearer {
   side: Side;
   dead: boolean;
   cap: number;
+  caste?: CasteKey;
 }
 
 interface CapChamber {
@@ -29,7 +30,11 @@ export function capUsed(
 ): number {
   let total = 0;
   for (const u of units) {
-    if (!u.dead && u.side === side) total += u.cap;
+    // ROYALS are hero units (one per hive, auto-spawned, not deployed) — they
+    // sit OUTSIDE the army-capacity budget, so the field can hold a full army
+    // PLUS the Royal. One rule here covers every geneline's Royal, both sides;
+    // a Royal's def `cap` is therefore moot for capacity.
+    if (!u.dead && u.side === side && u.caste !== 'royal') total += u.cap;
   }
   for (const c of chambers) {
     if (c) total += c.def.cap ?? 0;

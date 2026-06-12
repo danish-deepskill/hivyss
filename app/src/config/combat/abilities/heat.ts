@@ -23,6 +23,9 @@ export const heatAbilities: Record<string, AbilityDef> = {
       targetCount: 3,
       excludePrimary: true,
     },
+    // The bite IGNITES — a flame bloom at the hit (impact seam, not cast),
+    // sized to read as the burn-splash radius.
+    impactFx: { kind: 'fireburst' },
   },
 
   // Bombardier's death explosion. Opts out of the heat → burn default

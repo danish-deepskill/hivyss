@@ -670,6 +670,42 @@ export class Unit extends Phaser.GameObjects.Container {
       g.fillEllipse(this.unitW / 2, uy + this.unitH * 0.5, this.unitW * 0.5, this.unitH * 0.5);
     }
 
+    // Burn overlay — the unit is ON FIRE: small flame tongues lick up off the
+    // body, flickering + swaying, with a warm heat tint and a few rising
+    // embers. Drawn OVER the body so "it's burning" reads instantly; the burn
+    // DOT does the damage. Any unit carrying the `burn` effect lights up.
+    if (hasActiveEffect(this, 'burn')) {
+      const w = this.unitW, h = this.unitH, bcx = w / 2;
+      // Heat tint over the silhouette (gentle throb).
+      g.fillStyle(0xff5010, 0.1 + 0.06 * Math.abs(Math.sin(this.bob * 6)));
+      g.fillEllipse(bcx, uy + h * 0.5, w * 0.62, h * 0.62);
+      // Flame tongues along the top of the body, licking upward.
+      const n = 5;
+      for (let i = 0; i < n; i++) {
+        const fxp = w * (0.2 + 0.6 * (i / (n - 1)));
+        const phase = i * 1.7;
+        const flick = 0.65 + 0.35 * Math.sin(this.bob * 9 + phase);
+        const sway = Math.sin(this.bob * 7 + phase) * w * 0.05;
+        const baseY = uy + h * (0.16 + (i % 2) * 0.1);
+        const fh = h * 0.3 * flick;
+        const bx = fxp + sway;
+        g.fillStyle(0xff4810, 0.55 * flick);                       // outer flame
+        g.fillCircle(bx, baseY, w * 0.07);
+        g.fillCircle(bx + sway * 0.4, baseY - fh * 0.5, w * 0.048);
+        g.fillCircle(bx + sway * 0.7, baseY - fh, w * 0.03);
+        g.fillStyle(0xffd848, 0.7 * flick);                        // hot core
+        g.fillCircle(bx, baseY, w * 0.035);
+        g.fillCircle(bx + sway * 0.5, baseY - fh * 0.55, w * 0.022);
+      }
+      // A couple of rising ember flecks (sawtooth rise).
+      g.fillStyle(0xffc030, 0.6);
+      for (let i = 0; i < 2; i++) {
+        const ex = bcx + Math.sin(this.bob * 3 + i * 3) * w * 0.28;
+        const ey = uy + h * 0.16 - ((this.bob * 18 + i * 17) % (h * 0.5));
+        g.fillCircle(ex, ey, 1);
+      }
+    }
+
     // Enrage body sheen — the silhouette itself runs red-hot (drawn OVER the body,
     // so the enraged elite glows from within, not from the floor). Same fast throb
     // as the halo behind it.

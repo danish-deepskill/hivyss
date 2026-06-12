@@ -13,7 +13,7 @@ import { resetUid } from '../entities/Unit';
 import { BaseStructure } from '../entities/BaseStructure';
 import { BaseEntity } from '../entities/BaseEntity';
 import { BattleCore } from '../systems/BattleCore';
-import { setCastFxDispatcher } from '../systems/CombatDispatch';
+import { setCastFxDispatcher, setImpactFxDispatcher } from '../systems/CombatDispatch';
 import { FxDirector } from '../systems/FxDirector';
 import { registerCoreFx } from '../systems/FxRenderers';
 import { EventBus } from '../systems/EventBus';
@@ -24,13 +24,18 @@ import { ViewportController } from '../systems/ViewportController';
 import { saveUserPreset, type Placement } from '../systems/SandboxPresets';
 import { renderPreviewTexture } from '../ui/UnitPreviews';
 import type { EffectBearer } from '../config/combat/effects/types';
-import type { Side, PheromoneKind, EliteSlot } from '../types';
+import type { Side, PheromoneKind, EliteSlot, GeneLine } from '../types';
 import { PHEROMONE_DEFS } from '../config/PheromoneDefs';
 import { drawBiomeBackground } from './BiomeBackground';
 
 // Sandbox base HP — matches production BASE_HP.
 const SANDBOX_BASE_HP = 1000;
 const UNIT_KEYS: string[] = Object.keys(UNIT_DEFS);
+
+// Sandbox-only hive preview: the H key cycles BOTH hives through the authored
+// geneline bodies so each can be eyeballed here (real play doesn't yet field
+// them all — no β node, the run Royal is α). Add a geneline = add its key.
+const HIVE_PREVIEW_GENELINES: GeneLine[] = ['normal', 'alpha', 'beta'];
 
 // Max Elite-caste units allowed per side. Mirrors the caste design
 // ("Few (1-4) per battle", HIVYSS.md §8). Sandbox-local for now; the real
@@ -168,6 +173,14 @@ export class SandboxScene extends Phaser.Scene {
       color: 0xc8a070,   // dust tan (blunt); per-dmgType palette later
       magnitude: s.magnitude,
     }));
+    // Impact seam — per-hit FX (Fire Bite's flame), reads the SEPARATE
+    // `impactFx` field so casts never double-fire.
+    setImpactFxDispatcher((s) => this.fxDirector.play({
+      kind: s.ability.impactFx?.kind ?? '',
+      x: s.x,
+      y: s.y,
+      magnitude: s.magnitude,
+    }));
 
     // Base wiring — enemy hive pushed to the far end of the expanded
     // arena.
@@ -214,6 +227,9 @@ export class SandboxScene extends Phaser.Scene {
     // pick the active kind; click then paints a zone. ESC / 0 clears
     // the selection (back to unit-placement mode). Works mid-fight.
     this.input.keyboard?.on('keydown', this.onPheromoneKey, this);
+
+    // Dev preview: H cycles both hives through each geneline's body.
+    this.input.keyboard?.on('keydown-H', this.cycleHivePreview, this);
 
     // HUD launches after previews exist + EventBus is on registry.
     this.scene.launch('SandboxHUDScene');
@@ -272,6 +288,7 @@ export class SandboxScene extends Phaser.Scene {
       this.eventBus.off('sandboxSelectBiome', onSelectBiome);
       this.eventBus.off('sandboxTriggerSignature', onTriggerSignature);
       this.input.keyboard?.off('keydown', this.onPheromoneKey, this);
+      this.input.keyboard?.off('keydown-H', this.cycleHivePreview, this);
       HpHud.detachSource();
       this.scene.stop('SandboxHUDScene');
     });
@@ -280,6 +297,15 @@ export class SandboxScene extends Phaser.Scene {
   // ---------------------------------------------------------------
   // Base management
   // ---------------------------------------------------------------
+
+  // Dev: advance both hives to the next geneline body (derives the next from
+  // the current geneline — no extra state to keep in sync).
+  private cycleHivePreview(): void {
+    const order = HIVE_PREVIEW_GENELINES;
+    const next = order[(order.indexOf(this.playerBaseStructure.geneline) + 1) % order.length];
+    this.playerBaseStructure.setGeneline(next);
+    this.enemyBaseStructure.setGeneline(next);
+  }
 
   private resetBases(): void {
     this.playerBaseStructure.setHp(SANDBOX_BASE_HP);

@@ -1,5 +1,5 @@
 // β Swarm — NUMBERS / sacrifice (docs/mvp/GENELINES.md §2). The tide: cheap
-// expendable bodies whose DEATHS are the payoff (spore/blast/acid death
+// expendable bodies whose DEATHS are the payoff (spore/blast/bile death
 // triggers), a carrion-feeder that grows on fallen swarm-mates, and the
 // generative core — the "many" is SPAWNED, not deployed: Broodmother (passive
 // brood) + Broodlord (Spawn-Wave) birth free Swarmlings; the Swarmlord EATS
@@ -96,9 +96,10 @@ const bursterDef = bDef({
   deathAbility: "death_blast",
 });
 
-// Hivespitter — T2: squat living artillery. Lobs acid (chance to poison);
-// killing it ruptures the acid gland over everything nearby. Two systems:
-// ranged + death-effect.
+// Hivespitter — T2: squat living artillery. Lobs BILE (chance to poison);
+// killing it ruptures the bile gland over everything nearby. Two systems:
+// ranged + death-effect. (Bile = digestive swarm-fluid, NOT chemical acid —
+// corrosion is the future acid geneline's corner, GENELINES §1.0.)
 const hivespitterDef = bDef({
   name: "Hivespitter",
   ico: "\u{1F9EA}",
@@ -114,12 +115,12 @@ const hivespitterDef = bDef({
   h: 12,
   trait: "hivespitter",
   role: "ranged",
-  desc: "Acid Lobber",
+  desc: "Bile Lobber",
   tier: 2,
   incubation: 6,
   attackRange: "ranged",
-  defaultAbility: "acid_spit",
-  deathAbility: "acid_pool",
+  defaultAbility: "bile_spit",
+  deathAbility: "bile_rupture",
 });
 
 // Carrionling — T3: the scavenger that GROWS on the swarm's deaths — every

@@ -426,6 +426,25 @@ export interface RenderUnit {
 
 export type DrawFunction = (g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: number, uy: number) => void;
 
+// --- Hive body rendering ---
+// The hive mirrors the unit draw seam: a per-geneline body draw dispatched
+// from a registry, fed a flat state payload (no entity refs — same contract
+// as DrawFunction). BaseStructure owns the shared STATE CHROME (shadow, hit
+// flash, shield membrane); the body draw owns GENELINE IDENTITY. The payload
+// is an object (not positional args) so a later field — e.g. a maturation
+// `phase` for the doc'd hive-grows-across-the-run progression — extends it
+// without churning any body signature.
+export interface HiveRenderState {
+  side: Side;
+  /** hp / maxHp — drives the damage state (cracks, ooze, ruptured cells). */
+  frac: number;
+  /** Hive footprint width in px (the body draws within x ∈ [0, bw]). */
+  bw: number;
+  /** Ground baseline in px (the body sits on it). */
+  groundY: number;
+}
+export type HiveDrawFunction = (g: Phaser.GameObjects.Graphics, s: HiveRenderState) => void;
+
 // --- Sprite Animation (future — type foundations only, no runtime code yet) ---
 
 export type AnimState =
@@ -751,6 +770,13 @@ export interface AbilityDef {
    * dispatcher consumes it. Same 3-state convention as `appliesEffects`.
    */
   fx?: { kind: string };
+  /**
+   * Presentation-only IMPACT FX — played once per damage event at the hit
+   * (via `dispatchImpactFx`). Kept SEPARATE from `fx` (the per-cast, caster-
+   * anchored seam) so a signature that casts an `fx` never ALSO double-fires
+   * it per-hit. Use this for regular-attack hit bursts (Fire Bite's flame).
+   */
+  impactFx?: { kind: string };
   /**
    * Presentation-only FITTED SOUND key (AudioManager.playSfx) — parallel to
    * `fx`. The impact/cast path plays it; the simulation NEVER reads it. Absent

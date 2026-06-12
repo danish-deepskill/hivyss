@@ -3,7 +3,7 @@ import type { WaveDef, Side, PlayerAbilityKey, IWaveController, HiveProfile, Phe
 import { PHEROMONE_DEFS } from '../config/PheromoneDefs';
 import { DEFAULT_WORLD_W, SBW as SBW_CONST } from '../config/Constants';
 import type { RunBuff } from './RunState';
-import { UNIT_DEFS } from '../units/registry';
+import { UNIT_DEFS, hiveGenelineOf } from '../units/registry';
 import { ENEMY_DEFS } from '../config/EnemyDefs';
 import { BaseStructure } from '../entities/BaseStructure';
 import { BaseEntity } from '../entities/BaseEntity';
@@ -152,13 +152,15 @@ export class GameManager {
       );
     }
     this.incubation = new IncubationManager();
+    // Each hive wears its geneline's body: the player's from their deck's
+    // Royal, the enemy's from its AI roster (both via hiveGenelineOf).
     this.playerHive = {
-      base: new BaseStructure(scene, 0, 'player'),
+      base: new BaseStructure(scene, 0, 'player', hiveGenelineOf(deckKeys)),
       larvae: new LarvaVisuals(scene),
       cocoons: new CocoonVisuals(scene),
     };
     this.enemyHive = {
-      base: new BaseStructure(scene, worldW - SBW, 'enemy'),
+      base: new BaseStructure(scene, worldW - SBW, 'enemy', hiveGenelineOf(hiveProfile?.roster ?? [])),
       larvae: new LarvaVisuals(scene, worldW - SBW_CONST),
       cocoons: new CocoonVisuals(scene),
     };

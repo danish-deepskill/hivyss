@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { DEFAULT_WORLD_W } from '../config/Constants';
 import { drawBiomeBackground } from './BiomeBackground';
 import { drawPheromoneTrail } from './PheromoneTrail';
-import { setCastFxDispatcher } from '../systems/CombatDispatch';
+import { setCastFxDispatcher, setImpactFxDispatcher } from '../systems/CombatDispatch';
 import { FxDirector } from '../systems/FxDirector';
 import { registerCoreFx } from '../systems/FxRenderers';
 import { laneFromY, getGroundY } from '../config/RouteMatrix';
@@ -73,6 +73,14 @@ export class WorldScene extends Phaser.Scene {
       x: s.x,
       y: s.y,
       color: 0xc8a070,   // dust tan (blunt); per-dmgType palette later
+      magnitude: s.magnitude,
+    }));
+    // Impact seam — per-hit FX (Fire Bite's flame). Reads the SEPARATE
+    // `impactFx` field so casts never double-fire (unknown kind = no-op).
+    setImpactFxDispatcher((s) => this.fxDirector.play({
+      kind: s.ability.impactFx?.kind ?? '',
+      x: s.x,
+      y: s.y,
       magnitude: s.magnitude,
     }));
 
