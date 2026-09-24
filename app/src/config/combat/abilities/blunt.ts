@@ -60,6 +60,24 @@ export const bluntAbilities: Record<string, AbilityDef> = {
     fx: { kind: 'shockwave' },
   },
 
+  // γ Calcifier — the tomb-wall COLLAPSES on death: a wide ring of stone shards
+  // (heavier + wider than β's Burster pop — it's a T3 capstone, a fortress
+  // falling, not a runner popping). Keeps blunt's default knockback (the
+  // collapse shoves the line back — γ buys space when its wall finally breaks).
+  // Flat death damage, skips resistance (a mechanical collapse, not a typed bite).
+  shatter: {
+    name: 'Shatter',
+    category: 'damage',
+    dmgType: 'blunt',
+    targeting: 'all_enemies_in_range',
+    range: 60,
+    targetCount: 6,
+    trigger: 'onDeath',
+    skipsResistance: true,
+    deathDamage: 80,
+    fx: { kind: 'shockwave' },
+  },
+
   // Maulhorn's Elite signature — a focused SINGLE-TARGET ram: slams the nearest
   // enemy in front with the hardest knockback in the roster. No shockwave (that's
   // Goliath's AOE) — just the ram body motion + a hard knockback hit.

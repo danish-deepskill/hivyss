@@ -4156,7 +4156,7 @@ describe('phase9 Batch 1 item 3 — aoeRider', () => {
 // ------------------------------------------------------------------
 describe('resolveImpactTarget — windup-drift target-lock', () => {
   const foe = (over: Partial<IUnit> = {}): IUnit =>
-    ({ dead: false, burrowed: false, side: 'enemy', lane: 0, ...over } as IUnit);
+    ({ dead: false, burrowed: false, side: 'enemy', ...over } as IUnit);
   const attacker = foe({ side: 'player' });
 
   it('commits to the locked foe when it is still valid (a closer foe drifted in)', () => {
@@ -4171,9 +4171,8 @@ describe('resolveImpactTarget — windup-drift target-lock', () => {
     expect(resolveImpactTarget(foe({ burrowed: true }), nearest, attacker)).toBe(nearest);
   });
 
-  it('falls back when the locked unit left the lane or is friendly', () => {
+  it('falls back when the locked unit is friendly', () => {
     const nearest = foe();
-    expect(resolveImpactTarget(foe({ lane: 1 }), nearest, attacker)).toBe(nearest);
     expect(resolveImpactTarget(foe({ side: 'player' }), nearest, attacker)).toBe(nearest);
   });
 
@@ -4190,7 +4189,7 @@ describe('resolveImpactTarget — windup-drift target-lock', () => {
 // ------------------------------------------------------------------
 describe('signatureWouldWhiff — no-target cooldown guard', () => {
   const caster = ({
-    side: 'player', lane: 0, x: 100, unitW: 20, range: 70, dead: false, burrowed: false,
+    side: 'player', x: 100, unitW: 20, range: 70, dead: false, burrowed: false,
   } as unknown as IUnit);
 
   it('a DAMAGE signature with no foes in range whiffs (cooldown must be spared)', () => {

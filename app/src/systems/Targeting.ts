@@ -43,11 +43,11 @@ export type TargetSelector = (
 
 export const DEFAULT_COMBATANT_FILTER: readonly ComponentTag[] = ['HasAI'];
 
-/** Base-inclusive variant — `IsTargetable` catches BaseEntity (no HasAI). */
+/** Base-inclusive variant — `IsTargetable` catches HiveEntity (no HasAI). */
 export const DEFAULT_TARGETABLE_FILTER: readonly ComponentTag[] = ['IsTargetable'];
 
-/** Lane distance — X only. Matches SpatialIndex's sweep-and-prune axis. */
-export function laneDistance(a: SelectorEntity, b: SelectorEntity): number {
+/** X distance only. Matches SpatialIndex's sweep-and-prune axis. */
+export function xDistance(a: SelectorEntity, b: SelectorEntity): number {
   return Math.abs(a.x - b.x);
 }
 
@@ -76,7 +76,7 @@ function sortByDistance(
   caster: SelectorEntity,
   list: readonly SelectorEntity[],
 ): SelectorEntity[] {
-  return list.slice().sort((a, b) => laneDistance(caster, a) - laneDistance(caster, b));
+  return list.slice().sort((a, b) => xDistance(caster, a) - xDistance(caster, b));
 }
 
 const nearestEnemyInRange: TargetSelector = (caster, params, candidates) => {
@@ -214,11 +214,11 @@ export function runSelectorInRange(
 /**
  * Windup-drift resolution — which foe a completed swing actually hits. Prefers
  * the target LOCKED at swing-start (so the hit commits to the lunge animation),
- * falling back to the current nearest when the locked foe died / burrowed / left
- * the lane / changed sides.
+ * falling back to the current nearest when the locked foe died / burrowed /
+ * changed sides.
  */
 export function resolveImpactTarget(locked: IUnit | null | undefined, nearest: IUnit, attacker: IUnit): IUnit {
-  if (locked && !locked.dead && !locked.burrowed && locked.side !== attacker.side && locked.lane === attacker.lane) {
+  if (locked && !locked.dead && !locked.burrowed && locked.side !== attacker.side) {
     return locked;
   }
   return nearest;
@@ -236,9 +236,9 @@ export function signatureWouldWhiff(ability: AbilityDef, caster: IUnit, alive: I
 
 /**
  * HUD "would connect" check — an enemy sits within the unit's signature range,
- * same lane, center-to-center. Drives the lit state of Elite signature slots.
- * Distinct from signatureWouldWhiff (which is lane-blind + category-gated and
- * decides whether a CAST consumes cooldown) — this is the stricter visual cue.
+ * center-to-center. Drives the lit state of Elite signature slots. Distinct from
+ * signatureWouldWhiff (which is category-gated and decides whether a CAST
+ * consumes cooldown) — this is the stricter visual cue.
  */
 export function signatureHasTarget(u: IUnit, units: readonly IUnit[]): boolean {
   if (!u.signatureAbility) return false;
@@ -250,7 +250,7 @@ export function signatureHasTarget(u: IUnit, units: readonly IUnit[]): boolean {
   if (range <= 0) return false;
   const ux = u.x + u.unitW / 2;
   for (const e of units) {
-    if (e.side === u.side || e.dead || e.lane !== u.lane) continue;
+    if (e.side === u.side || e.dead) continue;
     if (Math.abs((e.x + e.unitW / 2) - ux) < range) return true;
   }
   return false;

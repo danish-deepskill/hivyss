@@ -4,22 +4,16 @@ import { UNIT_DEFS } from '../units/registry';
 import { ENEMY_DEFS } from '../config/EnemyDefs';
 import { PHEROMONE_DEFS } from '../config/PheromoneDefs';
 import { Unit } from '../entities/Unit';
-import { BaseStructure } from '../entities/BaseStructure';
+import { HiveStructure } from '../entities/structures/HiveStructure';
 import { CombatSystem } from './CombatSystem';
+import { TerrainSystem } from './TerrainSystem';
+import { StructureOccupancy } from './structures/StructureOccupancy';
 import { AudioManager } from './AudioManager';
 import { EventBus } from './EventBus';
 import { UnitPool } from './UnitPool';
 import { SpatialIndex } from './SpatialIndex';
 import { signatureHasTarget } from './Targeting';
 import { setSpawnDispatcher } from './CombatDispatch';
-
-/**
- * Unit render depth — units sit ABOVE the pheromone scent layer (50) and the
- * Royal control ring (51), inside the biome's 2.5D sandwich (ground strip at
- * 60.5, tunnel veil at 62): far lane 60, near lane 61, so the near row draws
- * over the far row where they overlap.
- */
-const UNIT_DEPTH_BASE = 60;
 
 /**
  * The battle SUBSTRATE — everything every battle has, regardless of who's
@@ -44,6 +38,14 @@ export class BattleCore {
   readonly unitPool: UnitPool;
   readonly spatialIndex: SpatialIndex;
   readonly combat: CombatSystem;
+  /** Neutral, per-route, battle-scoped terrain (the reaction-registry engine).
+   *  Lives on the substrate so both drivers get it; the renderer stays driver-side. */
+  readonly terrain: TerrainSystem;
+  /** Structure occupancy (parallel SRP layer to terrain). Placed structures
+   *  register their footprint here as per-pixel intervals; managed by the
+   *  structure managers, queried for placement validation. */
+  readonly structures: StructureOccupancy;
+  private readonly events: EventBus;
 
   /** Active pheromone zones (commands + courier trail blobs). Drivers may
    *  push (sandbox zone painting); decay happens in tickZones. */
@@ -57,10 +59,15 @@ export class BattleCore {
     this.unitPool = new UnitPool(scene);
     this.spatialIndex = new SpatialIndex();
     this.combat = new CombatSystem(scene, events, worldW);
+    this.events = events;
+    // `this.units` is the stable live-roster ref (declared above) — terrain
+    // scans it for pulse targets; never reassign it.
+    this.terrain = new TerrainSystem(events, worldW, this.units);
+    this.structures = new StructureOccupancy(worldW);
 
     // Generative-spawn seam — the sim's birth requests (spawner passives,
     // spawn-wave signatures) become real pooled units here, in BOTH drivers.
-    setSpawnDispatcher((key, side, x, lane) => {
+    setSpawnDispatcher((key, side, x) => {
       let count = 0;
       for (const u of this.units) if (u.side === side && !u.dead) count++;
       if (count >= BattleCore.SPAWN_SOFT_CAP) return;
@@ -70,17 +77,24 @@ export class BattleCore {
       // SPAWNED units cost cap 0 (β capacity ruling): the brood is a parallel
       // economy, not a squeeze on your deploy capacity. Deployed copies of the
       // same unit keep their def cap. The 48 soft-cap above is the backstop.
-      this.createUnit(resolvedKey, side, { ...def, cap: 0 }, x, lane);
+      this.createUnit(resolvedKey, side, { ...def, cap: 0 }, x);
     });
   }
 
-  /** Spawn a unit from the pool into the battle (roster + spatial index +
-   *  the lane depth sandwich). The ONLY unit-creation path. */
-  createUnit(key: string, side: Side, def: UnitDef, x: number, lane = 0): Unit {
-    const unit = this.unitPool.spawn({ ...def, _key: key }, side, x, lane);
-    unit.setDepth(UNIT_DEPTH_BASE + lane);
+  /** Spawn a unit from the pool into the battle (roster + spatial index). The
+   *  ONLY unit-creation path. */
+  createUnit(key: string, side: Side, def: UnitDef, x: number): Unit {
+    const unit = this.unitPool.spawn({ ...def, _key: key }, side, x);
+    // Render depth (the band sandwich) is owned by Unit.init, derived from the
+    // unit's stable band position — see UNIT_DEPTH_BASE / bandDepth.
     this.units.push(unit);
     this.spatialIndex.add(unit);
+    // Shaper onDeploy — lay this unit's terrain at its spawn (a backline
+    // structure). onReach (lay-forward on first engage) lives in the terrain
+    // tick; 'active' is still unwired. No starter uses onDeploy today.
+    if (def.terrainAbility?.trigger === 'onDeploy') {
+      this.events.emit('terrainApply', { route: def.route ?? 'land', x, element: def.terrainAbility.element });
+    }
     return unit;
   }
 
@@ -90,12 +104,14 @@ export class BattleCore {
    * The Scout IS the delivery: vulnerable, interceptable; killing it stops the
    * trail, laid scent fades on its own (deposit-fade, VISION §5).
    */
-  spawnCourier(kind: PheromoneKind, side: Side, x: number, lane: number): Unit | null {
+  spawnCourier(kind: PheromoneKind, side: Side, x: number): Unit | null {
     const def = side === 'enemy' ? ENEMY_DEFS['escout'] : UNIT_DEFS['scout'];
     if (!def) return null;
-    const scout = this.createUnit('scout', side, def, x, lane);
+    const scout = this.createUnit('scout', side, def, x);
     scout.pheromoneKind = kind;
-    scout.primary = PHEROMONE_DEFS[kind].color; // tint to its command
+    // Tint only the back STORAGE-POD to its command (read by draws/scout.ts);
+    // the body itself stays white. The deposited trail zones carry the colour too.
+    scout.resources['cmd'] = PHEROMONE_DEFS[kind].color;
     return scout;
   }
 
@@ -110,12 +126,15 @@ export class BattleCore {
   /** One combat step over the live roster. */
   resolve(
     dt: number,
-    playerBase: BaseStructure,
-    enemyBase: BaseStructure,
+    playerBase: HiveStructure,
+    enemyBase: HiveStructure,
     particles: IParticleManager | null,
     wallActive: number,
     audio: AudioManager | null,
   ): void {
+    // Terrain decay first (ttl/hp), then combat (movement reads terrain, and
+    // the in-resolve terrain tick applies DoT/pulses through the death economy).
+    this.terrain.update(dt);
     this.combat.resolve(this.units, dt, playerBase, enemyBase, particles, wallActive, audio, this.pheromoneZones);
   }
 
@@ -145,6 +164,14 @@ export class BattleCore {
       this.unitPool.despawn(u);
     }
     this.units.length = 0;
+    this.terrain.reset();
+  }
+
+  /** Battle teardown (scene shutdown) — unsubscribe terrain from the event bus
+   *  and unregister its TerrainDispatch seams so a dead system can't be ticked
+   *  or queried after the scene is gone. */
+  destroy(): void {
+    this.terrain.destroy();
   }
 
   /**

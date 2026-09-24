@@ -19,7 +19,6 @@ import type { SeededRNG } from './SeededRNG';
 export interface Bloom {
   id: number;
   x: number;
-  lane: number;
   carry: number;
   pool: number;
   maxPool: number;
@@ -33,7 +32,6 @@ export interface Bloom {
 export interface CorpsePickup {
   id: number;
   x: number;
-  lane: number;
   yield: number;
   /** Seconds before the field absorbs it. */
   decay: number;
@@ -99,22 +97,18 @@ export class Forage {
     const poorX = this.rollX(POOR_BAND);
     let richX = this.rollX(RICH_BAND);
     if (Math.abs(richX - poorX) < BLOOM_SPACING) richX = poorX + BLOOM_SPACING;
-    this.spawnBloom(poorX, this.rollLane(), BLOOM_POOR);
-    this.spawnBloom(richX, this.rollLane(), BLOOM_RICH);
+    this.spawnBloom(poorX, BLOOM_POOR);
+    this.spawnBloom(richX, BLOOM_RICH);
   }
 
   private rollX(band: [number, number]): number {
     return (band[0] + this.rng.next() * (band[1] - band[0])) * this.bounds.worldW;
   }
 
-  private rollLane(): number {
-    return this.rng.next() < 0.5 ? 0 : 1;
-  }
-
-  private spawnBloom(x: number, lane: number, kind: { carry: number; pool: number; rich: boolean }): Bloom {
+  private spawnBloom(x: number, kind: { carry: number; pool: number; rich: boolean }): Bloom {
     const b: Bloom = {
       id: this.nextId++,
-      x, lane,
+      x,
       carry: kind.carry,
       pool: kind.pool,
       maxPool: kind.pool,
@@ -126,8 +120,8 @@ export class Forage {
   }
 
   /** A death dropped remains on the field — scavengeable until it decays. */
-  dropCorpse(x: number, lane: number, vyssYield: number): void {
-    this.corpsePickups.push({ id: this.nextId++, x, lane, yield: vyssYield, decay: CORPSE_DECAY });
+  dropCorpse(x: number, vyssYield: number): void {
+    this.corpsePickups.push({ id: this.nextId++, x, yield: vyssYield, decay: CORPSE_DECAY });
   }
 
   private bloomById(id: number | null): Bloom | undefined {
@@ -174,7 +168,7 @@ export class Forage {
    * Send a worker to its next target, honoring the stance and running the
    * fallback chain: corpse-duty with no corpses left → revert the WHOLE
    * stance to the blooms (announced); blooms bare → idle at home (reseeds
-   * re-dispatch). Sets lane (the generic lane-slide carries it across).
+   * re-dispatch).
    */
   private dispatch(u: Unit, job: GatherJob): void {
     if (this.stance === 'corpse') {
@@ -183,7 +177,6 @@ export class Forage {
         job.targetKind = 'corpse';
         job.targetId = c.id;
         job.phase = 'out';
-        u._laneTarget = c.lane;
         u.order = { kind: 'move', x: c.x };
         return;
       }
@@ -202,7 +195,6 @@ export class Forage {
     job.targetKind = 'bloom';
     job.targetId = bloom.id;
     job.phase = 'out';
-    u._laneTarget = bloom.lane;
     u.order = { kind: 'move', x: bloom.x };
   }
 
@@ -263,9 +255,9 @@ export class Forage {
     if (bare || this.reseedTimer >= RESEED_CHECK) {
       if (!bare) this.reseedTimer = 0;
       if (this.blooms.length < MAX_ACTIVE_BLOOMS && (bare || this.rng.next() < RESEED_CHANCE)) {
-        const b = this.spawnBloom(this.rollX(RESEED_BAND), this.rollLane(), BLOOM_RICH);
+        const b = this.spawnBloom(this.rollX(RESEED_BAND), BLOOM_RICH);
         this.events.emit('logMessage', { message: '🌼 A nectar bloom has blossomed mid-field!' });
-        this.particles.float(b.x, getGroundY('land', b.lane) - 24, 'BLOOM!', 0xf0c040, true);
+        this.particles.float(b.x, getGroundY('land') - 24, 'BLOOM!', 0xf0c040, true);
         for (const u of this.core.units) {
           const job = this.jobs.get(u.id);
           if (job && !u.dead && job.phase === 'idle') this.dispatch(u, job);

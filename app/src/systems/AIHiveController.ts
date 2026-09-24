@@ -4,9 +4,6 @@
 import Phaser from 'phaser';
 import type { IWaveController, IParticleManager, HiveProfile, AIPersonality, UnitRole } from '../types';
 import { UNIT_DEFS } from '../units/registry';
-import { W } from '../config/Constants';
-import { LANE } from '../config/Layout';
-const GND = LANE.land.groundY;
 import { EventBus } from './EventBus';
 import { SeededRNG } from './SeededRNG';
 import { IncubationManager } from './IncubationManager';
@@ -123,7 +120,7 @@ export class AIHiveController implements IWaveController {
     this.enemyQueue = [];
   }
 
-  update(dt: number, particles: IParticleManager | null): void {
+  update(dt: number, _particles: IParticleManager | null): void {
     this.elapsed += dt;
 
     // 1. Economy tick (mirrors EconomyManager)
@@ -167,17 +164,14 @@ export class AIHiveController implements IWaveController {
       this.currentIncubation = null;
     }
 
-    // 4. Stage counter (cosmetic)
+    // Internal score clock — ticks quietly; surfaced to the player as the battle
+    // TIMER (HUD), NOT as stages. The roguelike has no stage mechanic, so there's
+    // no WAVE! popup and no stage/waveStart event here.
     this.waveTimer += dt;
     if (this.waveTimer >= this.waveInterval) {
       this.waveTimer = 0;
       this.stage++;
       this.waveIdx++;
-      if (particles) {
-        const camX = this.scene.cameras.main.scrollX;
-        particles.float(camX + W / 2, GND - 200, `WAVE ${this.stage}!`, 0xf0c040, true);
-      }
-      this.events.emit('waveStart', { wave: this.stage });
     }
   }
 

@@ -99,15 +99,15 @@ export function dispatchDeathTrigger(dyingUnit: IUnit, deathAbilityName: string)
  * player/enemy def mirror + the pool. NO-OP default keeps tests deterministic
  * (spawner units simply don't multiply there).
  */
-export type SpawnDispatcher = (key: string, side: 'player' | 'enemy', x: number, lane: number) => void;
+export type SpawnDispatcher = (key: string, side: 'player' | 'enemy', x: number) => void;
 let _spawnDispatcher: SpawnDispatcher = () => {};
 
 export function setSpawnDispatcher(fn: SpawnDispatcher): void {
   _spawnDispatcher = fn;
 }
 
-export function dispatchSpawn(key: string, side: 'player' | 'enemy', x: number, lane: number): void {
-  _spawnDispatcher(key, side, x, lane);
+export function dispatchSpawn(key: string, side: 'player' | 'enemy', x: number): void {
+  _spawnDispatcher(key, side, x);
 }
 
 // --- DOT dispatcher factory (gameplay) -------------------------------------

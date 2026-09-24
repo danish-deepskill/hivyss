@@ -79,7 +79,7 @@ this.events.emit('enemyKilled', { unit: { key, reward, x, y } });
 | `enemyKilled` | `{ unit: { key, reward, x, y } }` | CombatSystem, AbilityManager | GameManager (nectar + kills) |
 | `unitSpawned` | `{ key, side }` | WaveManager | GameManager (spawn enemy) |
 | `waveStart` | `{ wave }` | WaveManager | GameManager (audio + log), MenuUIScene (stage label) |
-| `deployUnit` | `{ key }` | MenuUIScene | WorldScene → GameManager.playerSpawn() |
+| `deployUnit` | `{ key, route }` | MenuUIScene | WorldScene → GameManager.playerSpawn() |
 | `useAbility` | `{ key }` | MenuUIScene | WorldScene → GameManager.castAbility() |
 | `cancelIncubation` | `{ index }` | MenuUIScene | WorldScene → GameManager.cancelIncubation() |
 | `logMessage` | `{ message }` | WorldScene, GameManager | MenuUIScene (log display) |

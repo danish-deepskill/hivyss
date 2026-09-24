@@ -29,6 +29,28 @@ export type ResistanceTier = (typeof RESISTANCE_TIERS)[number];
 export const DEFAULT_RESISTANCE: ResistanceTier = 'normal';
 
 /**
+ * Canonical resistance-tier → damage multiplier. The DEFAULT scaling for damage
+ * sources that carry no per-ability tier table of their own — terrain pulses /
+ * DoT use this so a unit's resistance to the damage type still matters (a
+ * toxic-'strongest' unit shrugs off acid; a 'weak' one takes extra). One shared
+ * ladder, NOT a per-source matrix. 'normal' = 1.0 (unchanged).
+ */
+export const RESISTANCE_DAMAGE_MULT: Record<ResistanceTier, number> = {
+  weakest: 2.0,
+  weaker: 1.5,
+  weak: 1.25,
+  normal: 1.0,
+  strong: 0.6,
+  stronger: 0.3,
+  strongest: 0.1,
+};
+
+/** Damage multiplier for a resistance tier (see RESISTANCE_DAMAGE_MULT). */
+export function resistanceDamageMult(tier: ResistanceTier): number {
+  return RESISTANCE_DAMAGE_MULT[tier] ?? 1.0;
+}
+
+/**
  * Shift a resistance tier by `delta` steps along the ladder.
  * Positive delta moves toward 'strongest', negative toward 'weakest'.
  * Both ends are clamped: shifting past 'weakest' or 'strongest'

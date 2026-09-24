@@ -193,9 +193,7 @@ Even in a slice, sequence by **de-risk**, not importance:
 
 Combat goes first **not because it outranks the hive, but because the hive feeds it** — every hive-build choice only matters if the fight it pours into is good. Both are the core.
 
-**Scope is 4 genelines; *sequence* is α-first.** Build **α** first to validate the fight, then **β/γ/δ** — don't confuse the build order with a smaller MVP. The map is *designed* (`GENELINES`); you build it thin (few nodes) first, then flesh it.
-
-**The #1 risk (sharpened):** not "is the *combat* fun" but **"is the build-a-hive-and-fight *loop* fun."** Still **UNTESTED.** Everything in this doc is worthless until that's answered — *do not let design depth keep front-running the playtest.*
+**Scope is 4 genelines; *sequence* is α-first.** Build **α** first, then **β/γ/δ** — don't confuse the build order with a smaller MVP. The map is *designed* (`GENELINES`); you build it thin (few nodes) first, then flesh it.
 
 ---
 

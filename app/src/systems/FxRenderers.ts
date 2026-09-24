@@ -33,6 +33,48 @@ export function registerCoreFx(director: FxDirector): void {
   });
 
   registerFireburst(director);
+  registerSpit(director);
+}
+
+// --- Spit (spire / tower projectile) ------------------------------------
+// An ORGANIC barbed glob (SC2 Zerg spore-crawler flavour, NOT a laser): a lumpy
+// blob with a short motion-tail flies muzzle → target, then splats. `color` is
+// the spire's crystal tint (side identity); the lumpy shape sells "biological".
+const SPIT_DURATION = 0.24;  // fast — a launched barb
+function registerSpit(director: FxDirector): void {
+  director.register('spit', SPIT_DURATION, (fx, t, g) => {
+    const ease = t * t;                              // accelerate (a launched barb)
+    const x = fx.x + (fx.tx - fx.x) * ease;
+    const y = fx.y + (fx.ty - fx.y) * ease;
+    const pale = 0xe8f0a0;
+
+    if (t < 0.82) {
+      // Motion tail behind the glob.
+      const back = Math.max(0, ease - 0.12);
+      const bx = fx.x + (fx.tx - fx.x) * back;
+      const by = fx.y + (fx.ty - fx.y) * back;
+      g.lineStyle(3, fx.color, 0.45);
+      g.lineBetween(bx, by, x, y);
+      // The glob — two overlapping circles (lumpy, not a dot) + a pale core.
+      g.fillStyle(fx.color, 0.95);
+      g.fillCircle(x, y, 4);
+      g.fillCircle(x - (x - bx) * 0.2, y - (y - by) * 0.2, 2.6);
+      g.fillStyle(pale, 0.7);
+      g.fillCircle(x, y, 1.8);
+    } else {
+      // Splat on arrival — a small organic burst of droplets at the target.
+      const f = (t - 0.82) / 0.18;
+      const fade = 1 - f;
+      g.fillStyle(fx.color, fade * 0.8);
+      g.fillCircle(fx.tx, fx.ty, 5 + f * 4);
+      g.fillStyle(pale, fade);
+      for (let i = 0; i < 4; i++) {
+        const a = i * 1.7;
+        const d = f * 7;
+        g.fillCircle(fx.tx + Math.cos(a) * d, fx.ty + Math.sin(a) * d * 0.8, 1.3);
+      }
+    }
+  });
 }
 
 // --- Fireburst (Cinderfly's Fire Bite) ----------------------------------

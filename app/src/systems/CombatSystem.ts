@@ -4,13 +4,18 @@ import { DEFAULT_WORLD_W, SBW } from '../config/Constants';
 import { LANE } from '../config/Layout';
 import { canAttack } from '../config/RouteMatrix';
 const GND = LANE.land.groundY;
-import { BaseStructure } from '../entities/BaseStructure';
-import { BaseEntity } from '../entities/BaseEntity';
+import { HiveStructure } from '../entities/structures/HiveStructure';
+import { HiveEntity } from '../entities/structures/HiveEntity';
+import { StructureEntity } from '../entities/structures/StructureEntity';
 import { AudioManager } from './AudioManager';
 import { EventBus } from './EventBus';
 import { CombatPipeline } from './CombatPipeline';
 import { updateEffects, hasActiveEffect, applyEffect } from './EffectSystem';
 import { setDotDispatcher } from '../config/combat/effects/dispatch';
+import { terrainEffectAt, dispatchTerrainTick } from './TerrainDispatch';
+import { computeReflect } from '../config/combat/reflect';
+import { degradeArmor } from '../config/combat/armorDegrade';
+import type { CalcTarget } from './CombatPipeline';
 import { setStunFxDispatcher, setStaggerFxDispatcher } from '../config/combat/effects/cc';
 import { applyModifiers, addModifier } from './ModifierSystem';
 import { getResource, addResource } from './ResourceSystem';
@@ -90,8 +95,14 @@ export class CombatSystem {
    * sandbox (dummy bases without wrappers) keeps working; _findTarget
    * skips base targeting when unset.
    */
-  playerBaseEntity: BaseEntity | null = null;
-  enemyBaseEntity: BaseEntity | null = null;
+  playerBaseEntity: HiveEntity | null = null;
+  enemyBaseEntity: HiveEntity | null = null;
+  /** Non-base attackable structures (towers / buildings), FLATTENED across every
+   *  source for the hot per-unit target scan. Rebuilt only when a source updates. */
+  structureTargets: StructureEntity[] = [];
+  /** Per-source target lists (key → entities), e.g. 'towers' + 'buildings'. Unioned
+   *  into `structureTargets` so multiple managers can coexist without clobbering. */
+  private structureSources = new Map<string, StructureEntity[]>();
 
   constructor(scene: Phaser.Scene, events: EventBus, worldW: number = DEFAULT_WORLD_W) {
     this.scene = scene;
@@ -109,6 +120,38 @@ export class CombatSystem {
     registerPhase8ModifyHandlers(this.pipeline);
     this.pipeline.on('pre_apply',  applyHealPhase);
     this.pipeline.on('apply',      (e) => this._applyDamagePhase(e));
+    // Reflect (thorns) — return a fraction of a DIRECT hit to the attacker.
+    // computeReflect is pure; we queue its result with isReflected=true so the
+    // return hit can't itself reflect (the loop break). γ Thornback & kin.
+    this.pipeline.on('post_apply', (e) => {
+      const r = computeReflect(e);
+      if (!r) return;
+      const ev = this.pipeline.queueAbility(r.source, r.victim, 'jaw_strike', {
+        baseDamageOverride: r.amount,
+        legacyHitFlavor: 'melee',
+      });
+      ev.isReflected = true;
+    });
+    // Armour-degrade (γ) — PHYSICAL hits wear physical armour. Accumulate soaked
+    // damage; when it crosses the unit's `per` threshold, strip sharp/blunt one
+    // tier toward normal (degradeArmor is pure; we mutate the live resistance).
+    this.pipeline.on('post_apply', (e) => {
+      if (e.dmgType !== 'sharp' && e.dmgType !== 'blunt') return; // only physical wears plates
+      if (e.finalDamage <= 0) return;
+      const t = e.target as CalcTarget & { degradeArmor?: { per: number }; _armorWear?: number };
+      if (!t.degradeArmor || t.dead) return;
+      const res = degradeArmor(
+        t.resistance?.sharp,
+        t.resistance?.blunt,
+        (t._armorWear ?? 0) + e.finalDamage,
+        t.degradeArmor.per,
+      );
+      t._armorWear = res.wear;
+      if (t.resistance) {
+        if (res.sharp !== undefined) t.resistance.sharp = res.sharp;
+        if (res.blunt !== undefined) t.resistance.blunt = res.blunt;
+      }
+    });
     registerPhase8PostApplyHandlers(
       this.pipeline,
       (e) => this._applyDeathEffectsPhase(e),
@@ -186,14 +229,12 @@ export class CombatSystem {
 
       const ability = lookupAbility(deathAbilityName);
       const allAlive = ctx.allAlive ?? [];
-      // Same-lane only — a death-bomb hits the dying unit's lane, never
-      // across the front.
       const targets = runSelectorInRange(
         ability.targeting!,
         dyingUnit,
         ability,
         allAlive,
-      ).filter(t => (t as IUnit).lane === dyingUnit.lane);
+      );
       for (const t of targets) {
         this.pipeline.queueAbility(dyingUnit, t as IUnit, deathAbilityName, {
           // Per-ability death damage (β's spore/blast/acid each carry their
@@ -232,9 +273,17 @@ export class CombatSystem {
   }
 
   /** GameManager calls once at battle setup; sandbox skips. */
-  setBaseEntities(player: BaseEntity, enemy: BaseEntity): void {
+  setBaseEntities(player: HiveEntity, enemy: HiveEntity): void {
     this.playerBaseEntity = player;
     this.enemyBaseEntity = enemy;
+  }
+
+  /** Register one SOURCE's attackable structures (e.g. 'towers', 'buildings').
+   *  Multi-source: re-unions all sources into the flat scan list, so managers
+   *  that coexist (towers + buildings in one battle) no longer clobber each other. */
+  setStructureTargets(sourceKey: string, structures: StructureEntity[]): void {
+    this.structureSources.set(sourceKey, structures);
+    this.structureTargets = ([] as StructureEntity[]).concat(...this.structureSources.values());
   }
 
   /**
@@ -264,12 +313,10 @@ export class CombatSystem {
     ctx.sourceUnit = u;
     if (ability.category === 'utility' && ability.appliesEffects && ability.appliesEffects.length > 0) {
       // Buff/utility signature (Primal Roar) — apply its effects directly to the
-      // selected SAME-LANE allies; no damage pipeline. Lane-scoped like cohesion,
-      // so the Royal stays a lane anchor, not a cross-field god-buff. The caster
-      // (the Queen) leads the surge, so she roars herself too (selectors omit self).
+      // selected in-range allies; no damage pipeline. The caster (the Queen) leads
+      // the surge, so she roars herself too (selectors omit self).
       for (const eff of ability.appliesEffects) applyEffect(u, eff, { source: u });
       for (const t of targets) {
-        if ((t as IUnit).lane !== u.lane) continue;
         for (const eff of ability.appliesEffects) applyEffect(t as IUnit, eff, { source: u });
       }
     } else {
@@ -285,7 +332,7 @@ export class CombatSystem {
       const scx = u.x + u.unitW / 2;
       for (let i = 0; i < ability.spawns.count; i++) {
         const offset = (i - (ability.spawns.count - 1) / 2) * 14;
-        dispatchSpawn(ability.spawns.key, u.side, scx + offset, u.lane);
+        dispatchSpawn(ability.spawns.key, u.side, scx + offset);
       }
     }
 
@@ -297,7 +344,7 @@ export class CombatSystem {
       let eaten = 0;
       for (const ally of alive) {
         if (ally === u || ally.side !== u.side || ally.dead) continue;
-        if (ally.lane !== u.lane || ally.geneline !== u.geneline) continue;
+        if (ally.geneline !== u.geneline) continue;
         if (ally.caste === 'elite' || ally.caste === 'royal' || ally.caste === 'worker') continue;
         if (Math.abs((ally.x + ally.unitW / 2) - scx) > ability.sacrifice.radius) continue;
         ally.kill();
@@ -305,12 +352,16 @@ export class CombatSystem {
         ctx.particles?.burst(ally.x + ally.unitW / 2, ally.y + ally.unitH / 2, 0x7aa030, 8);
       }
       if (eaten > 0) {
-        addModifier(u, {
-          stat: 'atk',
-          type: 'flat',
-          value: eaten * ability.sacrifice.perUnitAtk,
-          source: `tide:${u.id}`,
-        });
+        // Tide still CONSUMES the whole swarm in radius, but the atk gain is
+        // CAPPED: count existing tide stacks and add at most up to `max` (one
+        // flat stack per body, mirroring Carrionling's deathFeed). Bounded —
+        // not an unbounded permanent snowball.
+        const tag = `tide:${u.id}`;
+        const have = u.modifiers?.filter(m => m.source === tag).length ?? 0;
+        const gained = Math.min(eaten, Math.max(0, ability.sacrifice.max - have));
+        for (let k = 0; k < gained; k++) {
+          addModifier(u, { stat: 'atk', type: 'flat', value: ability.sacrifice.perUnitAtk, source: tag });
+        }
         ctx.particles?.float(scx, u.y - 16, `FEAST ×${eaten}`, 0x9adb3a, true);
       }
     }
@@ -363,7 +414,7 @@ export class CombatSystem {
     }
   }
 
-  resolve(units: IUnit[], dt: number, playerBase: BaseStructure, enemyBase: BaseStructure, particles: IParticleManager | null, wallActive: number, audio: AudioManager | null, zones: PheromoneZone[] = []): void {
+  resolve(units: IUnit[], dt: number, playerBase: HiveStructure, enemyBase: HiveStructure, particles: IParticleManager | null, wallActive: number, audio: AudioManager | null, zones: PheromoneZone[] = []): void {
     const alive = units.filter(u => !u.dead);
     this.audio = audio;
 
@@ -456,10 +507,8 @@ export class CombatSystem {
         return;
       }
 
-      // Find foe in attack range. Same-lane only — bilateral lanes
-      // (0 = upper, 1 = lower) fight independent fronts; cross-lane
-      // targeting is impossible.
-      const foes = alive.filter(e => e.side !== u.side && !e.dead && e.lane === u.lane);
+      // Find foe in attack range (any living enemy on the single front).
+      const foes = alive.filter(e => e.side !== u.side && !e.dead);
       const { target, dist } = this._findTarget(u, foes);
 
       // Pheromone command — FIRST own-side zone whose 1D center-x band
@@ -496,7 +545,7 @@ export class CombatSystem {
 
       if (effTarget) {
         this.tickAttackSwing(u, () => {
-          if (effTarget instanceof BaseEntity) {
+          if (effTarget instanceof HiveEntity) {
             // In-range base attack — ranged units only (melee units
             // can't enter this branch via _findTarget). Fires from
             // the unit's current position; wallActive blocks only
@@ -518,6 +567,16 @@ export class CombatSystem {
               effTarget.structure.flash(0.2);
               if (particles) particles.float(this.worldW - SBW / 2, GND - 40, `-${dmg}`, DMG_COLORS.base);
               if (particles) particles.burst(this.worldW - SBW + 2, GND - 20, u.primary, 4);
+            }
+          } else if (effTarget instanceof StructureEntity) {
+            // Mid-lane spire / tower — simple structure damage (no wall block,
+            // no unit pipeline), at the structure's own position.
+            const dmg = Math.max(1, u.atk);
+            effTarget.takeDamage(dmg);
+            effTarget.structure.flash(0.2);
+            if (particles) {
+              particles.float(effTarget.x, GND - 40, `-${dmg}`, DMG_COLORS.base);
+              particles.burst(effTarget.x, GND - 20, u.primary, 4);
             }
           } else {
             this._lastAttacker = u;
@@ -552,7 +611,6 @@ export class CombatSystem {
                     .filter(e =>
                       e !== primary &&
                       e.side !== u.side &&
-                      e.lane === u.lane &&
                       !e.dead &&
                       !e.burrowed &&
                       Math.abs(e.x - primary.x) <= cr,
@@ -568,11 +626,8 @@ export class CombatSystem {
                     ability,
                     ctx.allAlive,
                   );
-                  // Same-lane only — the selector ranges over the whole
-                  // roster, so re-filter to the attacker's lane to keep
-                  // multi-hit from leaking across the front.
                   secondaries = selectorResults
-                    .filter(e => e !== impactTarget && (e as IUnit).lane === u.lane)
+                    .filter(e => e !== impactTarget)
                     .slice(0, tc - 1) as IUnit[];
                 }
                 const targets = [impactTarget, ...secondaries];
@@ -636,12 +691,28 @@ export class CombatSystem {
         }, () => {
           // Lock the target at windup-start so the hit commits to it; a closer foe
           // drifting in mid-swing won't steal it. Bases don't move → no lock.
-          u.lockedTarget = effTarget instanceof BaseEntity ? null : (effTarget as IUnit);
+          u.lockedTarget = effTarget instanceof HiveEntity ? null : (effTarget as IUnit);
         });
       } else {
         // March
         u.state = 'march';
-        const spd = u.getSpeed();
+        let spd = u.getSpeed();
+
+        // Terrain (neutral, per-route): a flood/web underfoot slows the march;
+        // a wall ahead blocks forward advance. Slow scales the velocity here;
+        // block is enforced AFTER the move (revert a forward step that pushed
+        // into an impassable cell) so it covers every movement mode below
+        // without editing each one. A flyer/tunneler on another route queries
+        // empty terrain → unaffected (movement-immunity for free).
+        const _terrCx = u.x + u.unitW / 2;
+        const _terrHere = terrainEffectAt(u.currentRoute, _terrCx);
+        if (_terrHere?.slowPct) spd *= Math.max(0, 1 - _terrHere.slowPct / 100);
+        if (_terrHere?.root) spd = 0;
+        const _blockedAhead = !!terrainEffectAt(
+          u.currentRoute,
+          _terrCx + u.facing * (u.unitW / 2 + 1),
+        )?.block;
+        const _preMoveX = u.x;
 
         // Pheromone movement override. `cmd` is the own-side zone
         // covering this unit (rally/charge/retreat) or null. Each
@@ -659,9 +730,6 @@ export class CombatSystem {
           if (Math.abs(delta) > ROYAL_ARRIVE) {
             u.facing = delta > 0 ? 1 : -1;
             u.x += Math.sign(delta) * spd * 60 * dt;
-          } else if (order.crossing) {
-            // Arrived in X but still sliding between lanes — keep the WALK pose
-            // (state stays 'march') as she crosses; she guards only once landed.
           } else {
             u.state = 'attack';                    // arrived — stand/guard, not walk-in-place
             u.facing = this._faceNearestFoe(u, foes);
@@ -689,6 +757,12 @@ export class CombatSystem {
         } else {
           // Normal march.
           u.x += u.facing * spd * 60 * dt;
+        }
+
+        // Wall block — undo a forward step that pushed into an impassable cell.
+        // A backward move (retreat: sign opposite facing) passes through.
+        if (_blockedAhead && Math.sign(u.x - _preMoveX) === u.facing) {
+          u.x = _preMoveX;
         }
 
         // Player unit reaches enemy base — attack it (workers just clamp + idle)
@@ -743,9 +817,14 @@ export class CombatSystem {
       const cx = u.x + u.unitW / 2;
       if (u._lastDepositX == null || Math.abs(cx - u._lastDepositX) >= TRAIL_SPACING) {
         u._lastDepositX = cx;
-        zones.push({ kind: u.pheromoneKind, x: cx, radius: TRAIL_BLOB_RADIUS, side: u.side, lane: u.lane, remaining: TRAIL_BLOB_FADE });
+        zones.push({ kind: u.pheromoneKind, x: cx, radius: TRAIL_BLOB_RADIUS, side: u.side, remaining: TRAIL_BLOB_FADE });
       }
     }
+
+    // Terrain unit-interaction (passive DoT, catalyst cell-entry). Runs HERE —
+    // inside resolve, ctx live — so terrain damage routes through the same DoT
+    // seam and feeds the death economy. No-op when no terrain is registered.
+    dispatchTerrainTick(alive, dt);
 
     // Tick active effects AFTER the per-unit combat loop but BEFORE
     // clearing _currentCtx — DOT hooks route damage through the
@@ -776,7 +855,6 @@ export class CombatSystem {
     const unitCx = u.x + u.unitW / 2;
     for (const z of zones) {
       if (u.side !== z.side) continue;
-      if (u.lane !== z.lane) continue;
       if (Math.abs(unitCx - z.x) < z.radius) return z;
     }
     return null;
@@ -789,10 +867,10 @@ export class CombatSystem {
   // opposing bases; melee units can't (they fall through to the
   // at-wall attack path so their wall-touching animation is preserved).
   /**
-   * Facing toward the nearest same-lane foe (either direction), or the unit's
-   * forward default when none. Lets the controllable Royal guard a held spot from
-   * BOTH sides — face an enemy that broke through behind her, not just stare
-   * forward — so next frame's facing-gated _findTarget can engage it.
+   * Facing toward the nearest foe (either direction), or the unit's forward
+   * default when none. Lets the controllable Royal guard a held spot from BOTH
+   * sides — face an enemy that broke through behind her, not just stare forward —
+   * so next frame's facing-gated _findTarget can engage it.
    */
   private _faceNearestFoe(u: IUnit, foes: IUnit[]): number {
     const cx = u.x + u.unitW / 2;
@@ -805,8 +883,8 @@ export class CombatSystem {
     return dir;
   }
 
-  _findTarget(u: IUnit, foes: IUnit[]): { target: IUnit | BaseEntity | null; dist: number } {
-    let target: IUnit | BaseEntity | null = null;
+  _findTarget(u: IUnit, foes: IUnit[]): { target: IUnit | StructureEntity | null; dist: number } {
+    let target: IUnit | StructureEntity | null = null;
     let bestDist = Infinity;
     foes.forEach(e => {
       if (e.burrowed) return;
@@ -833,6 +911,18 @@ export class CombatSystem {
           bestDist = absDist;
           target = enemyBase;
         }
+      }
+    }
+
+    // Towers — attackable by ALL units in range (mid-field structures, unlike
+    // the wall base, which melee reach via the at-wall path).
+    for (const s of this.structureTargets) {
+      if (s.dead || s.side === u.side) continue;
+      const dist = u.facing > 0 ? (s.x - (u.x + u.unitW)) : (u.x - (s.x + s.unitW));
+      const absDist = Math.max(0, dist);
+      if (absDist <= u.range && absDist < bestDist) {
+        bestDist = absDist;
+        target = s;
       }
     }
 
@@ -958,7 +1048,7 @@ export class CombatSystem {
     for (const ally of ctx.allAlive as IUnit[]) {
       const feed = ally.deathFeed;
       if (!feed || ally.dead || ally === u) continue;
-      if (ally.side !== u.side || ally.geneline !== u.geneline || ally.lane !== u.lane) continue;
+      if (ally.side !== u.side || ally.geneline !== u.geneline) continue;
       if (Math.abs((ally.x + ally.unitW / 2) - dyingCx) > feed.radius) continue;
       const tag = `feed:${ally.id}`;
       const stacks = ally.modifiers?.filter(m => m.source === tag).length ?? 0;
@@ -970,7 +1060,9 @@ export class CombatSystem {
 
     // Every death announces itself \u2014 the corpse economy (GameManager layer)
     // drops a scavengeable pickup from this. Kill stats ride enemyKilled.
-    this.events.emit('unitDied', { key: u.key, side: u.side, x: u.x, y: u.y, lane: u.lane });
+    // route + element feed the terrain corpse-footprint (a unit with a terrain
+    // affinity lays/ignites its element where it fell). Harmless for the rest.
+    this.events.emit('unitDied', { key: u.key, side: u.side, x: u.x, y: u.y, route: u.currentRoute, element: u.element });
     if (u.side === 'enemy') {
       this.events.emit('enemyKilled', { unit: { key: u.key, reward: u.reward, x: u.x, y: u.y } });
     }

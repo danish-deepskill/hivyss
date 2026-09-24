@@ -1,13 +1,14 @@
 import Phaser from 'phaser';
-import type { UnitDef, Side, UnitState, RenderUnit, Route, AttackRange, GenePalette, ComponentTag, UnitPersistent, PassiveDef, GeneLine, CasteKey, SfxKey, IUnit, PheromoneKind, RoyalOrder } from '../types';
+import type { UnitDef, Side, UnitState, RenderUnit, Route, AttackRange, GenePalette, ComponentTag, UnitPersistent, PassiveDef, GeneLine, CasteKey, SfxKey, IUnit, PheromoneKind, RoyalOrder, Element, TerrainAbilityDef } from '../types';
 import { hasActiveEffect } from '../systems/EffectSystem';
 import type { DamageType } from '../config/combat/damageTypes';
 import type { ResistanceTier } from '../config/combat/resistances';
 import type { Modifier } from '../systems/ModifierSystem';
 import type { ActiveEffect } from '../config/combat/effects/types';
 import { resolveColors } from '../config/Palettes';
-import { SPD_MULT, LANE_CROSS_REACH } from '../config/Constants';
-import { getGroundY, laneDepth, laneDepthLerp } from '../config/RouteMatrix';
+import { SPD_MULT } from '../config/Constants';
+import { UNIT_DEPTH_BASE } from '../config/Layout';
+import { getGroundY, bandDepth } from '../config/RouteMatrix';
 import { drawUnit } from '../units/registry';
 import { NEUTRAL, type Motion, type MotionTransform, type AnimPhase } from '../units/motions';
 import { UNIT_COMPONENTS } from '../systems/EntityComponents';
@@ -33,17 +34,14 @@ export class Unit extends Phaser.GameObjects.Container {
   key: string;
   side: Side;
   /**
-   * Battle lane (0 = upper, 1 = lower). Identity set by the spawner each
-   * spawn via init(); units only fight same-lane enemies and render at a
-   * lane-offset ground Y. NOT persistent — re-laned on pool recycle.
+   * Stable band position (0 = back of the band, 1 = front). Hashed from `id` at
+   * init so the herd spreads deterministically across the vertical band (no
+   * per-frame randomness; re-derived on pool recycle via the fresh id). Named
+   * `bandT` — NOT `depth` — because Phaser.GameObjects.Container already owns a
+   * `depth` property (the render-order value `setDepth` writes); reusing that
+   * name would alias the two. PRESENTATION ONLY — combat NEVER reads it.
    */
-  lane: number;
-  /** Visual lane (float) while mid lane-switch — eases toward `_laneTarget` across
-   *  the depth stack. `lane` = round(_laneVisual), so the combat row flips at the
-   *  midpoint of a cross. Equals `lane`/`_laneTarget` when settled. */
-  _laneVisual: number;
-  /** Destination lane of a lane-switch; `_laneVisual` slides to it. Only the Royal moves it. */
-  _laneTarget: number;
+  bandT: number;
   geneline: GeneLine;
 
   // Stats
@@ -123,8 +121,17 @@ export class Unit extends Phaser.GameObjects.Container {
   healTimer: number;
   // Spawner-passive brood accumulator (β Broodmother).
   spawnTimer: number;
+  // Re-calcify pulse accumulator (γ Calcifier).
+  recalcifyTimer: number;
   // Carrion-feed config (β Carrionling) — applied by the death phase.
   deathFeed?: { perDeath: number; radius: number; max: number };
+  // Terrain affinity (copied from def) — corpse footprint / catalyst / shaper.
+  element?: Element;
+  catalyst?: Element;
+  terrainAbility?: TerrainAbilityDef;
+  _terrainLaid?: boolean;     // one-shot latch — shaper has laid its onReach terrain
+  _terrainSeg?: number;       // catalyst last-segment tracker
+  _terrainDotAccum?: number;  // fractional terrain-DoT carry
 
   components: Set<ComponentTag>;
 
@@ -133,6 +140,12 @@ export class Unit extends Phaser.GameObjects.Container {
   // mutable view modifiers can shift.
   baseResistance: Partial<Record<DamageType, ResistanceTier>>;
   resistance: Partial<Record<DamageType, ResistanceTier>>;
+  /** Thorns/reflect config (copy of def.reflect) — read by the reflect phase. */
+  reflect?: { pct: number };
+  /** Armour-degrade config (copy of def.degradeArmor) + the soaked-physical-damage
+   *  accumulator that drives it (battle-scope; reset in init). */
+  degradeArmor?: { per: number };
+  _armorWear: number;
 
   // Battle-scope primitives — cleared by init() on pool recycle.
   activeEffects: ActiveEffect[];
@@ -156,16 +169,14 @@ export class Unit extends Phaser.GameObjects.Container {
   hpBar: Phaser.GameObjects.Graphics;
 
   /** Pool-friendly constructor. If def is provided, initializes immediately. Otherwise, call init() later. */
-  constructor(scene: Phaser.Scene, def?: UnitDef, side?: Side, x?: number, lane = 0) {
+  constructor(scene: Phaser.Scene, def?: UnitDef, side?: Side, x?: number) {
     super(scene, 0, 0);
 
     // Defaults for all fields (satisfy TS — will be set properly in init())
     this.id = 0;
     this.key = '';
     this.side = 'player';
-    this.lane = 0;
-    this._laneVisual = 0;
-    this._laneTarget = 0;
+    this.bandT = 0;
     this.geneline = 'normal';
     this.hp = 0;
     this.maxHp = 0;
@@ -209,7 +220,14 @@ export class Unit extends Phaser.GameObjects.Container {
     this.poiseAccum = 0;
     this.healTimer = 0;
     this.spawnTimer = 0;
+    this.recalcifyTimer = 0;
     this.deathFeed = undefined;
+    this.element = undefined;
+    this.catalyst = undefined;
+    this.terrainAbility = undefined;
+    this._terrainLaid = false;
+    this._terrainSeg = undefined;
+    this._terrainDotAccum = 0;
     this.caste = undefined;
     this.phaseThreshold = undefined;
     this.sfx = undefined;
@@ -225,6 +243,9 @@ export class Unit extends Phaser.GameObjects.Container {
     this.components = new Set();
     this.baseResistance = {};
     this.resistance = {};
+    this.reflect = undefined;
+    this.degradeArmor = undefined;
+    this._armorWear = 0;
 
     // Phase 5 primitives — empty on first construction. init() resets
     // battle-scope (activeEffects, modifiers, resources); persistent
@@ -243,19 +264,20 @@ export class Unit extends Phaser.GameObjects.Container {
     scene.add.existing(this);
 
     if (def && side !== undefined && x !== undefined) {
-      this.init(def, side, x, lane);
+      this.init(def, side, x);
     }
   }
 
   /** (Re)initialize this unit with new stats. Used by pool to recycle units. */
-  init(def: UnitDef, side: Side, x: number, lane = 0): void {
+  init(def: UnitDef, side: Side, x: number): void {
     const isPlayer = side === 'player';
     this.id = uid();
+    // Stable band position hashed from the id (Knuth multiplicative → 0..1).
+    // Deterministic, NOT per-frame random; a recycled unit re-derives from its
+    // fresh id, so the reset is automatic.
+    this.bandT = ((this.id * 2654435761) >>> 0) / 0xffffffff;
     this.key = def._key!;
     this.side = side;
-    this.lane = lane;
-    this._laneVisual = lane;
-    this._laneTarget = lane; // settled until a lane-switch moves the target
     this.geneline = def.geneline;
 
     this.hp = def.hp;
@@ -322,7 +344,14 @@ export class Unit extends Phaser.GameObjects.Container {
     this.poiseAccum = 0;
     this.healTimer = 0;
     this.spawnTimer = 0;
+    this.recalcifyTimer = 0;
     this.deathFeed = def.deathFeed;
+    this.element = def.element;
+    this.catalyst = def.catalyst;
+    this.terrainAbility = def.terrainAbility;
+    this._terrainLaid = false;
+    this._terrainSeg = undefined;
+    this._terrainDotAccum = 0;
 
     // Battle-scope reset. `persistent` is NOT cleared.
     this.activeEffects.length = 0;
@@ -345,6 +374,9 @@ export class Unit extends Phaser.GameObjects.Container {
         }
       }
     }
+    this.reflect = def.reflect; // recycle-safe: this def's value (or undefined)
+    this.degradeArmor = def.degradeArmor;
+    this._armorWear = 0; // soaked-damage accumulator resets each spawn/recycle
 
     // Reset scratch latches so pool-recycled units don't inherit
     // previous-life state.
@@ -352,13 +384,14 @@ export class Unit extends Phaser.GameObjects.Container {
     this._deathTriggerFired = false;
     this._auraCleanedUp = false;
 
-    // Lane depth — the far (North) lane draws smaller + dimmer. Scale is
-    // presentation-only (combat reads logical x / unitW). Re-anchor Y by
-    // the SCALED height so the scaled feet still rest on the ground line.
-    const depth = laneDepth(this.lane);
-    this.setScale(depth.scale);
-    this.setAlpha(depth.alpha);
-    this.setPosition(Math.round(x), Math.round(getGroundY(this.currentRoute, this.lane) - def.h * depth.scale));
+    // Spread across the depth band — back rows sit higher, smaller, dimmer;
+    // front rows lower, full size, and render in front (presentation only;
+    // combat reads logical x / unitW, never this).
+    const d = bandDepth(this.bandT);
+    this.setScale(d.scale);
+    this.setAlpha(d.alpha);
+    this.setPosition(Math.round(x), Math.round(getGroundY(this.currentRoute) + d.dy - def.h * d.scale));
+    this.setDepth(UNIT_DEPTH_BASE + this.bandT * 10); // near units render in front
     this.setActive(true);
     this.setVisible(true);
     this.gfx.clear();
@@ -396,27 +429,6 @@ export class Unit extends Phaser.GameObjects.Container {
 
     // ActiveEffect durations tick via CombatSystem.resolve's
     // updateEffects call (once per combat frame, not per Unit).
-
-    // Lane-switch slide — the controllable Royal eases across the 2.5D depth stack
-    // toward her new `lane` (combat already committed to it). Rate scales with her
-    // OWN speed (≈ LANE_CROSS_REACH / spd seconds), so nimble genelines cross
-    // faster, ponderous ones slower. Settled units (visual == lane) skip it.
-    if (this._laneVisual !== this._laneTarget) {
-      const rate = this.spd / LANE_CROSS_REACH; // lanes per second
-      const dir = this._laneTarget > this._laneVisual ? 1 : -1;
-      this._laneVisual += dir * rate * dt;
-      if ((dir > 0 && this._laneVisual >= this._laneTarget) || (dir < 0 && this._laneVisual <= this._laneTarget)) {
-        this._laneVisual = this._laneTarget;
-      }
-      // Combat row = the lane her BODY is in (flips at the midpoint), so enemies
-      // engage her by physical position: the front she's LEAVING threatens her
-      // first, the one she's ENTERING last (the option-A hand-off).
-      this.lane = Math.round(this._laneVisual);
-      const depth = laneDepthLerp(this._laneVisual);
-      this.setScale(depth.scale);
-      this.setAlpha(depth.alpha);
-      this.y = Math.round(getGroundY(this.currentRoute, this._laneVisual) - this.unitH * depth.scale);
-    }
 
     // Bob animation
     this.bob += dt * (this.state === 'march' ? 10 : 3);
@@ -586,11 +598,13 @@ export class Unit extends Phaser.GameObjects.Container {
       primary = (((ar + t * (br - ar)) | 0) << 16) | (((ag + t * (bg - ag)) | 0) << 8) | ((ab2 + t * (bb - ab2)) | 0);
     }
 
-    // Shadow (skip for tunnel units — they're underground). Divide the
-    // ground distance by scaleY so the shadow lands ON the ground line
-    // even when the container is depth-scaled (else it sits at scale²).
+    // Shadow on the land surface (skip for tunnel units — they're underground).
+    // Track the DEPTH-ADJUSTED ground line (+d.dy) so the shadow stays under the
+    // unit's banded feet, not on the flat line; un-scale into the container's
+    // local space (the container is band-scaled).
     if (this.currentRoute !== 'tunnel') {
-      const groundLocalY = (getGroundY('land', this._laneVisual) - this.y) / (this.scaleY || 1);
+      const d = bandDepth(this.bandT);
+      const groundLocalY = (getGroundY('land') + d.dy - this.y) / d.scale;
       g.fillStyle(0x000000, 0.25);
       g.fillEllipse(this.unitW / 2, groundLocalY + 1, this.unitW / 2 + 2, 3);
     }

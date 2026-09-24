@@ -1,34 +1,23 @@
-import Phaser from 'phaser';
-import type { Side, GeneLine } from '../types';
-import { BASE_HP, SBW } from '../config/Constants';
-import { LANE } from '../config/Layout';
-import { drawHive } from '../draws/hives/registry';
+import type { Side, GeneLine } from '../../types';
+import { BASE_HP, SBW } from '../../config/Constants';
+import { LANE } from '../../config/Layout';
+import { drawHive } from '../../draws/structures/hives/registry';
+import { Structure } from './Structure';
 const GND = LANE.land.groundY;
 
-export class BaseStructure extends Phaser.GameObjects.Container {
-  side: Side;
+// HiveStructure — the HIVE building. Owns the shared state chrome (ground
+// shadow, hit-flash back-glow, shield membrane); the geneline BODY is delegated
+// to its registered draw (drawHive). A Structure subclass (HP/flash/gfx shared).
+export class HiveStructure extends Structure {
   /** Which geneline's body to draw — its architecture/identity. Late-bindable
-   *  via setGeneline (the deck/Royal may be resolved after construction). */
+   *  via setGeneline (the deck/Royal may resolve after construction). */
   geneline: GeneLine;
-  hp: number;
-  maxHp: number;
-  flashTimer: number;
   shielded: boolean;
-  gfx: Phaser.GameObjects.Graphics;
 
   constructor(scene: Phaser.Scene, x: number, side: Side, geneline: GeneLine = 'normal') {
-    super(scene, x, 0);
-    this.side = side;
+    super(scene, x, side, BASE_HP);
     this.geneline = geneline;
-    this.hp = BASE_HP;
-    this.maxHp = BASE_HP;
-    this.flashTimer = 0;
     this.shielded = false;
-
-    this.gfx = scene.add.graphics();
-    this.add(this.gfx);
-
-    scene.add.existing(this);
     this.redraw();
   }
 
@@ -39,15 +28,6 @@ export class BaseStructure extends Phaser.GameObjects.Container {
     this.redraw();
   }
 
-  setHp(hp: number): void {
-    this.hp = Math.max(0, Math.min(this.maxHp, hp));
-    this.redraw();
-  }
-
-  flash(duration: number = 0.2): void {
-    this.flashTimer = duration;
-  }
-
   update(dt: number): void {
     if (this.flashTimer > 0) {
       this.flashTimer = Math.max(0, this.flashTimer - dt * 2);
@@ -55,9 +35,6 @@ export class BaseStructure extends Phaser.GameObjects.Container {
     }
   }
 
-  // BaseStructure owns only the SHARED STATE CHROME (ground shadow, hit-flash
-  // back-glow, shield membrane) — feedback that must read identically on every
-  // hive. The geneline BODY is delegated to its registered draw (its identity).
   redraw(): void {
     const g = this.gfx;
     const isBlue = this.side === 'player';

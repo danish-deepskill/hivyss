@@ -8,7 +8,7 @@ const GND = LANE.land.groundY;
 // Wallet — the shape both EconomyManager (nectar) and VyssEconomy (corpses)
 // satisfy. Hive abilities spend VYSS (the tactical currency).
 export interface AbilityWallet { canAfford(cost: number): boolean; spend(cost: number): boolean }
-import { BaseStructure } from '../entities/BaseStructure';
+import { HiveStructure } from '../entities/structures/HiveStructure';
 import { EventBus } from './EventBus';
 
 export class AbilityManager {
@@ -42,7 +42,7 @@ export class AbilityManager {
     return this.cooldowns[key] <= 0 && wallet.canAfford(def.cost);
   }
 
-  castNuke(wallet: AbilityWallet, units: IUnit[], enemyBase: BaseStructure, particles: IParticleManager | null): boolean {
+  castNuke(wallet: AbilityWallet, units: IUnit[], enemyBase: HiveStructure, particles: IParticleManager | null): boolean {
     const def = ABILITY_DEFS.nuke;
     if (!this.canCast('nuke', wallet)) return false;
     wallet.spend(def.cost);
@@ -67,7 +67,7 @@ export class AbilityManager {
     return true;
   }
 
-  castWall(wallet: AbilityWallet, playerBase: BaseStructure, particles: IParticleManager | null): boolean {
+  castWall(wallet: AbilityWallet, playerBase: HiveStructure, particles: IParticleManager | null): boolean {
     const def = ABILITY_DEFS.wall;
     if (!this.canCast('wall', wallet)) return false;
     wallet.spend(def.cost);
@@ -95,7 +95,7 @@ export class AbilityManager {
     return true;
   }
 
-  castRepair(wallet: AbilityWallet, playerBase: BaseStructure, particles: IParticleManager | null): boolean {
+  castRepair(wallet: AbilityWallet, playerBase: HiveStructure, particles: IParticleManager | null): boolean {
     const def = ABILITY_DEFS.repair;
     if (!this.canCast('repair', wallet)) return false;
     wallet.spend(def.cost);

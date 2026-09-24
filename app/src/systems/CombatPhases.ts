@@ -133,8 +133,6 @@ export function applyAoeRiderPhase(event: DamageEvent): void {
     .filter(e => {
       if (rider.excludePrimary && e === primary) return false;
       if (e.side === (event.attacker as IUnit).side) return false;
-      // Same-lane only — AOE spreads within the primary's lane.
-      if (e.lane !== primary.lane) return false;
       if (e.dead || e.burrowed) return false;
       // Center-to-center distance.
       const dist = Math.abs(

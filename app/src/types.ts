@@ -69,6 +69,42 @@ export type AttackRange = 'melee' | 'ranged';
 export type UnitRole = 'tank' | 'dps' | 'support' | 'ranged';
 export type AIPersonality = 'aggressive' | 'defensive' | 'swarm';
 
+// --- Terrain Engine (event-driven reaction registry) ---
+// A coarse, data-driven terrain layer: an invisible logical grid of cells
+// (3 routes × N segments) plus a table of reactions resolved on discrete
+// events. New states / elements / reactions are DATA (config/TerrainDefs.ts),
+// not new code. Terrain is NEUTRAL (affects both sides), per-route scoped, and
+// battle-scoped (never saved). See `systems/TerrainSystem.ts`.
+
+// v1 subset. 'destroyed' | 'composite' arrive later as data + resolve cases —
+// the resolve(cell, element) signature stays stable so callers never change.
+export type TerrainState = 'empty' | 'raised' | 'flooded' | 'covered';
+// v1 subset of the doc'd 21 elements (the ones the 4 starter reactions need).
+export type Element = 'chitin' | 'acid' | 'silk' | 'fever' | 'nerve';
+
+/** One logical terrain cell (one route × one segment). */
+export interface TerrainCell {
+  state: TerrainState;
+  /** What defines this cell — null when empty. */
+  element: Element | null;
+  /** 0..1 — reaction strength + render size/alpha. */
+  intensity: number;
+  /** Destructible terrain (walls). 0 = n/a (indestructible / non-wall). */
+  hp: number;
+  /** Seconds of life left; Infinity = permanent (cleared only by reaction). */
+  ttl: number;
+}
+
+/**
+ * Shaper role (UnitDef.terrainAbility) — the unit LAYS its `element` terrain at
+ * a trigger moment. v1 wires `'onDeploy'` (lay where deployed); `'onReach'` and
+ * `'active'` are declared seams (data accepted, not yet triggered).
+ */
+export interface TerrainAbilityDef {
+  element: Element;
+  trigger: 'onDeploy' | 'onReach' | 'active';
+}
+
 export interface TierDef {
   label: string;
   name: string;
@@ -189,7 +225,20 @@ export interface SpawnerConfig {
   count: number;
 }
 
-export type PassiveKind = 'self_modifier' | 'aura_modifier' | 'heal_cast' | 'cohesion' | 'spawner';
+/**
+ * Re-calcify (γ Calcifier) — the unit periodically RE-HARDENS, stepping its
+ * degraded physical armour one tier back toward its spawn-time base every
+ * `interval` seconds and resetting the soak meter. The fortress capstone's
+ * answer to its own geneline's armour-degrade weakness; physical-only by
+ * design (elemental stays the way to bring a wall down). See
+ * `config/combat/recalcify.ts`.
+ */
+export interface RecalcifyConfig {
+  /** Seconds between re-hardening pulses. */
+  interval: number;
+}
+
+export type PassiveKind = 'self_modifier' | 'aura_modifier' | 'heal_cast' | 'cohesion' | 'spawner' | 'recalcify';
 
 /**
  * A single always-on passive behavior, discriminated by `kind`. Variant
@@ -210,7 +259,8 @@ export type PassiveDef =
   | ({ kind: 'aura_modifier' } & AuraModifierConfig)
   | ({ kind: 'heal_cast' } & PassiveHealConfig)
   | ({ kind: 'cohesion' } & CohesionConfig)
-  | ({ kind: 'spawner' } & SpawnerConfig);
+  | ({ kind: 'spawner' } & SpawnerConfig)
+  | ({ kind: 'recalcify' } & RecalcifyConfig);
 
 export interface UnitDef {
   name: string;
@@ -297,6 +347,24 @@ export interface UnitDef {
   resistance?: Partial<Record<DamageType, ResistanceTier>>;
   /** Shifts target resistance DOWN by N ladder steps for this damage type. */
   penetration?: Partial<Record<DamageType, number>>;
+  /** Thorns/reflect: return `pct` (0..1) of incoming DIRECT-hit damage to the
+   *  attacker (type-agnostic; DoT/terrain/death overrides and reflects excluded).
+   *  Event-driven → resolved in CombatSystem post_apply (see computeReflect). */
+  reflect?: { pct: number };
+  /** Armour-degrade (γ hook): every `per` points of PHYSICAL damage soaked drops
+   *  the unit's sharp/blunt resistance one tier toward normal (strips, never
+   *  weakens below normal). Resolved in CombatSystem post_apply (see degradeArmor). */
+  degradeArmor?: { per: number };
+
+  // --- Terrain affinity (data-driven; all optional) ---
+  /** Affinity element — the unit's corpse lays this terrain on death (the
+   *  universal footprint). A fire-affinity unit's death ignites/lays, etc. */
+  element?: Element;
+  /** Shaper role — lays `element` terrain at the trigger moment. */
+  terrainAbility?: TerrainAbilityDef;
+  /** Catalyst role — applies this element to each new cell the unit enters as
+   *  it marches (reacting with whatever terrain is already there). */
+  catalyst?: Element;
 
   _key?: string;
 }
@@ -351,7 +419,7 @@ export type UnitState = 'march' | 'attack';
 export type Side = 'player' | 'enemy';
 
 // --- Pheromone Command ---
-// Lane/movement commands the player paints onto the field (HIVYSS.md §8).
+// Movement commands the player paints onto the field (HIVYSS.md §8).
 // Own-side units inside a zone change BEHAVIOR (movement), not stats:
 //   rally   → mass toward the zone center (cohesion spikes)
 //   charge  → advance forward at boosted speed (attacks AND pushes)
@@ -368,8 +436,6 @@ export interface PheromoneZone {
   radius: number;
   /** Only own-side units obey. */
   side: Side;
-  /** Lane the zone applies to (0 = upper, 1 = lower). Same-lane scoped. */
-  lane: number;
   /** Seconds of life left; decremented in the caller's tick (GameManager /
    *  SandboxScene), NOT in resolve. For a trail blob this is its fade timer. */
   remaining: number;
@@ -429,7 +495,7 @@ export type DrawFunction = (g: Phaser.GameObjects.Graphics, u: RenderUnit, cx: n
 // --- Hive body rendering ---
 // The hive mirrors the unit draw seam: a per-geneline body draw dispatched
 // from a registry, fed a flat state payload (no entity refs — same contract
-// as DrawFunction). BaseStructure owns the shared STATE CHROME (shadow, hit
+// as DrawFunction). HiveStructure owns the shared STATE CHROME (shadow, hit
 // flash, shield membrane); the body draw owns GENELINE IDENTITY. The payload
 // is an object (not positional args) so a later field — e.g. a maturation
 // `phase` for the doc'd hive-grows-across-the-run progression — extends it
@@ -444,6 +510,82 @@ export interface HiveRenderState {
   groundY: number;
 }
 export type HiveDrawFunction = (g: Phaser.GameObjects.Graphics, s: HiveRenderState) => void;
+
+// --- Tower (defensive structure) rendering ---
+// A Tower is the generic defensive structure (spire, bunker, …); its BODY is a
+// per-variant draw dispatched from a registry (mirrors the hive seam). The
+// "spire" is just the first variant. It sits at its x on the land surface and
+// fires at any enemy in range.
+// --- Structure (shared base for Tower / Building / future Wall / …) ---
+// The fields every placeable structure's DATA + RENDER STATE share, declared
+// ONCE so a field added to all structures (e.g. armor) lands in one place.
+export interface StructureDef {
+  /** Body draw variant (the per-family draws registry key). */
+  variant: string;
+  hp: number;
+  /** Per-damage-type resistance tier (terrain DoT scaling; omit = 'normal'). */
+  resistance?: Partial<Record<DamageType, ResistanceTier>>;
+}
+export interface StructureRenderState {
+  side: Side;
+  /** hp / maxHp — drives wear (cracks). */
+  frac: number;
+  /** hp <= 0 → draw the BROKEN/rubble body, not the standing one. */
+  dead: boolean;
+  /** Hit-flash timer (seconds, >0 = recently hit) — body-shaped white overlay. */
+  hitFlash: number;
+  /** Ground baseline (the land surface groundY). */
+  groundY: number;
+}
+
+export interface TowerRenderState extends StructureRenderState {
+  /** 0..1 muzzle flare (1 = just fired). */
+  fire: number;
+  /** Crystal / projectile tint (side identity). */
+  crystal: number;
+}
+export type TowerDrawFunction = (g: Phaser.GameObjects.Graphics, s: TowerRenderState) => void;
+
+// Per-variant tower data (data-driven, like UnitDef). Capabilities + stats live
+// here, NOT as uniform constants — so spire/bunker/etc. genuinely differ. Adding
+// a tower type = one TOWER_DEFS entry + one draw variant.
+export interface TowerDef extends StructureDef {
+  /** Firing reach in px (x-distance to a unit's centre). */
+  range: number;
+  damage: number;
+  /** Seconds between shots. */
+  fireInterval: number;
+}
+
+// --- Building (player-placed, builder-constructed structure) ---
+// A Building is a Structure with a CONSTRUCTION lifecycle: placed as a blueprint
+// (at a per-pixel position, footprint registered in StructureOccupancy), then a
+// builder worker accrues `progress` 0→1 over `buildTime` seconds until `complete`.
+// Data-driven like TowerDef.
+export interface BuildingDef extends StructureDef {
+  /** Display name (build palette tooltip + build-mode log). */
+  name: string;
+  /** Emoji icon for the build-palette button. */
+  ico: string;
+  /** Seconds of builder-work to finish construction. */
+  buildTime: number;
+  /** Nectar cost to place. */
+  cost: number;
+  /** FUNCTION (data-driven): nectar/sec generated while built + alive (the
+   *  economy building). Omit = a passive prop. More effect kinds slot in here
+   *  as fields, applied by the Buildings manager. */
+  income?: number;
+}
+
+// Per-variant building render state (the construction fields drive the
+// scaffold-vs-finished body); shares the structure chrome via StructureRenderState.
+export interface BuildingRenderState extends StructureRenderState {
+  /** Construction progress 0..1 — the scaffold fills with this. */
+  progress: number;
+  /** True once built — draw the finished body, not the scaffold. */
+  complete: boolean;
+}
+export type BuildingDrawFunction = (g: Phaser.GameObjects.Graphics, s: BuildingRenderState) => void;
 
 // --- Sprite Animation (future — type foundations only, no runtime code yet) ---
 
@@ -506,12 +648,6 @@ export interface UnitPersistent {
 export interface IUnit extends WorldEntity {
   key: string;
   side: Side;
-  /**
-   * Battle lane (0 = upper, 1 = lower). Identity set by the spawner each
-   * spawn (NOT persistent — recycled units are re-laned in init()). Units
-   * only fight same-lane enemies and render at a lane-offset ground Y.
-   */
-  lane: number;
   geneline: GeneLine;
   hp: number;
   maxHp: number;
@@ -556,8 +692,22 @@ export interface IUnit extends WorldEntity {
   healTimer: number;
   /** Spawner-passive brood accumulator (β Broodmother). */
   spawnTimer?: number;
+  /** Re-calcify pulse accumulator (γ Calcifier). */
+  recalcifyTimer?: number;
   /** Carrion-feed config (copied from the def); applied by the death phase. */
   deathFeed?: { perDeath: number; radius: number; max: number };
+  /** Terrain affinity (copied from the def) — corpse footprint element. */
+  element?: Element;
+  /** Catalyst element (copied from the def) — applied on cell-entry by the terrain tick. */
+  catalyst?: Element;
+  /** Shaper terrain ability (copied from the def). */
+  terrainAbility?: TerrainAbilityDef;
+  /** One-shot latch — the shaper has laid its `onReach` terrain. Reset in init(). */
+  _terrainLaid?: boolean;
+  /** Catalyst last-segment tracker (cell-entry detection). Reset in init(). */
+  _terrainSeg?: number;
+  /** Fractional terrain-DoT carry (whole-chunk dispatch). Reset in init(). */
+  _terrainDotAccum?: number;
 
   _spawned?: boolean;
   /**
@@ -590,13 +740,6 @@ export interface IUnit extends WorldEntity {
   /** Player's direct click-order (MOBA-lite Royal control); null = autonomous.
    *  Read by resolveRoyalOrder each frame to override target + march. */
   order?: RoyalOrder | null;
-  /** Visual lane position (float) while mid lane-switch — eases toward `_laneTarget`.
-   *  `lane` (the combat row) is round(_laneVisual), so it flips at the midpoint:
-   *  enemies engage her by physical position during a cross. Drives the depth slide. */
-  _laneVisual?: number;
-  /** Destination lane of a Royal lane-switch (where `_laneVisual` is heading).
-   *  Equals `lane` when settled; set by commandRoyalClick. */
-  _laneTarget?: number;
   /** Player-triggered signature ability key (Elite/Royal active). */
   signatureAbility?: string;
   /** Signature cooldown length (seconds). */
@@ -793,9 +936,11 @@ export interface AbilityDef {
   /**
    * Sacrifice payload (β Swarmlord's Tide): CONSUME same-geneline soldier
    * allies within `radius` (they vanish — eaten, no corpses, no death
-   * triggers) and permanently gain `perUnitAtk` flat atk per body.
+   * triggers) and gain `perUnitAtk` flat atk per body, as source-tagged
+   * stacks CAPPED at `max` (the buff is permanent-until-death but bounded —
+   * not an unbounded snowball; mirrors Carrionling's `deathFeed`).
    */
-  sacrifice?: { radius: number; perUnitAtk: number };
+  sacrifice?: { radius: number; perUnitAtk: number; max: number };
 }
 
 // DamageEvent — envelope flowing through the 7-phase pipeline. Any

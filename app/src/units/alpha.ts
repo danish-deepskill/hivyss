@@ -6,7 +6,7 @@
 // Built: Pack Cohesion (hook) + both Elite signatures (Goliath Stampede, Maulhorn Ram,
 // each w/ FX + body animation) + Quillback (α's ranged anti-air) + Goliath's cohesion-
 // amplifier aura + the Matriarch's full Royal kit (click-control via RoyalLifecycle,
-// Primal Roar ultimate, death stakes, lane-switch). α is roster-complete.
+// Primal Roar ultimate, death stakes). α is roster-complete.
 import type { UnitDef, UnitModule, PassiveDef, CohesionConfig } from "../types";
 import { PALETTES } from "../config/Palettes";
 import { charge, ram } from "./motions";
@@ -174,6 +174,10 @@ const maulhornDef = aDef({
   caste: "elite",
   defaultAbility: "jaw_strike",
   sfx: "gore", // bruiser's basic bite is a heavy gore (Ram Charge is its own sound)
+  // Anti-armour: α's designated wall-cracker. Maulhorn's attacks drive through
+  // chitin — penetration shifts a target's physical resistance DOWN 2 tiers, so
+  // γ's armour (stronger ×0.3) reads as normal (×1.0). Realises the α→γ leg.
+  penetration: { sharp: 2, blunt: 2 },
   // Elite signature — a hard ram-charge with the roster's biggest knockback
   // (see blunt.ts). Uses the `ram` motion (crouch → flat thrust → recoil
   // bounce), distinct from Goliath's forward-settling `charge`.
@@ -246,7 +250,7 @@ const goliathDef = aDef({
 // Matriarch — α's ROYAL (T3 capstone): the herd queen. Vast, slow, regal; the
 // ultimate cohesion anchor (widest radius + highest cap — the herd is strongest
 // massed around her). The CONTROLLABLE hero (RoyalLifecycle: click-select →
-// move/focus, lane-switch, death → leaderless → respawn) with the Primal Roar
+// move/focus, death → leaderless → respawn) with the Primal Roar
 // ultimate below. NOT a re-tag of Goliath — a distinct queen silhouette
 // (banded egg-gaster, coronet, vestigial wings).
 const matriarchDef = aDef({

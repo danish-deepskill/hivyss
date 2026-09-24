@@ -1,4 +1,4 @@
-import type { HiveDrawFunction } from '../../types';
+import type { HiveDrawFunction } from '../../../types';
 
 // The untagged wax dome — the baseline hive + the registry's fallback for any
 // geneline without a bespoke body. Layered organic honeycomb: base mound,

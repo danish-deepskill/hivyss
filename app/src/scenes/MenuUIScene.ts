@@ -9,20 +9,19 @@ import type { EventBus } from '../systems/EventBus';
 import type { EliteSlot, RoyalStatus, PheromoneKind } from '../types';
 import { PHEROMONE_DEFS, PHEROMONE_ORDER } from '../config/PheromoneDefs';
 import { FORAGE_ENABLED } from '../config/ForageDefs';
+import { getBuildingDef, BUILDING_ORDER } from '../config/BuildingDefs';
 import { PHEROMONE_VYSS_COST } from '../config/VyssDefs';
 
 export class MenuUIScene extends Phaser.Scene {
   private eventBus!: EventBus;
   private deckKeys: string[] = [];
 
-  // Resource bar
+  // Resource bar — a single SC2-style numeric strip (no fill-bars)
   private stageLbl!: HTMLElement;
-  private nectarFill!: HTMLElement;
   private nectarNum!: HTMLElement;
   private incomeLbl!: HTMLElement;
   private larvaeNum!: HTMLElement;
   private larvaeTimer!: HTMLElement;
-  private capFill!: HTMLElement;
   private capNum!: HTMLElement;
   private vyssNum!: HTMLElement;
   private phaseLbl!: HTMLElement;
@@ -37,8 +36,7 @@ export class MenuUIScene extends Phaser.Scene {
   private pherDots: Array<{ dot: HTMLButtonElement; kind: PheromoneKind }> = [];
   private gathererCard!: HTMLDivElement;
 
-  // Larva mound
-  private larvaCounter!: HTMLElement;
+  // Larva mound (the count lives in the resource bar; the mound is just slots)
   private moundSlots: { div: HTMLDivElement; ico: HTMLElement; bar: HTMLElement; timer: HTMLElement }[] = [];
 
   // Unit slots
@@ -61,13 +59,6 @@ export class MenuUIScene extends Phaser.Scene {
     name: HTMLElement; tier: HTMLElement; hpFill: HTMLElement; hpNum: HTMLElement;
     status: HTMLElement; roarBtn: HTMLButtonElement; roarLbl: HTMLElement; roarCd: HTMLElement;
   };
-
-  // Active deploy lane (0 = top, 1 = bottom). Units hatch into this lane;
-  // Shift+deploy sends ONE unit to the other lane (a sticky toggle + override —
-  // the RTS rally-point model). Tab flips the active lane.
-  private activeLane = 0;
-  private shiftHeld = false; // Shift held → highlight previews the cross-send lane
-  private leftArrows: HTMLElement[] = []; // ▲/▼ active-lane indicator + switch control (left edge)
 
   // Enemy HUD
   private enemyBar!: HTMLElement | null;
@@ -105,13 +96,15 @@ export class MenuUIScene extends Phaser.Scene {
       this.enemyBar = this.buildEnemyBar();
       panel.appendChild(this.enemyBar);
     }
-    panel.appendChild(this.buildLarvaMound());
     panel.appendChild(this.buildUnitSlots(previews));
-    panel.appendChild(this.buildRoyalProfile());
-    panel.appendChild(this.buildAbilities());
+    // Royal profile + command abilities share ONE row (was two stacked rows).
+    panel.appendChild(this.buildActionRow());
     panel.appendChild(this.buildLog());
 
-    outer.appendChild(this.buildLaneIndicator());
+    // Larva incubation floats as a transparent strip on the LEFT edge (over the
+    // battlefield, NOT in the bottom HUD stack) — keeps the bottom bar short so
+    // the tunnel stratum stays visible.
+    outer.appendChild(this.buildLarvaMound());
     outer.appendChild(panel);
     // Phaser's DOMElement re-applies pointerEvents:auto onto the wrapped node
     // every render frame — overriding outer's authored pointer-events:none and
@@ -120,25 +113,17 @@ export class MenuUIScene extends Phaser.Scene {
     // the HUD panels keep their own pointer-events:auto so buttons still work.
     const wrapper = this.add.dom(640, 360, outer);
     wrapper.pointerEvents = 'none';
-    this.refreshLaneHighlight(); // light both the HUD toggle + the left arrows
 
-    // Keyboard: Tab flips the active lane; 1-9/0 deploy slots 1-10 into the
-    // active lane (Shift+digit → the other lane, a one-off cross-send). Uses
-    // e.code so Shift+1 still reads as digit 1 (not '!'). Holding Shift previews
-    // the cross-send lane on the highlight via _trackShift.
-    this.input.keyboard!.addCapture('TAB');
+    // Keyboard: 1-9/0 deploy deck slots 1-10. Uses e.code so the digit reads
+    // correctly regardless of modifiers. Shift+digit → tunnel deploy (Phase 2a).
     this.input.keyboard!.on('keydown', (e: KeyboardEvent) => {
-      this._trackShift(e.shiftKey);
-      if (e.code === 'Tab') { e.preventDefault(); this.setActiveLane(1 - this.activeLane); return; }
       let idx = -1;
       if (e.code >= 'Digit1' && e.code <= 'Digit9') idx = parseInt(e.code.slice(5)) - 1;
       else if (e.code === 'Digit0') idx = 9;
       if (idx >= 0 && idx < this.deckKeys.length) {
-        const lane = e.shiftKey ? 1 - this.activeLane : this.activeLane;
-        this.eventBus.emit('deployUnit', { key: this.deckKeys[idx], lane });
+        this.eventBus.emit('deployUnit', { key: this.deckKeys[idx], route: e.shiftKey ? 'tunnel' : 'land' });
       }
     });
-    this.input.keyboard!.on('keyup', (e: KeyboardEvent) => this._trackShift(e.shiftKey));
 
     // Listen for events from GameManager
     this.logListener = (data) => { this.logTxt.textContent = data.message; };
@@ -175,12 +160,20 @@ export class MenuUIScene extends Phaser.Scene {
     const forageRate: number = this.registry.get('forage.rate') ?? 0;
     const forageWorkers: number = this.registry.get('forage.workers') ?? 0;
     const vyssCount: number = this.registry.get('vyss.count') ?? 0;
-    this.nectarFill.style.width = nectarPct + '%';
     this.nectarNum.textContent = String(Math.floor(nectar));
+    this.nectarNum.style.color = nectarPct < 20 ? '#f0a040' : '#f0c040'; // amber when low
     this.incomeLbl.textContent = FORAGE_ENABLED
       ? `+${(income + forageRate).toFixed(1)}/s 🌼${forageWorkers}`
       : '+' + income + '/s';
     this.vyssNum.textContent = String(vyssCount);
+
+    // Roguelike (AI-hive) battles have NO stage mechanic — the top-left slot
+    // shows an up-counting TIMER from 0 instead of a STAGE number. Scripted-wave
+    // (PLAY) battles keep the STAGE label (set by the waveStart listener).
+    if (this.registry.get('ai.personality') != null) {
+      const t = Math.max(0, Math.floor(this.registry.get('game.elapsed') ?? 0));
+      this.stageLbl.textContent = `⏱ ${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+    }
 
     // Hive maturation readout + MATURE button — phases read as a STORY
     // (EARLY/MID/LATE PHASE), not numbers.
@@ -218,24 +211,15 @@ export class MenuUIScene extends Phaser.Scene {
       this.larvaeTimer.textContent = 'MAX';
     }
 
-    // Capacity bar — turns amber/red as it approaches max
+    // Capacity (supply-style) — the HIVE number turns amber near full, red at the
+    // cap (no fill-bar in the SC2-style strip).
     const capPct = capMax > 0 ? (capUsedNow / capMax) * 100 : 0;
-    this.capFill.style.width = capPct + '%';
-    if (capUsedNow >= capMax) {
-      this.capFill.style.background = 'linear-gradient(90deg,#a04040,#f06060)';
-      this.capNum.style.color = '#f06060';
-    } else if (capPct >= 80) {
-      this.capFill.style.background = 'linear-gradient(90deg,#806020,#f0a040)';
-      this.capNum.style.color = '#f0a040';
-    } else {
-      this.capFill.style.background = 'linear-gradient(90deg,#106080,#40c0e0)';
-      this.capNum.style.color = '#40c0e0';
-    }
-    this.capNum.textContent = capUsedNow + ' / ' + capMax;
+    if (capUsedNow >= capMax) this.capNum.style.color = '#f06060';
+    else if (capPct >= 80) this.capNum.style.color = '#f0a040';
+    else this.capNum.style.color = '#40c0e0';
+    this.capNum.textContent = capUsedNow + '/' + capMax;
 
-    // Larva mound
-    this.larvaCounter.textContent = `Larvae: ${larvaCount}/${MAX_LARVAE}`;
-    this.larvaCounter.className = larvaCount === 0 ? 'lc-empty' : '';
+    // Larva mound (cocoon slots — the count itself lives in the resource bar)
     for (let i = 0; i < this.moundSlots.length; i++) {
       const slot = this.moundSlots[i];
       if (i >= numChambers) {
@@ -320,83 +304,75 @@ export class MenuUIScene extends Phaser.Scene {
 
   // --- DOM builders ---
 
+  // A thin vertical divider between resource chips.
+  private resSep(): HTMLElement {
+    return this.el('div', 'width:1px; height:16px; background:#23232e;');
+  }
+
+  // SC2-style resource STRIP — one dense row of icon+number chips (no fill-bars).
+  // NECTAR (⬡) ≈ minerals, VYSS (✦) ≈ gas, LARVAE (🐛) + HIVE capacity ≈ supply;
+  // the hive number turns amber/red as it nears/hits the cap. The timer/stage
+  // sits at the left, the maturation tech + ESC at the right.
   private buildResourceBar(): HTMLElement {
     const bar = document.createElement('div');
-    bar.style.cssText = 'display:flex; flex-direction:column; gap:2px; padding:4px 10px; background:#0e0e16; border-bottom:1px solid #1a1a28; pointer-events:auto;';
+    bar.style.cssText = 'display:flex; align-items:center; gap:8px; padding:5px 12px; background:#0e0e16; border-bottom:1px solid #1a1a28; pointer-events:auto;';
 
-    // Row 1 — stage label + nectar bar + larvae
-    const row1 = document.createElement('div');
-    row1.style.cssText = 'display:flex; align-items:center; gap:8px;';
+    // Timer (roguelike) / stage (scripted) — set by update() + the waveStart listener.
+    this.stageLbl = this.el('span', 'font-size:11px; color:#888; letter-spacing:1px; min-width:46px;', 'STAGE 1');
 
-    this.stageLbl = this.el('span', 'font-size:10px; color:#666; letter-spacing:2px; margin-right:8px;', 'STAGE 1');
-    const nectarLbl = this.el('span', 'font-size:9px; color:#666; letter-spacing:0.5px; min-width:42px;', 'NECTAR');
+    // NECTAR (minerals) — icon · number · income.
+    const nectarIco = this.el('span', 'font-size:12px; color:#f0c040;', '⬡');
+    this.nectarNum = this.el('span', 'font-size:14px; color:#f0c040; font-weight:bold; min-width:32px; text-align:right;', '80');
+    this.incomeLbl = this.el('span', 'font-size:10px; color:#8a7a40;', '+8/s');
 
-    const nectarTrack = document.createElement('div');
-    nectarTrack.style.cssText = 'width:200px; height:10px; background:#1a1a22; border-radius:5px; border:1px solid #2a2a3a; overflow:hidden;';
-    this.nectarFill = this.el('div', 'height:100%; background:linear-gradient(90deg,#806010,#f0c040); border-radius:5px; transition:width .1s; width:26%;');
-    nectarTrack.appendChild(this.nectarFill);
+    // VYSS (gas).
+    const vyssIco = this.el('span', 'font-size:12px; color:#c8c8d8;', '✦');
+    this.vyssNum = this.el('span', 'font-size:14px; color:#c8c8d8; font-weight:bold; min-width:22px; text-align:right;', '0');
 
-    this.nectarNum = this.el('span', 'font-size:13px; color:#f0c040; min-width:40px; text-align:right;', '80');
-    this.incomeLbl = this.el('span', 'font-size:10px; color:#664;', '+8/s');
+    // LARVAE — count · next-larva countdown.
+    const larvaeIco = this.el('span', 'font-size:12px; color:#c0b888;', '🐛');
+    this.larvaeNum = this.el('span', 'font-size:14px; color:#c0b888; font-weight:bold; min-width:34px; text-align:right;', '3/10');
+    this.larvaeTimer = this.el('span', 'font-size:9px; color:#555; min-width:18px;');
 
-    const sep = document.createElement('div');
-    sep.style.cssText = 'width:1px; height:14px; background:#222; margin:0 4px;';
+    // HIVE capacity (supply) — used/max; number recolours near/at the cap.
+    const capLbl = this.el('span', 'font-size:9px; color:#446677; letter-spacing:0.5px;', 'HIVE');
+    this.capNum = this.el('span', 'font-size:14px; color:#40c0e0; font-weight:bold; min-width:44px; text-align:right;', '0/' + MAX_CAPACITY);
 
-    const larvaeLbl = this.el('span', 'font-size:9px; color:#666; letter-spacing:0.5px;', 'LARVAE');
-    this.larvaeNum = this.el('span', 'font-size:13px; color:#c0b888; min-width:30px; text-align:right;', '3/10');
-    this.larvaeTimer = this.el('span', 'font-size:9px; color:#555;');
+    // Maturation tech — phase readout + MATURE button.
+    this.phaseLbl = this.el('span', 'font-size:10px; color:#c8a030; letter-spacing:1px;', 'EARLY PHASE');
+    this.matureBtn = document.createElement('button');
+    this.matureBtn.style.cssText = 'font-size:10px; padding:2px 10px; border-radius:3px; border:1px solid #c8a030; background:#1a1404; color:#f0c040; cursor:pointer; pointer-events:auto; font-weight:bold;';
+    this.matureBtn.onclick = () => this.eventBus.emit('matureHive', {});
 
-    // Corpses — the tactical currency (commands). Fed by deaths on the field.
-    const sep2 = document.createElement('div');
-    sep2.style.cssText = 'width:1px; height:14px; background:#222; margin:0 4px;';
-    const vyssLbl = this.el('span', 'font-size:9px; color:#667; letter-spacing:0.5px;', 'VYSS');
-    this.vyssNum = this.el('span', 'font-size:13px; color:#c8c8d8; min-width:24px; text-align:right;', '0');
-
-    const spacer = document.createElement('div');
-    spacer.style.cssText = 'flex:1;';
+    const spacer = this.el('div', 'flex:1;');
     const escHint = this.el('span', 'font-size:9px; color:#444; letter-spacing:1px;', 'ESC PAUSE');
 
-    row1.append(this.stageLbl, nectarLbl, nectarTrack, this.nectarNum, this.incomeLbl, sep, larvaeLbl, this.larvaeNum, this.larvaeTimer, sep2, vyssLbl, this.vyssNum, spacer, escHint);
-
-    // Row 2 — capacity bar (shorter, slim, distinct cyan/teal)
-    const row2 = document.createElement('div');
-    row2.style.cssText = 'display:flex; align-items:center; gap:8px; padding-left:60px;'; // align under nectar label
-
-    const capLbl = this.el('span', 'font-size:9px; color:#446677; letter-spacing:0.5px; min-width:42px;', 'HIVE');
-
-    const capTrack = document.createElement('div');
-    capTrack.style.cssText = 'width:160px; height:6px; background:#0a1418; border-radius:3px; border:1px solid #1a2a32; overflow:hidden;';
-    this.capFill = this.el('div', 'height:100%; background:linear-gradient(90deg,#106080,#40c0e0); border-radius:3px; transition:width .1s, background .15s; width:0%;');
-    capTrack.appendChild(this.capFill);
-
-    this.capNum = this.el('span', 'font-size:11px; color:#40c0e0; min-width:48px; text-align:right;', '0 / ' + MAX_CAPACITY);
-
-    row2.append(capLbl, capTrack, this.capNum);
-
-    // Hive maturation — the tech-up arc: the phase readout + the MATURE
-    // button (spend to unlock the next tier band / the Royal's ultimate).
-    this.phaseLbl = this.el('span', 'font-size:10px; color:#c8a030; letter-spacing:1px; margin-left:16px;', 'PHASE 1/3');
-    this.matureBtn = document.createElement('button');
-    this.matureBtn.style.cssText = 'font-size:10px; padding:2px 10px; margin-left:6px; border-radius:3px; border:1px solid #c8a030; background:#1a1404; color:#f0c040; cursor:pointer; pointer-events:auto; font-weight:bold;';
-    this.matureBtn.onclick = () => this.eventBus.emit('matureHive', {});
-    row2.append(this.phaseLbl, this.matureBtn);
-
-    bar.append(row1, row2);
+    bar.append(
+      this.stageLbl, this.resSep(),
+      nectarIco, this.nectarNum, this.incomeLbl, this.resSep(),
+      vyssIco, this.vyssNum, this.resSep(),
+      larvaeIco, this.larvaeNum, this.larvaeTimer, this.resSep(),
+      capLbl, this.capNum, this.resSep(),
+      this.phaseLbl, this.matureBtn,
+      spacer, escHint,
+    );
     return bar;
   }
 
+  // Larva incubation — a transparent vertical strip of cocoon slots on the LEFT
+  // edge (over the battlefield, by the hive), NOT a full-width HUD row. The
+  // container is click-through (pointer-events:none); each slot re-enables clicks
+  // so cancel-incubation still works. Empty slots stay faint, so the strip is
+  // near-invisible until something is incubating.
   private buildLarvaMound(): HTMLElement {
     const mound = document.createElement('div');
-    mound.style.cssText = 'display:flex; flex-wrap:wrap; gap:4px; padding:4px 6px; background:#0b0b14; border-bottom:1px solid #1a1a28; width:100%; justify-content:center; align-items:center; pointer-events:auto;';
-
-    this.larvaCounter = document.createElement('div');
-    this.larvaCounter.style.cssText = 'width:100%; text-align:center; font-size:10px; color:#8a8a6a; letter-spacing:0.5px; padding:1px 0;';
-    mound.appendChild(this.larvaCounter);
+    mound.style.cssText = 'position:absolute; left:8px; top:96px; display:flex; flex-direction:column; gap:4px; pointer-events:none;';
 
     this.moundSlots = [];
     for (let i = 0; i < MAX_CHAMBERS; i++) {
       const div = document.createElement('div');
       div.className = 'lm-slot lm-empty';
+      div.style.pointerEvents = 'auto'; // container is click-through; slots aren't
 
       const ico = document.createElement('span');
       ico.className = 'lm-ico';
@@ -419,8 +395,16 @@ export class MenuUIScene extends Phaser.Scene {
     return mound;
   }
 
+  /** Royal profile + command abilities on ONE row (was two stacked rows) — the
+   *  Royal panel sizes to its content on the left, the abilities fill the rest. */
+  private buildActionRow(): HTMLElement {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex; align-items:stretch; width:100%; pointer-events:auto;';
+    row.append(this.buildRoyalProfile(), this.buildAbilities());
+    return row;
+  }
+
   private buildUnitSlots(previews: Record<string, string>): HTMLElement {
-    const cols = this.deckKeys.length;
     const slots = document.createElement('div');
     slots.style.cssText = `display:flex; flex-wrap:wrap; justify-content:center; gap:3px; padding:5px 6px; background:#0a0a12; border-bottom:1px solid #1a1a28; width:100%; pointer-events:auto;`;
 
@@ -429,10 +413,9 @@ export class MenuUIScene extends Phaser.Scene {
       if (!UNIT_DEFS[key]) return;
 
       const div = createUnitCard(key, { preview: previews[key] });
-      // Read Shift off the click itself → cross-send to the other lane.
+      // Shift-click → tunnel deploy; normal click → land (Phase 2a).
       div.addEventListener('click', (ev) => {
-        const lane = (ev as MouseEvent).shiftKey ? 1 - this.activeLane : this.activeLane;
-        this.eventBus.emit('deployUnit', { key, lane });
+        this.eventBus.emit('deployUnit', { key, route: (ev as MouseEvent).shiftKey ? 'tunnel' : 'land' });
       });
 
       slots.appendChild(div);
@@ -470,7 +453,7 @@ export class MenuUIScene extends Phaser.Scene {
     `;
     this.scoutCost = scout.querySelector('.ucost') as HTMLElement;
     scout.addEventListener('click', () => {
-      this.eventBus.emit('castPheromone', { kind: this.selectedPheromone, lane: this.activeLane });
+      this.eventBus.emit('castPheromone', { kind: this.selectedPheromone });
     });
     const dots = document.createElement('div');
     dots.style.cssText = 'display:flex; gap:3px;';
@@ -504,17 +487,34 @@ export class MenuUIScene extends Phaser.Scene {
     gatherer.addEventListener('click', () => this.eventBus.emit('deployGatherer', {}));
     this.gathererCard = gatherer;
 
-    // --- Builder: the caste's third job — visible, locked until built.
+    // --- Builder: a BUILD PALETTE. Pick a building from the row, then click the
+    // field to place it (snapped to a cell); a builder worker walks out from the
+    // hive and raises it over its build-time. The building row mirrors the Scout's
+    // command-dot selector — adding a building (BUILDING_ORDER) extends it for free.
+    const builderCol = document.createElement('div');
+    builderCol.style.cssText = 'display:flex; flex-direction:column; gap:3px; align-items:center;';
     const builder = document.createElement('div');
-    builder.className = 'ucard disabled';
+    builder.className = 'ucard';
     builder.innerHTML = `
       <div class="utier" style="color:#40a0d0">W</div>
       <div class="uico">🔨</div>
-      <div class="uname">Builder</div>
-      <div class="ucost-row"><span class="utag">SOON</span></div>
+      <div class="uname">Build</div>
+      <div class="ucost-row"><span class="utag">PICK</span></div>
     `;
+    const buildRow = document.createElement('div');
+    buildRow.style.cssText = 'display:flex; gap:3px;';
+    for (const variant of BUILDING_ORDER) {
+      const bdef = getBuildingDef(variant);
+      const btn = document.createElement('button');
+      btn.title = `${bdef.name} — ${bdef.cost}n${bdef.income ? ` · +${bdef.income}n/s` : ''}`;
+      btn.textContent = bdef.ico;
+      btn.style.cssText = 'width:24px; height:20px; font-size:12px; line-height:1; border-radius:3px; border:1px solid #40a0d0; background:#10141a; cursor:pointer; pointer-events:auto; padding:0;';
+      btn.addEventListener('click', () => this.eventBus.emit('enterBuildMode', { variant }));
+      buildRow.appendChild(btn);
+    }
+    builderCol.append(builder, buildRow);
 
-    wrap.append(scoutCol, gatherer, builder);
+    wrap.append(scoutCol, gatherer, builderCol);
     this.selectPheromone(this.selectedPheromone); // initial highlight + cost
     return wrap;
   }
@@ -535,7 +535,7 @@ export class MenuUIScene extends Phaser.Scene {
 
   private buildAbilities(): HTMLElement {
     const container = document.createElement('div');
-    container.style.cssText = 'display:flex; gap:4px; padding:4px 6px; background:#090910; border-bottom:1px solid #1a1a28; width:100%; pointer-events:auto;';
+    container.style.cssText = 'display:flex; gap:4px; padding:4px 6px; background:#090910; border-bottom:1px solid #1a1a28; flex:1; min-width:0; pointer-events:auto;';
 
     this.abilityBtns = {};
     Object.entries(ABILITY_DEFS).forEach(([key, def]) => {
@@ -550,50 +550,6 @@ export class MenuUIScene extends Phaser.Scene {
     });
 
     return container;
-  }
-
-  // Elite signature trigger row — one button per live player Elite. Hidden when
-  // none are out. Click fires THAT Elite's signature (emits `triggerSignature`).
-  private setActiveLane(lane: number): void {
-    this.activeLane = lane;
-    this.refreshLaneHighlight();
-  }
-
-  // Shift held → the highlight previews the cross-send lane (the deploy target).
-  private _trackShift(held: boolean): void {
-    if (this.shiftHeld === held) return;
-    this.shiftHeld = held;
-    this.refreshLaneHighlight();
-  }
-
-  // Light the lane the NEXT deploy will go to (active lane, or its opposite while
-  // Shift is held) on the left-edge arrows.
-  private refreshLaneHighlight(): void {
-    const shown = this.shiftHeld ? 1 - this.activeLane : this.activeLane;
-    this.leftArrows.forEach((a, i) => {
-      const on = i === shown;
-      a.style.color = on ? '#a0e070' : '#33402f';
-      a.style.opacity = on ? '1' : '0.3';
-      a.style.transform = on ? 'scale(1.3)' : 'scale(1)';
-    });
-  }
-
-  // Active-lane indicator AND control, pinned to the LEFT of the screen (where
-  // your base + freshly-hatched units are). ▲ = top lane, ▼ = bottom; the active
-  // (or Shift-previewed) one lights up and scales. Click an arrow to switch lanes
-  // (Tab also flips it). Replaces the old bottom-HUD toggle row.
-  private buildLaneIndicator(): HTMLElement {
-    const wrap = document.createElement('div');
-    wrap.style.cssText = 'position:absolute; left:10px; top:30%; display:flex; flex-direction:column; gap:64px; pointer-events:none;';
-    this.leftArrows = ['▲', '▼'].map((glyph, lane) => {
-      const a = document.createElement('div');
-      a.textContent = glyph;
-      a.style.cssText = 'font-size:34px; line-height:1; text-shadow:0 0 5px #000; cursor:pointer; pointer-events:auto; transition:opacity .12s, color .12s, transform .12s;';
-      a.addEventListener('click', () => this.setActiveLane(lane));
-      wrap.appendChild(a);
-      return a;
-    });
-    return wrap;
   }
 
   // Render the live Elites as SILVER 1:1 portraits (smaller siblings of the gold
@@ -663,7 +619,7 @@ export class MenuUIScene extends Phaser.Scene {
   // her own panel, not an ELITE signature slot.
   private buildRoyalProfile(): HTMLElement {
     const wrap = document.createElement('div');
-    wrap.style.cssText = 'display:none; align-items:center; gap:10px; padding:5px 10px; background:linear-gradient(180deg,#16110a,#0b0906); border-top:1px solid #2e2410; border-bottom:1px solid #2e2410; width:100%; pointer-events:auto;';
+    wrap.style.cssText = 'display:none; align-items:center; gap:10px; padding:5px 10px; background:linear-gradient(180deg,#16110a,#0b0906); border-top:1px solid #2e2410; border-bottom:1px solid #2e2410; flex:0 0 auto; pointer-events:auto;';
     wrap.appendChild(this.el('span', 'font-size:10px; color:#c8a030; letter-spacing:2px; margin-right:2px;', 'ROYAL'));
 
     // Hero block — 1:1 portrait + name/HP/status. Click it to command.

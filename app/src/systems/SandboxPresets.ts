@@ -9,12 +9,6 @@ export interface Placement {
   unitKey: string;
   side: Side;
   x: number;
-  /**
-   * Battle lane (0 = upper, 1 = lower), derived from the click Y at
-   * placement time. Optional so old presets (saved before lanes) load
-   * cleanly — callers default to 0 when absent.
-   */
-  lane?: number;
 }
 
 /**

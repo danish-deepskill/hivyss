@@ -1,5 +1,5 @@
-import type { HiveDrawFunction } from '../../types';
-import { PALETTES } from '../../config/Palettes';
+import type { HiveDrawFunction } from '../../../types';
+import { PALETTES } from '../../../config/Palettes';
 
 // β Swarm — the BROOD-NEST. Not a hard shell: a swollen, sagging mound of
 // bog-green lobes, studded with translucent egg-sacs glowing with latent

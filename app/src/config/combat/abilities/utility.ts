@@ -44,13 +44,14 @@ export const utilityAbilities: Record<string, AbilityDef> = {
   },
 
   // β Swarmlord's Elite signature — TIDE: CONSUME the nearby swarm (same-
-  // geneline soldiers vanish — eaten: no corpses, no death triggers) and
-  // permanently grow flat atk per body eaten. Sacrifice as a verb, literal.
+  // geneline soldiers vanish — eaten: no corpses, no death triggers) and grow
+  // flat atk per body eaten, CAPPED at `max` stacks (bounded, not a snowball).
+  // Sacrifice as a verb, literal. `max` is the balance knob.
   tide: {
     name: 'Tide',
     category: 'utility',
     targeting: 'self',
-    sacrifice: { radius: 90, perUnitAtk: 6 },
+    sacrifice: { radius: 90, perUnitAtk: 6, max: 10 },
     sfx: 'gore',
   },
 

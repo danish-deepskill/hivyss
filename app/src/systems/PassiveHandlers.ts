@@ -6,6 +6,7 @@ import { lookupPredicate } from './PassivePredicates';
 import { runSelectorInRange } from './Targeting';
 import { lookupAbility } from '../config/combat/abilities';
 import { dispatchSpawn } from './CombatDispatch';
+import { recalcify, type ArmorTiers } from '../config/combat/recalcify';
 
 /**
  * Per-frame passive engine — the "tick band" registry.
@@ -209,8 +210,6 @@ const cohesionHandler: PassiveHandler = {
     for (const ally of env.alive) {
       if (ally === u) continue;
       if (ally.side !== u.side) continue;
-      // Same-lane pack-mates only — cohesion is per-front.
-      if (ally.lane !== u.lane) continue;
       if (ally.geneline !== u.geneline) continue;
       const ax = ally.x + ally.unitW / 2;
       if (Math.abs(ax - ux) < radius) count++;
@@ -252,15 +251,42 @@ const spawnerHandler: PassiveHandler = {
     const behind = u.side === 'player' ? -1 : 1;
     const cx = u.x + u.unitW / 2;
     for (let i = 0; i < passive.count; i++) {
-      dispatchSpawn(passive.unitKey, u.side, cx + behind * (10 + i * 12), u.lane);
+      dispatchSpawn(passive.unitKey, u.side, cx + behind * (10 + i * 12));
     }
   },
 };
 
 /**
- * Registration order: self-modifier → cohesion → aura → heal-cast → spawner.
- * The driver calls `pipeline.resolveFrame()` once after all handlers run, so
- * queued heals land before the same-frame attack pass.
+ * Re-calcify (γ Calcifier): every `interval` seconds the wall RE-HARDENS —
+ * steps its degraded physical armour one tier back toward the immutable
+ * spawn-time `baseResistance` and resets the soak meter. The interval-timer
+ * shape mirrors the spawner handler; the tier math is the pure `recalcify`
+ * (the inverse of the `degradeArmor` post_apply hook in CombatSystem).
+ */
+const recalcifyHandler: PassiveHandler = {
+  kind: 'recalcify',
+  sweep: 'alive',
+  tick(u, passive, env) {
+    if (passive.kind !== 'recalcify') return;
+    u.recalcifyTimer = (u.recalcifyTimer ?? 0) + env.dt;
+    if (u.recalcifyTimer < passive.interval) return;
+    u.recalcifyTimer = 0;
+    // resistance/baseResistance/_armorWear live on the Unit class, not IUnit
+    // (the calc layer carries them via CalcTarget) — cast, same as the degrade
+    // hook in CombatSystem. Always present at runtime (init sets {} / 0).
+    const t = u as IUnit & { resistance?: ArmorTiers; baseResistance?: ArmorTiers; _armorWear?: number };
+    if (!t.resistance || !t.baseResistance) return;
+    const res = recalcify(t.resistance, t.baseResistance);
+    if (res.sharp !== undefined) t.resistance.sharp = res.sharp;
+    if (res.blunt !== undefined) t.resistance.blunt = res.blunt;
+    t._armorWear = 0; // a re-harden re-sets the wear meter — the wall is fresh
+  },
+};
+
+/**
+ * Registration order: self-modifier → cohesion → aura → heal-cast → spawner
+ * → recalcify. The driver calls `pipeline.resolveFrame()` once after all
+ * handlers run, so queued heals land before the same-frame attack pass.
  */
 export const PASSIVE_HANDLERS: readonly PassiveHandler[] = [
   selfModifierHandler,
@@ -268,4 +294,5 @@ export const PASSIVE_HANDLERS: readonly PassiveHandler[] = [
   auraModifierHandler,
   healCastHandler,
   spawnerHandler,
+  recalcifyHandler,
 ];

@@ -210,4 +210,10 @@ export class ViewportController {
   getZoom(): number {
     return this.cam.zoom;
   }
+
+  /** True while the cursor is over the battlefield canvas (not a HUD DOM element).
+   *  Reused by the build-placement ghost so it doesn't paint while over the HUD. */
+  isOverCanvas(): boolean {
+    return this.overCanvas;
+  }
 }

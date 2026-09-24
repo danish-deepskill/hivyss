@@ -1,21 +1,20 @@
 import Phaser from 'phaser';
 import { H, SBW, DEFAULT_WORLD_W } from '../config/Constants';
 import { LANE } from '../config/Layout';
-import { getGroundY, laneDepth } from '../config/RouteMatrix';
+import { getGroundY } from '../config/RouteMatrix';
 import { drawPheromoneTrail } from './PheromoneTrail';
 const GND = LANE.land.groundY;
-// Lane midline — the single-lane land ground. Clicks above this Y go to
-// lane 0 (upper), below to lane 1 (lower). Also where the divider draws.
-const LANE_MIDLINE_Y = LANE.land.groundY;
 import { UNIT_DEFS } from '../units/registry';
 import { ENEMY_DEFS } from '../config/EnemyDefs';
 import { resetUid } from '../entities/Unit';
-import { BaseStructure } from '../entities/BaseStructure';
-import { BaseEntity } from '../entities/BaseEntity';
+import { HiveStructure } from '../entities/structures/HiveStructure';
+import { HiveEntity } from '../entities/structures/HiveEntity';
+import { Towers } from '../systems/structures/Towers';
 import { BattleCore } from '../systems/BattleCore';
 import { setCastFxDispatcher, setImpactFxDispatcher } from '../systems/CombatDispatch';
 import { FxDirector } from '../systems/FxDirector';
 import { registerCoreFx } from '../systems/FxRenderers';
+import { TerrainRenderer } from '../systems/TerrainRenderer';
 import { EventBus } from '../systems/EventBus';
 import { ParticleManager } from '../systems/ParticleManager';
 import { AudioManager } from '../systems/AudioManager';
@@ -74,6 +73,7 @@ export class SandboxScene extends Phaser.Scene {
   private elapsed!: number;
   private particles!: ParticleManager;
   private fxDirector!: FxDirector;
+  private terrainRenderer!: TerrainRenderer;
   private audio!: AudioManager;
 
   // Cross-scene comms
@@ -81,10 +81,11 @@ export class SandboxScene extends Phaser.Scene {
   private viewport!: ViewportController;
 
   // Base targets
-  private playerBaseStructure!: BaseStructure;
-  private enemyBaseStructure!: BaseStructure;
-  private playerBaseEntity!: BaseEntity;
-  private enemyBaseEntity!: BaseEntity;
+  private playerBaseStructure!: HiveStructure;
+  private enemyBaseStructure!: HiveStructure;
+  private towers!: Towers;
+  private playerBaseEntity!: HiveEntity;
+  private enemyBaseEntity!: HiveEntity;
   private playerHpBar!: Phaser.GameObjects.Graphics;
   private enemyHpBar!: Phaser.GameObjects.Graphics;
 
@@ -158,12 +159,17 @@ export class SandboxScene extends Phaser.Scene {
     this.pheromoneGhost = this.add.graphics();
     this.pheromoneGhost.setDepth(51);
 
+    // Terrain blobs — depth 48 (set by the renderer), below the unit band
+    // (60-70) and above the biome background (~45). Decoupled + stub-able.
+    this.terrainRenderer = new TerrainRenderer(this.add.graphics());
+
     // FX director — one-shot ability FX (Stampede shockwave…) on its own
     // layer above the units. The cast-FX seam routes signature casts here,
     // resolving the ability's fx.kind → a registered renderer; magnitude
-    // carries cohesion so the shockwave scales with the herd.
+    // carries cohesion so the shockwave scales with the herd. Depth 80 keeps it
+    // above the whole unit depth band (60..70).
     const fxLayer = this.add.graphics();
-    fxLayer.setDepth(64);
+    fxLayer.setDepth(80);
     this.fxDirector = new FxDirector(fxLayer);
     registerCoreFx(this.fxDirector);
     setCastFxDispatcher((s) => this.fxDirector.play({
@@ -184,15 +190,26 @@ export class SandboxScene extends Phaser.Scene {
 
     // Base wiring — enemy hive pushed to the far end of the expanded
     // arena.
-    this.playerBaseStructure = new BaseStructure(this, 0, 'player');
+    this.playerBaseStructure = new HiveStructure(this, 0, 'player');
     this.playerBaseStructure.maxHp = SANDBOX_BASE_HP;
     this.playerBaseStructure.setHp(SANDBOX_BASE_HP);
-    this.enemyBaseStructure = new BaseStructure(this, DEFAULT_WORLD_W - SBW, 'enemy');
+    this.enemyBaseStructure = new HiveStructure(this, DEFAULT_WORLD_W - SBW, 'enemy');
     this.enemyBaseStructure.maxHp = SANDBOX_BASE_HP;
     this.enemyBaseStructure.setHp(SANDBOX_BASE_HP);
-    this.playerBaseEntity = new BaseEntity(this.playerBaseStructure, SBW);
-    this.enemyBaseEntity = new BaseEntity(this.enemyBaseStructure, DEFAULT_WORLD_W - SBW);
+    this.playerBaseEntity = new HiveEntity(this.playerBaseStructure, SBW);
+    this.enemyBaseEntity = new HiveEntity(this.enemyBaseStructure, DEFAULT_WORLD_W - SBW);
     this.core.combat.setBaseEntities(this.playerBaseEntity, this.enemyBaseEntity);
+
+    // Spires — forward towers per side (the node-grade defense; here a sandbox
+    // demo of the firing/destructible mechanic). They shoot the nearest enemy in
+    // range and can be destroyed back.
+    this.towers = new Towers(this, this.core, (sx, sy, tx, ty, color) =>
+      this.fxDirector.play({ kind: 'spit', x: sx, y: sy, tx, ty, color }));
+    // Two towers per side, demoing range + destructibility.
+    this.towers.add('player', SBW + 200);
+    this.towers.add('player', SBW + 360);
+    this.towers.add('enemy', DEFAULT_WORLD_W - SBW - 200);
+    this.towers.add('enemy', DEFAULT_WORLD_W - SBW - 360);
 
     this.playerHpBar = this.add.graphics();
     this.enemyHpBar = this.add.graphics();
@@ -289,6 +306,8 @@ export class SandboxScene extends Phaser.Scene {
       this.eventBus.off('sandboxTriggerSignature', onTriggerSignature);
       this.input.keyboard?.off('keydown', this.onPheromoneKey, this);
       this.input.keyboard?.off('keydown-H', this.cycleHivePreview, this);
+      this.towers.destroy();
+      this.core.destroy(); // unsubscribe terrain + unregister its dispatch seams
       HpHud.detachSource();
       this.scene.stop('SandboxHUDScene');
     });
@@ -310,6 +329,7 @@ export class SandboxScene extends Phaser.Scene {
   private resetBases(): void {
     this.playerBaseStructure.setHp(SANDBOX_BASE_HP);
     this.enemyBaseStructure.setHp(SANDBOX_BASE_HP);
+    this.towers.reset();
     this.playerBaseEntity.syncDead();
     this.enemyBaseEntity.syncDead();
     (this.playerBaseEntity as EffectBearer).activeEffects = [];
@@ -386,14 +406,6 @@ export class SandboxScene extends Phaser.Scene {
     return x < DEFAULT_WORLD_W / 2 ? 'player' : 'enemy';
   }
 
-  /**
-   * Lane is derived from the pointer's world Y relative to the lane
-   * midline: above → lane 0 (upper), below → lane 1 (lower).
-   */
-  private laneForY(y: number): number {
-    return y < LANE_MIDLINE_Y ? 0 : 1;
-  }
-
   private clearGhost(): void {
     if (this.ghostSprite) {
       this.ghostSprite.destroy();
@@ -434,9 +446,7 @@ export class SandboxScene extends Phaser.Scene {
 
     this.ghostSprite.setVisible(true);
     this.ghostSprite.setPosition(pointer.worldX, pointer.worldY);
-    // Resize to the lane the cursor is over so the ghost previews the
-    // far-row shrink before you commit the placement.
-    this.ghostSprite.setScale(1.2 * laneDepth(this.laneForY(pointer.worldY)).scale);
+    this.ghostSprite.setScale(1.2);
 
     // Auto-side: tint flips across the midline. setTexture only on
     // actual side change so pointermove doesn't thrash the texture.
@@ -474,6 +484,13 @@ export class SandboxScene extends Phaser.Scene {
     if (pointer.y < TOP_BAR_BOTTOM_Y) return;
     if (pointer.y >= CONTROL_PANEL_TOP_Y) return;
 
+    // Left-click a tower → toggle its range ring (inspect any time); clicking
+    // elsewhere clears it. Consumes the click so it doesn't also place a unit.
+    if (!pointer.rightButtonDown()) {
+      if (this.towers.selectAt(pointer.worldX, pointer.worldY)) return;
+      this.towers.clearSelection();
+    }
+
     // Pheromone placement — runs even DURING a fight (zones are painted
     // mid-battle to command units). Left-click only; right-click still
     // pans the camera (ViewportController) / deletes placements.
@@ -483,8 +500,8 @@ export class SandboxScene extends Phaser.Scene {
       // Shift+click drops a free static zone instead — a debug convenience for
       // isolating zone tuning from scout behaviour.
       const debugStatic = (pointer.event as MouseEvent | undefined)?.shiftKey === true;
-      if (debugStatic) this.placePheromone(this.selectedPheromone, pointer.worldX, pointer.worldY);
-      else this.deployScout(this.selectedPheromone, pointer.worldX, pointer.worldY);
+      if (debugStatic) this.placePheromone(this.selectedPheromone, pointer.worldX);
+      else this.deployScout(this.selectedPheromone, pointer.worldX);
       return;
     }
 
@@ -498,16 +515,16 @@ export class SandboxScene extends Phaser.Scene {
 
     if (this.selectedUnitKey === null) return;
     if (!this.canPlaceSelected(pointer.worldX)) return;
-    this.placeUnit(pointer.worldX, pointer.worldY);
+    this.placeUnit(pointer.worldX);
   }
 
-  private placeUnit(x: number, y: number): void {
+  private placeUnit(x: number): void {
     const key = this.selectedUnitKey;
     if (!key) return;
     const side = this.sideForX(x);
     // Hard guard (defense in depth — the ghost already blocks this path).
     if (UNIT_DEFS[key]?.caste === 'elite' && this.eliteCount(side) >= MAX_ELITES_PER_SIDE) return;
-    this.placements.push({ unitKey: key, side, x, lane: this.laneForY(y) });
+    this.placements.push({ unitKey: key, side, x });
     this.renderPlacementSprite(this.placements.length - 1);
     this.emitPlacementCount();
   }
@@ -581,32 +598,31 @@ export class SandboxScene extends Phaser.Scene {
   }
 
   /**
-   * Paint a zone of `kind` at world-(x, y); side derived from x relative
-   * to the midline, lane from y relative to the lane midline.
+   * Paint a zone of `kind` at world-x; side derived from x relative to the
+   * midline.
    */
-  private placePheromone(kind: PheromoneKind, x: number, y: number): void {
+  private placePheromone(kind: PheromoneKind, x: number): void {
     const def = PHEROMONE_DEFS[kind];
     this.core.pheromoneZones.push({
       kind,
       x,
       radius: def.radius,
       side: this.sideForX(x),
-      lane: this.laneForY(y),
       remaining: def.duration,
     });
     this.drawPheromoneZones();
   }
 
   /**
-   * Deploy a Scout (worker) carrying `kind` at world-(x, y): a fast, fragile,
+   * Deploy a Scout (worker) carrying `kind` at world-x: a fast, fragile,
    * NON-combatant that runs forward laying a FADING pheromone TRAIL as it goes
    * (the sim drops scent-blobs per `pheromoneKind` in CombatSystem.resolve).
    * Kill the Scout → no new scent, but the laid trail persists and fades on its
    * own timer (deposit-fade, VISION §5). Live spawn — running only.
    */
-  private deployScout(kind: PheromoneKind, x: number, y: number): void {
+  private deployScout(kind: PheromoneKind, x: number): void {
     if (!this.running) return;
-    this.core.spawnCourier(kind, this.sideForX(x), x, this.laneForY(y));
+    this.core.spawnCourier(kind, this.sideForX(x), x);
   }
 
   /** Cursor-follow preview circle for the selected pheromone. */
@@ -623,8 +639,7 @@ export class SandboxScene extends Phaser.Scene {
     const def = PHEROMONE_DEFS[this.selectedPheromone];
     const valid = this.isValidPlacementForPointer(pointer.worldX);
     const color = valid ? def.color : 0xff3030;
-    // Render at the lane the pointer is over (above/below the midline).
-    const zy = getGroundY('land', this.laneForY(pointer.worldY));
+    const zy = getGroundY('land');
     g.fillStyle(color, 0.15);
     g.fillCircle(pointer.worldX, zy, def.radius);
     g.lineStyle(2, color, 0.6);
@@ -679,7 +694,7 @@ export class SandboxScene extends Phaser.Scene {
       const p = this.placements[i];
       const def = UNIT_DEFS[p.unitKey];
       if (!def) continue;
-      const unitY = getGroundY(def.route ?? 'land', p.lane ?? 0);
+      const unitY = getGroundY(def.route ?? 'land');
       const dx = Math.abs(x - p.x);
       const dy = Math.abs(y - unitY);
       if (dx <= def.w / 2 + 6 && dy <= def.h) {
@@ -694,16 +709,13 @@ export class SandboxScene extends Phaser.Scene {
   private renderPlacementSprite(idx: number): void {
     const p = this.placements[idx];
     const def = UNIT_DEFS[p.unitKey];
-    const lane = p.lane ?? 0;
-    const y = getGroundY(def.route ?? 'land', lane);
-    const dep = laneDepth(lane);
+    const y = getGroundY(def.route ?? 'land');
     const spr = this.add.image(p.x, y, this.previewKeyForSide(p.unitKey, p.side));
-    // Feet-anchor — see handleSelectUnit comment for the originY math.
-    // Scaling around the feet origin keeps the unit grounded; lane depth
-    // shrinks + dims the far (North) row to match the live fight.
+    // Feet-anchor — see handleSelectUnit comment for the originY math. Scaling
+    // around the feet origin keeps the unit grounded.
     spr.setOrigin(0.5, (10 + def.h) / (def.h + 30));
-    spr.setAlpha(0.6 * dep.alpha);
-    spr.setScale(1.2 * dep.scale);
+    spr.setAlpha(0.6);
+    spr.setScale(1.2);
     this.placementSprites.push(spr);
   }
 
@@ -747,9 +759,7 @@ export class SandboxScene extends Phaser.Scene {
    */
   private handleLoadPreset(placements: Placement[]): void {
     if (this.running) return;
-    // Old presets (saved before lanes existed) have no `lane`; default
-    // them to lane 0 so every placement is lane-resolved downstream.
-    this.placements = placements.map((p) => ({ ...p, lane: p.lane ?? 0 }));
+    this.placements = placements.map((p) => ({ ...p }));
     this.clearGhost();
     this.clearPlacementSprites();
     this.resetBases();
@@ -800,7 +810,7 @@ export class SandboxScene extends Phaser.Scene {
         ? ENEMY_DEFS['e' + p.unitKey]
         : UNIT_DEFS[p.unitKey];
       if (!baseDef) continue;
-      this.core.createUnit(p.unitKey, p.side, baseDef, p.x, p.lane ?? 0);
+      this.core.createUnit(p.unitKey, p.side, baseDef, p.x);
     }
 
     // Fresh fight — clear any zones + FX left from a prior run.
@@ -821,11 +831,14 @@ export class SandboxScene extends Phaser.Scene {
   // Game loop
   // ---------------------------------------------------------------
 
-  update(_time: number, delta: number): void {
+  update(time: number, delta: number): void {
     const dt: number = Math.min(delta / 1000, 0.05);
 
     this.viewport.update(dt);
     this.particles.update(dt);
+    // Terrain repaints every frame (it self-clears), so an empty grid (pre-fight
+    // / post-reset) shows nothing and laid terrain stays visible at fight end.
+    this.terrainRenderer.draw(this.core.terrain.grid, time * 0.001);
 
     if (!this.running) return;
 
@@ -844,6 +857,9 @@ export class SandboxScene extends Phaser.Scene {
       this.particles, 0, this.audio,
     );
     this.core.postResolve();
+
+    // Towers fire after combat resolves (units are positioned for this frame).
+    this.towers.tick(dt);
 
     // The trail changes every frame (deposit + fade) — redraw while active,
     // and clear once when the last blob is gone.
@@ -920,7 +936,7 @@ export class SandboxScene extends Phaser.Scene {
     this.bgObjects.forEach((o) => o.destroy());
     const objs = drawBiomeBackground(this, this.biomeKey, DEFAULT_WORLD_W);
     // Faint VS marker high in the sky (sandbox flourish, not part of the biome).
-    const grassTop = Math.round(getGroundY('land', 0));
+    const grassTop = Math.round(getGroundY('land'));
     const vs = this.add.text(DEFAULT_WORLD_W / 2, Math.round(grassTop * 0.4), 'VS', {
       fontFamily: '"Press Start 2P", monospace', fontSize: '20px', color: '#ffffff',
     }).setOrigin(0.5).setAlpha(0.06).setDepth(-90);

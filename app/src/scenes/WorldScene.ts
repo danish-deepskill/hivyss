@@ -5,14 +5,17 @@ import { drawPheromoneTrail } from './PheromoneTrail';
 import { setCastFxDispatcher, setImpactFxDispatcher } from '../systems/CombatDispatch';
 import { FxDirector } from '../systems/FxDirector';
 import { registerCoreFx } from '../systems/FxRenderers';
-import { laneFromY, getGroundY } from '../config/RouteMatrix';
+import { TerrainRenderer } from '../systems/TerrainRenderer';
+import { PlacementGhost } from '../systems/structures/PlacementGhost';
+import { BUILDING_HALF_W, BUILDING_HEIGHT } from '../draws/structures/buildings/dims';
+import { getGroundY } from '../config/RouteMatrix';
 import { UNIT_DEFS } from '../units/registry';
 import { FORAGE_ENABLED } from '../config/ForageDefs';
 import { ABILITY_DEFS } from '../config/AbilityDefs';
 import { GameManager } from '../systems/GameManager';
 import { capUsed, MAX_CAPACITY } from '../systems/Capacity';
 import { ViewportController } from '../systems/ViewportController';
-import type { PlayerAbilityKey, WaveDef, HiveProfile, PheromoneKind } from '../types';
+import type { PlayerAbilityKey, WaveDef, HiveProfile, PheromoneKind, Route } from '../types';
 import type { RunBuff } from '../systems/RunState';
 
 interface WorldSceneData {
@@ -33,6 +36,13 @@ export class WorldScene extends Phaser.Scene {
   private royalLayer!: Phaser.GameObjects.Graphics;
   private bloomLayer!: Phaser.GameObjects.Graphics;
   private fxDirector!: FxDirector;
+  private terrainRenderer!: TerrainRenderer;
+  private placementGhost!: PlacementGhost;
+  /** Reused scratch for per-frame cursor→world projection (no per-frame alloc). */
+  private readonly _ghostPt = new Phaser.Math.Vector2();
+  /** Shift-held telegraph: a marker at the tunnel ground line by the hive,
+   *  showing the next deploy spawns underground (Phase 2a). */
+  private deployHint!: Phaser.GameObjects.Container;
 
   constructor() {
     super('WorldScene');
@@ -63,9 +73,10 @@ export class WorldScene extends Phaser.Scene {
 
     // FX director — one-shot ability FX (Stampede / Primal Roar shockwaves)
     // above the units, same wiring as the sandbox. Until this, cast-FX only
-    // had a renderer in the sandbox — invisible in real runs.
+    // had a renderer in the sandbox — invisible in real runs. Depth 80 keeps it
+    // above the whole unit depth band (60..70).
     const fxLayer = this.add.graphics();
-    fxLayer.setDepth(64);
+    fxLayer.setDepth(80);
     this.fxDirector = new FxDirector(fxLayer);
     registerCoreFx(this.fxDirector);
     setCastFxDispatcher((s) => this.fxDirector.play({
@@ -84,6 +95,17 @@ export class WorldScene extends Phaser.Scene {
       magnitude: s.magnitude,
     }));
 
+    // Terrain blobs — depth 48 (below the unit band, above the biome bg). Same
+    // wiring as the sandbox; the grid lives on the substrate (gm.core.terrain)
+    // and is read each frame in update(). Without this the real run would run
+    // invisible block/slow/DoT terrain.
+    this.terrainRenderer = new TerrainRenderer(this.add.graphics());
+
+    // Build-placement ghost — a tinted footprint preview under the cursor while
+    // in build mode. Reusable presentation; fed by gm.previewPlacement (the one
+    // placement authority), so it always matches where the building actually lands.
+    this.placementGhost = new PlacementGhost(this.add.graphics());
+
     // Create game manager (owns all systems, entities, and game state)
     this.gm = new GameManager(this, data.deck, data.startWave, this.worldW, data.customWaves, data.runBuffs, data.hiveProfile, data.hiveSeed);
 
@@ -96,8 +118,8 @@ export class WorldScene extends Phaser.Scene {
     this.registry.set('eventBus', this.gm.events);
 
     // Subscribe to UI action events (MenuUIScene emits these)
-    const onDeploy = (evt: { key: string; lane: number }) => {
-      const result = this.gm.playerSpawn(evt.key, evt.lane);
+    const onDeploy = (evt: { key: string; route: Route }) => {
+      const result = this.gm.playerSpawn(evt.key, evt.route);
       if (result.message) this.gm.events.emit('logMessage', { message: result.message });
     };
     const onAbility = (evt: { key: string }) => {
@@ -119,8 +141,8 @@ export class WorldScene extends Phaser.Scene {
       if (result.message) this.gm.events.emit('logMessage', { message: result.message });
     };
     // Pheromone command button → cast it on the player army's front.
-    const onPheromone = (evt: { kind: PheromoneKind; lane: number }) => {
-      const result = this.gm.castPheromone(evt.kind, evt.lane);
+    const onPheromone = (evt: { kind: PheromoneKind }) => {
+      const result = this.gm.castPheromone(evt.kind);
       if (result.message) this.gm.events.emit('logMessage', { message: result.message });
     };
     // Royal profile click (or R key) → toggle command mode.
@@ -130,6 +152,8 @@ export class WorldScene extends Phaser.Scene {
       const result = this.gm.deployGatherer();
       if (result.message) this.gm.events.emit('logMessage', { message: result.message });
     };
+    // Builder button → enter build-placement mode (next field click places it).
+    const onEnterBuildMode = (evt: { variant: string }) => this.gm.enterBuildMode(evt.variant);
     this.gm.events.on('deployUnit', onDeploy);
     this.gm.events.on('useAbility', onAbility);
     this.gm.events.on('cancelIncubation', onCancel);
@@ -137,6 +161,7 @@ export class WorldScene extends Phaser.Scene {
     this.gm.events.on('castPheromone', onPheromone);
     this.gm.events.on('toggleRoyalSelect', onToggleRoyalSelect);
     this.gm.events.on('deployGatherer', onDeployGatherer);
+    this.gm.events.on('enterBuildMode', onEnterBuildMode);
     this.gm.events.on('matureHive', onMature);
 
     // Cleanup on shutdown
@@ -149,7 +174,11 @@ export class WorldScene extends Phaser.Scene {
       this.gm.events.off('castPheromone', onPheromone);
       this.gm.events.off('toggleRoyalSelect', onToggleRoyalSelect);
       this.gm.events.off('deployGatherer', onDeployGatherer);
+      this.gm.events.off('enterBuildMode', onEnterBuildMode);
       this.gm.events.off('matureHive', onMature);
+      this.gm.buildings.destroy(); // drop placed buildings + free their grid cells
+      this.placementGhost.destroy();
+      this.gm.core.destroy(); // unsubscribe terrain + unregister its dispatch seams
     });
 
     // ESC — toggle pause overlay
@@ -174,6 +203,17 @@ export class WorldScene extends Phaser.Scene {
       this.gm?.toggleGatherMode();
     });
 
+    // Shift = TUNNEL deploy (Phase 2a): while held, a hint at the hive's tunnel
+    // ground line telegraphs that the next deploy spawns underground. The deploy
+    // route itself is read off the click/keypress in MenuUIScene.
+    this.deployHint = this.buildDeployHint();
+    this.input.keyboard!.on('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Shift') this.deployHint.setVisible(true);
+    });
+    this.input.keyboard!.on('keyup', (e: KeyboardEvent) => {
+      if (e.key === 'Shift') this.deployHint.setVisible(false);
+    });
+
     // Suppress browser right-click menu so right-drag pan fires
     // cleanly on the canvas.
     this.input.mouse?.disableContextMenu();
@@ -184,8 +224,11 @@ export class WorldScene extends Phaser.Scene {
     // clicks on the DOM HUD never reach the canvas. Right-drag stays the pan.
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       if (p.button !== 0 || !this.gm?.running) return;
-      this.gm.commandFieldClick(p.worldX, laneFromY(p.worldY));
+      this.gm.commandFieldClick(p.worldX);
     });
+    // The build-placement ghost is repainted every frame in update() from the
+    // LIVE camera + cursor (not pointer events), so it tracks pan/edge-pan/zoom
+    // and never disagrees with the cell the click lands in.
 
     // Camera + pan/zoom controller. Right-drag so left-click stays
     // available for any future unit-selection UX without colliding
@@ -198,11 +241,32 @@ export class WorldScene extends Phaser.Scene {
     });
   }
 
-  update(_time: number, delta: number): void {
+  update(time: number, delta: number): void {
     const dt: number = Math.min(delta / 1000, 0.05);
 
     // Pan/zoom tick — owned by ViewportController.
     this.viewport.update(dt);
+
+    // Terrain repaints every frame (self-clears); an empty grid draws nothing.
+    if (this.gm) this.terrainRenderer.draw(this.gm.core.terrain.grid, time * 0.001);
+
+    // Build-placement ghost — recompute from the LIVE camera + cursor each frame
+    // (after viewport.update) so it tracks pan/edge-pan/zoom and previews the
+    // SAME x the click will place at (getWorldPoint uses the same camera transform).
+    if (this.gm?.running && this.gm.buildMode && this.viewport.isOverCanvas()) {
+      const p = this.input.activePointer;
+      const wx = this.cameras.main.getWorldPoint(p.x, p.y, this._ghostPt).x;
+      const pv = this.gm.previewPlacement(wx);
+      this.placementGhost.show({
+        x: pv.x,
+        groundY: getGroundY('land'),
+        halfW: BUILDING_HALF_W,
+        height: BUILDING_HEIGHT,
+        valid: pv.valid,
+      });
+    } else if (this.gm) {
+      this.placementGhost.hide();
+    }
 
     // Write shared state to registry every frame (HUDScene + MenuUIScene read these)
     this.registry.set('cam.scrollX', this.viewport.getScrollX());
@@ -256,6 +320,7 @@ export class WorldScene extends Phaser.Scene {
 
       // Game state (MenuUIScene)
       this.registry.set('wave.stage', this.gm.waves.stage);
+      this.registry.set('game.elapsed', this.gm.elapsed);
       this.registry.set('game.running', this.gm.running);
       this.registry.set('elite.slots', this.gm.getEliteSlots());
       this.registry.set('royal.status', this.gm.getRoyalStatus());
@@ -306,21 +371,21 @@ export class WorldScene extends Phaser.Scene {
 
     // Control ring — bright when you're commanding her (selected), a faint dot
     // otherwise so you can still spot her without it shouting.
+    const groundY = getGroundY('land');
     g.lineStyle(selected ? 2.5 : 1.5, 0x60e0ff, selected ? 0.95 : 0.3);
-    g.strokeEllipse(r.x + r.unitW / 2, getGroundY('land', r.lane), r.unitW * 1.1, r.unitW * 0.42);
+    g.strokeEllipse(r.x + r.unitW / 2, groundY, r.unitW * 1.1, r.unitW * 0.42);
 
     // Order markers only matter while she's under command.
     const order = r.order;
     if (!selected || !order) return;
     if (order.kind === 'move') {
-      const my = getGroundY('land', r.lane);
       g.lineStyle(2, 0x60e0ff, 0.7);
-      g.strokeEllipse(order.x, my, 14, 6);
-      g.lineBetween(order.x, my - 11, order.x, my);
+      g.strokeEllipse(order.x, groundY, 14, 6);
+      g.lineBetween(order.x, groundY - 11, order.x, groundY);
     } else if (!order.target.dead) {
       const t = order.target;
       g.lineStyle(2, 0xff5050, 0.9);
-      g.strokeEllipse(t.x + t.unitW / 2, getGroundY('land', t.lane), t.unitW * 1.25, t.unitW * 0.5);
+      g.strokeEllipse(t.x + t.unitW / 2, groundY, t.unitW * 1.25, t.unitW * 0.5);
     }
   }
 
@@ -337,7 +402,7 @@ export class WorldScene extends Phaser.Scene {
     // Corpse pickups — fallen chitin husks, fading as they decay. Scavenge
     // targets for G-mode; bigger yields draw bigger husks.
     for (const c of forage.corpsePickups) {
-      const cy = getGroundY('land', c.lane);
+      const cy = getGroundY('land');
       const a = Math.max(0.15, Math.min(1, c.decay / 6)); // fade out over the last seconds
       const r = 2.5 + Math.min(4, c.yield * 0.4);
       g.fillStyle(0x8a8a96, 0.55 * a);
@@ -347,7 +412,7 @@ export class WorldScene extends Phaser.Scene {
       g.lineBetween(c.x - r * 0.7, cy - 2 + r * 0.4, c.x + r * 0.7, cy - 2 - r * 0.6);
     }
     for (const b of forage.blooms) {
-      const by = getGroundY('land', b.lane);
+      const by = getGroundY('land');
       const fill = Math.max(0.35, b.pool / b.maxPool); // wilt toward 35% size
       const heads = b.rich ? [-7, 0, 7] : [0];          // cluster = one object, three flowers
       // priority ring — the standing gather order
@@ -375,6 +440,29 @@ export class WorldScene extends Phaser.Scene {
         g.fillCircle(hx, hy, r * 0.7);
       }
     }
+  }
+
+  /**
+   * Build the Shift-held tunnel-deploy telegraph — a dim marker at the hive's
+   * TUNNEL ground line (dashed line + downward chevron + label) so the player
+   * sees a Shift-deploy will emerge underground. Created hidden; toggled by the
+   * Shift key handlers. Phase 2a control affordance (no balance).
+   */
+  private buildDeployHint(): Phaser.GameObjects.Container {
+    const x0 = this.gm.SBW, x1 = x0 + 150;
+    const ty = getGroundY('tunnel');
+    const g = this.add.graphics();
+    g.lineStyle(2, 0xc89058, 0.9);
+    for (let x = x0; x < x1; x += 14) g.lineBetween(x, ty, x + 8, ty);   // dashed ground line
+    g.fillStyle(0xc89058, 0.9);                                          // downward chevron
+    g.fillTriangle(x0 + 8, ty - 16, x0 + 24, ty - 16, x0 + 16, ty - 4);
+    const label = this.add.text(x0 + 30, ty - 24, 'TUNNEL DEPLOY', {
+      fontFamily: 'monospace', fontSize: '11px', color: '#e0b070',
+    }).setOrigin(0, 0.5);
+    const c = this.add.container(0, 0, [g, label]);
+    c.setDepth(90); // above the unit band (60..70), the tunnel veil (72) + FX (80)
+    c.setVisible(false);
+    return c;
   }
 
   private drawBackground(): void {

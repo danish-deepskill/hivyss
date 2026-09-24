@@ -199,6 +199,99 @@
 
 ---
 
+## 12. Run progression — Normal start → capture → roster loadouts [PROPOSED, 2026-06-13]
+
+> The user's idea is still **~30% formed** ("I need to take time"); captured so it
+> isn't lost. Builds on the LOCKED node map (`GENELINES §4-6`), doesn't replace it.
+
+- **Start as Normal, earn genelines.** Already half-LOCKED: `GENELINES §5` —
+  *"Normal = the wild substrate … also the starting roster."* You begin with the
+  Normal roster and **no Royal**; acquiring your first geneline (ally gift, or
+  conquest) is a genuine **power + system unlock**, not a given.
+- **Normal has no Royal [PROPOSED-lock].** The Royal/hero layer is a **geneline
+  privilege** — the whole control-a-hero mechanic *turns on* at your first
+  capture. Knock-ons: a distinct scrappy early-run texture; and Normal's hive is
+  the **plain wax dome** (the default body — "no identity yet" reads visually).
+- **Multi-geneline runs via the rule: OWN ≠ FIELD.** With 24 genelines, locking
+  to one per run wastes the premise; but **fielding** several at once = an
+  identity-less everything-blob that destroys what makes genelines distinct. So:
+  - **Own** (run-wide): each captured hive joins your **collection** — its units
+    enter your deploy pool, its **queen** stays alive governing that hive (lore-
+    true; *not* a worker-only colony). You accrue a **stable** of queens/genelines.
+  - **Field** (per battle): you commit **one deploy roster** = one queen/identity.
+  - You experience several genelines by **switching which roster you bring**, not
+    by stacking. **Own many, field one.** The Royal stays special *in the battle*
+    (one queen leads each fight), not by capping how many you own.
+- **Deploy-roster loadouts (the fun core).** At Home (+ your captured hives as
+  rally points) you pre-build a few **rosters** — Roster A ≈ α (α queen + α
+  units), Roster B ≈ β (captured β queen + β units) — and pick one per node. A
+  **multi-loadout deck-builder**: "bring the right army for this matchup."
+- **Guardrail:** capture = more **options/adaptability**, never more **power in a
+  single fight** (you never field two queens). Breadth in prep, focus in combat.
+  Bonus: owning several = **run resilience** (re-equip a different identity if a
+  fight/Royal goes bad).
+- **Refines, doesn't break, the old rule:** `"hive+Royal = your selected
+  geneline"` → `"= your ACTIVE geneline, swappable as you capture more."` Same
+  combat model (one hive, one Royal per battle).
+- **Forks:** [O] roster composition — **pure** vs **anchor+splash** (lean:
+  queen+Elites match the active geneline; **soldiers** can be a melting pot) ·
+  [O] # of roster slots (2-3 vs unlimited) · [O] swap cost (free at Home vs gated).
+
+## 13. The node-combat model — attacker vs node, not hive-vs-hive [PROPOSED, 2026-06-13]
+
+- **Every battle is YOU (attacker) assaulting a NODE (defender)** — *not* two
+  symmetric hives. The node you *come from* is just a launch point; the node you
+  *attack* defines the enemy. Literal "Hive vs Hive" only happens at a **Hive**
+  node. **Your side stays consistent; the enemy scales by node grade.**
+- **Node grade = the caste-tier cap of the battle + the defender's installed
+  structure** (the principle that makes the gradient cohere: **territory tier
+  mirrors the caste tier of who holds it**):
+
+  | Node | Held by | Structure | Spires | Battle ceiling |
+  |---|---|---|---|---|
+  | **Forage** | soldiers/workers | minimal / weak mound | **0** | low (skirmish) |
+  | **Warren** | an **Elite** | lesser fortified chamber | **1** | mid (+Elite) |
+  | **Hive** | the **Royal** | full hive | **2** (forward+inner) | high (+Royal) |
+
+  Already half-canon: `GENELINES §5` tier gradient is *Forage T0-1 → Hive T2-3 +
+  Elite*, so Elites are excluded from Forage **by tier** today. Caste-cap just
+  makes it explicit. *Forage is leaderless for BOTH sides* (you don't drag your
+  queen to a frontier scrap → gives the Royal **death-stakes teeth**).
+- **Forage/Warren combat = same loop, lower ceiling.** Economy (incubation /
+  larvae / forage) is **decoupled from the Royal** — *already true in the build*
+  (no-Royal battles run the full economy; that's the Normal early-game). The node
+  grade sets your **maturation ceiling** (Forage=Early, Warren=Mid, Hive=Late) —
+  reusing the built maturation phases as the per-node power cap.
+- **You don't bring your hive — you tunnel in.** Lore fix (insect-true: army ants
+  bivouac, carry brood on the march):
+  - **Capital hive** (home + captured hives) — **rooted, safe, never on the
+    battlefield**; the queen's seat, where you prep rosters, draw brood/supply,
+    pick the next node. The **strategic/home layer.**
+  - **Field-nest** (what you fight *from*) — a **temporary forward burrow** your
+    swarm digs on arrival; a **small hive with a few chambers** that hatches the
+    brood you carried. Expendable (lose it = lose the fight; capital untouched).
+    The **tactical/combat layer.** *This is the "player hive" the game fights from
+    today, reframed.*
+  - So production IS present every battle (the field-nest), but **bounded by
+    supply** — the existing **capacity + larvae + nectar** caps, now *explained*
+    (a campaign force, not your whole empire). When you bring the **Queen**, she's
+    *leaving her hive to lead in person* → why it's weighty.
+- **Siege asymmetry (the Hive fight):** the defender is an **established colony →
+  starts "already mature"** (high tier, Royal home, spires up) as an **entrenched
+  garrison**; you start **Early and ramp.** That gap **is** the siege + the
+  difficulty (bigger hive = further to climb). Winnable because the defender is
+  **strong-but-static/finite** while you **grow + came prepared** (chosen roster).
+  Already half-built: enemy tier ceiling = node **difficulty** (`HiveProfile.maxTier`).
+  *How big the head-start gap should be = a playtest tuning number.*
+- **Build-cheapness:** most of this *configures the battle you already have* —
+  (1) economy ≠ Royal (decoupled today), (2) maturation = the per-node ceiling
+  (built), (3) keep your side as-is + scale the **enemy** (structure HP / spire
+  count / garrison / Royal-spawn off node grade). New work: functional **spires**
+  (this build), a `NodeDef.grade` field, and the pure Forage **field-battle**
+  win-condition (post-MVP; MVP = weak-mound siege).
+
+---
+
 ## Open forks (decide before the builds they gate)
 
 1. **Outgrow vs scale** shallow genelines (§6).
@@ -208,3 +301,10 @@
 4. δ formation rank-bonus + squad UI (§2).
 5. §14 reframe — adopt the archetype-via-reskin amendment? (§9)
 6. Curse-of-Ascent — in scope? (§7)
+7. **Roster loadouts (§12):** composition (pure vs anchor+splash) · # of slots ·
+   swap cost.
+8. **Node-combat (§13):** Forage win-condition (weak-mound siege MVP vs true
+   field-battle post-MVP) · the siege head-start gap (tuning) · `NodeDef.grade`
+   data shape · persistent captured-hive meta (economy/counter-attack = post-MVP).
+9. **Re-pick primary geneline** — locked at first acquisition, or swappable at
+   Home? (§12)

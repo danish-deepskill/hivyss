@@ -1,5 +1,5 @@
-import type { HiveDrawFunction } from '../../types';
-import { PALETTES } from '../../config/Palettes';
+import type { HiveDrawFunction } from '../../../types';
+import { PALETTES } from '../../../config/Palettes';
 
 // α Primal — the BONE WARREN (the original "beginning" body, restored). A
 // squat mound of blood-red flesh over bone: ribbed with an exposed cage,

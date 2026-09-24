@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   SELECTORS,
   lookupSelector,
-  laneDistance,
+  xDistance,
   runSelectorInRange,
   DEFAULT_COMBATANT_FILTER,
   type SelectorEntity,
@@ -39,20 +39,21 @@ const ent = (
 const caster = (x = 100) => ent(0, x, { side: 'player', hp: 100, maxHp: 100 });
 
 // ------------------------------------------------------------------
-// laneDistance helper
+// xDistance helper
 // ------------------------------------------------------------------
 
-describe('laneDistance', () => {
+describe('xDistance', () => {
   it('returns absolute X delta', () => {
-    expect(laneDistance(ent(1, 0), ent(2, 50))).toBe(50);
-    expect(laneDistance(ent(1, 100), ent(2, 30))).toBe(70);
-    expect(laneDistance(ent(1, 50), ent(2, 50))).toBe(0);
+    expect(xDistance(ent(1, 0), ent(2, 50))).toBe(50);
+    expect(xDistance(ent(1, 100), ent(2, 30))).toBe(70);
+    expect(xDistance(ent(1, 50), ent(2, 50))).toBe(0);
   });
 
-  it('ignores Y (lane-based combat)', () => {
+  it('ignores Y', () => {
+    // X-distance only; Y/stratum ignored
     const a = { ...ent(1, 0), y: 0 };
     const b = { ...ent(2, 0), y: 999 };
-    expect(laneDistance(a, b)).toBe(0);
+    expect(xDistance(a, b)).toBe(0);
   });
 });
 
@@ -393,7 +394,7 @@ describe('SELECTORS registry', () => {
 
 describe('nearest_target_in_range / nearest_targets_in_range — Phase 6 follow-up #2', () => {
   // Helper: a base-shaped entity (HasHP + IsTargetable + HasAllegiance,
-  // NO HasAI). Mirrors what BaseEntity exposes for selector queries.
+  // NO HasAI). Mirrors what HiveEntity exposes for selector queries.
   const baseEnt = (id: number, x: number, side: Side): SelectorEntity => ({
     id,
     x,

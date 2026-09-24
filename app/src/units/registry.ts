@@ -17,6 +17,8 @@ import { units as alphaUnits } from "./alpha"; // α Primal — the canonical al
 import { units as betaUnits } from "./beta"; // β Swarm — numbers / sacrifice
 import { units as archiveUnits } from "./archive"; // retired legacy "military alpha"
 import { units as workerUnits } from "./worker"; // universal worker caste (Scout)
+import { units as terraformUnits } from "./terraform"; // universal terrain engineers
+import { units as gammaUnits } from "./gamma"; // γ Fortress — walls / never-die / hold
 
 // All unit modules keyed by unit ID
 const UNITS: Record<string, UnitModule> = {
@@ -25,6 +27,8 @@ const UNITS: Record<string, UnitModule> = {
   ...betaUnits,
   ...archiveUnits,
   ...workerUnits,
+  ...terraformUnits,
+  ...gammaUnits,
 };
 
 // Tier display definitions
@@ -52,6 +56,7 @@ export const TIER_DEFS: Record<TierKey, TierDef> = {
 export const GENELINE_DEFS: Partial<Record<GeneLine, GeneLineDef>> = {
   alpha: { symbol: 'α', name: 'Alpha', color: '#c03030' },
   beta: { symbol: 'β', name: 'Beta', color: '#86a832' },
+  gamma: { symbol: 'γ', name: 'Gamma', color: '#a89878' },
   normal: { symbol: '\u2014', name: 'Normal', color: '#888888' },
   archive: { symbol: '\u2298', name: 'Archive', color: '#777777' },
 };

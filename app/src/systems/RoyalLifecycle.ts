@@ -57,7 +57,7 @@ export class RoyalLifecycle {
     if (!this.key) return null;
     const def = UNIT_DEFS[this.key];
     if (!def) return null;
-    const royal = this.core.createUnit(this.key, 'player', def, this.bounds.spawnX, 0);
+    const royal = this.core.createUnit(this.key, 'player', def, this.bounds.spawnX);
     royal.order = { kind: 'move', x: royal.x + royal.unitW / 2 }; // hold at spawn, guard the hive
     return royal;
   }
@@ -105,20 +105,18 @@ export class RoyalLifecycle {
 
   /**
    * Battlefield click (MOBA-lite control):
-   *   - on/near her body in her lane → SELECT (the discoverable pick-up)
-   *   - while selected: an enemy under the click → focus + chase (and cross
-   *     lanes to reach it); open ground → move there (clamped to the field).
-   *     A click in the other lane sets the lane-switch destination.
+   *   - on/near her body → SELECT (the discoverable pick-up)
+   *   - while selected: an enemy under the click → focus + chase; open ground →
+   *     move there (clamped to the field).
    *   - unselected field click → a hint, not a silent no-op.
    */
-  commandClick(worldX: number, lane: number): void {
+  commandClick(worldX: number): void {
     const r = this.royal;
     if (!r || r.dead) return;
 
-    // Generous, lane-scoped body hit-box — a fumbled "almost hit her" click
-    // should select; a click in the OTHER lane at her x reads as a lane-switch.
+    // Generous body hit-box — a fumbled "almost hit her" click should select.
     const grabHalf = Math.max(24, r.unitW);
-    if (lane === r.lane && Math.abs(worldX - (r.x + r.unitW / 2)) <= grabHalf) {
+    if (Math.abs(worldX - (r.x + r.unitW / 2)) <= grabHalf) {
       this.selected = true;
       return;
     }
@@ -130,15 +128,12 @@ export class RoyalLifecycle {
 
     let focus: Unit | null = null;
     for (const u of this.core.units) {
-      if (u.side !== 'enemy' || u.dead || u.lane !== lane) continue;
+      if (u.side !== 'enemy' || u.dead) continue;
       if (worldX >= u.x - 4 && worldX <= u.x + u.unitW + 4) { focus = u; break; }
     }
     // Clamp ground-clicks to the playable field — past the hive walls means
     // "all the way back/forward", not "stand inside the hive".
     const x = Math.max(this.bounds.minX, Math.min(this.bounds.maxX, worldX));
-    // Destination lane — if it differs, this kicks off the cross-lane slide
-    // (her combat row flips at the midpoint; disengaged until landed).
-    r._laneTarget = lane;
     r.order = focus ? { kind: 'focus', target: focus } : { kind: 'move', x };
   }
 

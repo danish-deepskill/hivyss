@@ -1,14 +1,17 @@
 import Phaser from 'phaser';
-import type { WaveDef, Side, PlayerAbilityKey, IWaveController, HiveProfile, PheromoneZone, PheromoneKind, EliteSlot, RoyalStatus, UnitDef } from '../types';
+import type { WaveDef, Side, PlayerAbilityKey, IWaveController, HiveProfile, PheromoneZone, PheromoneKind, EliteSlot, RoyalStatus, UnitDef, Route } from '../types';
 import { PHEROMONE_DEFS } from '../config/PheromoneDefs';
 import { DEFAULT_WORLD_W, SBW as SBW_CONST } from '../config/Constants';
 import type { RunBuff } from './RunState';
 import { UNIT_DEFS, hiveGenelineOf } from '../units/registry';
 import { ENEMY_DEFS } from '../config/EnemyDefs';
-import { BaseStructure } from '../entities/BaseStructure';
-import { BaseEntity } from '../entities/BaseEntity';
+import { HiveStructure } from '../entities/structures/HiveStructure';
+import { HiveEntity } from '../entities/structures/HiveEntity';
 import { Unit, resetUid } from '../entities/Unit';
 import { BattleCore } from './BattleCore';
+import { Buildings } from './structures/Buildings';
+import { getBuildingDef } from '../config/BuildingDefs';
+import { BUILDING_HALF_W } from '../draws/structures/buildings/dims';
 import { RoyalLifecycle } from './RoyalLifecycle';
 import { Forage } from './Forage';
 import { FORAGE_ENABLED, PASSIVE_FLOOR, AI_INCOME_MULT, BLOOM_CLICK_RADIUS } from '../config/ForageDefs';
@@ -35,7 +38,7 @@ import { LarvaVisuals } from '../entities/LarvaVisuals';
 import { HpHud } from './HpHud';
 
 export interface HiveView {
-  base: BaseStructure;
+  base: HiveStructure;
   larvae: LarvaVisuals;
   cocoons: CocoonVisuals;
 }
@@ -69,6 +72,12 @@ export class GameManager {
   /** G-mode: clicks set the gather priority instead of commanding the Royal.
    *  Mutually exclusive with Royal command mode. */
   gatherMode = false;
+  /** Player-placed, builder-constructed structures (totem, …). */
+  buildings: Buildings;
+  /** Build-mode: the next field click places `buildVariant`. Like G-mode,
+   *  mutually exclusive with Royal command / gather mode. */
+  buildMode = false;
+  private buildVariant = 'totem';
   waves: IWaveController;
   economy: EconomyManager;
   abilities: AbilityManager;
@@ -79,14 +88,11 @@ export class GameManager {
   private enemyChamberSnapshot: boolean[];
   // Phase 6 follow-up #2 — WorldEntity wrappers around the hive
   // structures so ranged units' targeting includes the base.
-  playerBaseEntity: BaseEntity;
-  enemyBaseEntity: BaseEntity;
+  playerBaseEntity: HiveEntity;
+  enemyBaseEntity: HiveEntity;
   deckKeys: string[];
   SBW: number;
   worldW: number;
-
-  // Round-robin lane cursor for wave/AI enemy spawns so both lanes populate.
-  private _enemyLaneCursor = 0;
 
   // Game state
   running: boolean;
@@ -139,6 +145,8 @@ export class GameManager {
     if (MATURATION_ENABLED) this.maturation = new Maturation();
     this.abilities = new AbilityManager(scene, this.events, worldW);
     this.particles = new ParticleManager(scene);
+    // builders retire to the hive doorstep; built Nectar Fonts pay through economy.earn.
+    this.buildings = new Buildings(scene, this.core, SBW + 2, (n) => this.economy.earn(n));
     if (FORAGE_ENABLED) {
       // Active economy: built income (gatherers) replaces the passive ramp;
       // the floor prevents softlock, nothing more — and it GROWS with the
@@ -155,12 +163,12 @@ export class GameManager {
     // Each hive wears its geneline's body: the player's from their deck's
     // Royal, the enemy's from its AI roster (both via hiveGenelineOf).
     this.playerHive = {
-      base: new BaseStructure(scene, 0, 'player', hiveGenelineOf(deckKeys)),
+      base: new HiveStructure(scene, 0, 'player', hiveGenelineOf(deckKeys)),
       larvae: new LarvaVisuals(scene),
       cocoons: new CocoonVisuals(scene),
     };
     this.enemyHive = {
-      base: new BaseStructure(scene, worldW - SBW, 'enemy', hiveGenelineOf(hiveProfile?.roster ?? [])),
+      base: new HiveStructure(scene, worldW - SBW, 'enemy', hiveGenelineOf(hiveProfile?.roster ?? [])),
       larvae: new LarvaVisuals(scene, worldW - SBW_CONST),
       cocoons: new CocoonVisuals(scene),
     };
@@ -172,11 +180,19 @@ export class GameManager {
     //   enemyBase wall:  x = worldW - SBW (player units approach from left, attack when u.x + u.unitW ≥ worldW - SBW)
     // Bases are dropped with the GameManager — no explicit deregister
     // is needed since the spatial index is owned by this instance.
-    this.playerBaseEntity = new BaseEntity(this.playerHive.base, SBW);
-    this.enemyBaseEntity = new BaseEntity(this.enemyHive.base, worldW - SBW);
+    this.playerBaseEntity = new HiveEntity(this.playerHive.base, SBW);
+    this.enemyBaseEntity = new HiveEntity(this.enemyHive.base, worldW - SBW);
     this.core.spatialIndex.add(this.playerBaseEntity);
     this.core.spatialIndex.add(this.enemyBaseEntity);
     this.core.combat.setBaseEntities(this.playerBaseEntity, this.enemyBaseEntity);
+
+    // Hives also OCCUPY their footprint spans in the structure occupancy — ONE
+    // occupancy layer for every structure (base + towers + buildings), so
+    // placement validity is uniform (a building/tower can't land on a hive). The
+    // base stays its own entity; only its span registers here (scalability:
+    // future fixed structures do the same).
+    this.core.structures.addSpan(this.playerBaseEntity, 0, SBW);
+    this.core.structures.addSpan(this.enemyBaseEntity, worldW - SBW, worldW);
 
     // Apply run buffs (hive buildings from roguelike rewards)
     if (runBuffs) {
@@ -213,7 +229,7 @@ export class GameManager {
       if (!def) return;
       const vyssYield = vyssYieldOf(def);
       if (vyssYield <= 0) return;
-      if (this.forage) this.forage.dropCorpse(data.x, data.lane, vyssYield);
+      if (this.forage) this.forage.dropCorpse(data.x, vyssYield);
       else this.vyss.earn(vyssYield); // forage off → instant credit fallback
     });
 
@@ -245,7 +261,7 @@ export class GameManager {
     // Incubation — hatch ready units
     const hatched = this.incubation.update(dt);
     for (const h of hatched) {
-      this.core.createUnit(h.key, 'player', h.def, this.SBW + 2, h.lane);
+      this.core.createUnit(h.key, 'player', h.def, this.SBW + 2);
     }
     this.playerHive.cocoons.update(dt, this.incubation.chambers, this.incubation.numChambers);
     this.playerHive.larvae.update(dt, this.incubation.larvaCount);
@@ -275,6 +291,10 @@ export class GameManager {
     // Forage — flip gatherer destinations / tick harvests BEFORE the combat
     // step so this frame's movement follows the fresh orders.
     this.forage?.tick(dt);
+
+    // Buildings — drive each builder's move-order toward its site + accrue
+    // construction progress, also BEFORE combat so the orders land this frame.
+    this.buildings.tick(dt);
 
     // The battle substrate: decay zones → combat step → spatial re-sort +
     // reap the dead back to the pool.
@@ -330,7 +350,11 @@ export class GameManager {
     }
   }
 
-  playerSpawn(key: string, lane = 0): SpawnResult {
+  /** Deploy a unit. `route` (Phase 2a) chooses the spawn stratum — Shift+deploy
+   *  sends it onto the 'tunnel' line, normal deploy onto 'land'. The deploy route
+   *  OVERRIDES the unit's def route for placement; it rides into the chamber so
+   *  the hatched unit emerges on that stratum. */
+  playerSpawn(key: string, route: Route = 'land'): SpawnResult {
     const def = UNIT_DEFS[key];
     if (!def) return { success: false, message: '' };
     // Maturation gate — high tiers wait for the hive to tech up.
@@ -353,7 +377,9 @@ export class GameManager {
     this.economy.spend(def.cost);
     // Capture larva position before consuming it
     const larvaPos = this.playerHive.larvae.consumeLarva(this.incubation.larvaCount);
-    const chamberIdx = this.incubation.queue(key, def, lane);
+    // Deploy-route override rides into the chamber on a def copy, so the unit
+    // hatches on the chosen stratum (createUnit reads def.route).
+    const chamberIdx = this.incubation.queue(key, { ...def, route });
     if (chamberIdx >= 0) {
       this.playerHive.cocoons.setCocoonPosition(chamberIdx, larvaPos.x, larvaPos.y);
     }
@@ -378,15 +404,12 @@ export class GameManager {
       scaledDef = { ...def, hp: Math.ceil(def.hp * scale), atk: Math.ceil(def.atk * scale) };
     }
 
-    // Round-robin enemies across both lanes so the front splits across the field.
-    const lane = this._enemyLaneCursor;
-    this._enemyLaneCursor ^= 1;
-    this.core.createUnit(key, 'enemy', scaledDef, this.worldW - this.SBW - def.w - 2, lane);
+    this.core.createUnit(key, 'enemy', scaledDef, this.worldW - this.SBW - def.w - 2);
   }
 
   /** Substrate delegate — spawn a unit into the battle. */
-  createUnit(key: string, side: Side, def: UnitDef, x: number, lane = 0): Unit {
-    return this.core.createUnit(key, side, def, x, lane);
+  createUnit(key: string, side: Side, def: UnitDef, x: number): Unit {
+    return this.core.createUnit(key, side, def, x);
   }
 
   /** Per-Elite signature-slot state for the HUD (registry `elite.slots`). */
@@ -396,17 +419,17 @@ export class GameManager {
 
   /**
    * Cast a pheromone command (VISION §5 deposit-fade): a courier Scout runs
-   * from the player hive in `lane`, laying a fading scent-trail. The Scout IS
-   * the cost — vulnerable, interceptable.
+   * from the player hive, laying a fading scent-trail. The Scout IS the cost —
+   * vulnerable, interceptable.
    */
-  castPheromone(kind: PheromoneKind, lane = 0): { success: boolean; message: string } {
+  castPheromone(kind: PheromoneKind): { success: boolean; message: string } {
     if (!this.running) return { success: false, message: '' };
     // Commands cost VYSS — the tactical currency the battle itself yields.
     const cost = PHEROMONE_VYSS_COST[kind];
     if (!this.vyss.canAfford(cost)) {
       return { success: false, message: `Not enough vyss (${cost}✦ for ${PHEROMONE_DEFS[kind].name})!` };
     }
-    const scout = this.core.spawnCourier(kind, 'player', this.SBW + 2, lane);
+    const scout = this.core.spawnCourier(kind, 'player', this.SBW + 2);
     if (!scout) return { success: false, message: '' };
     this.vyss.spend(cost);
     return { success: true, message: `${PHEROMONE_DEFS[kind].name} scout sent!` };
@@ -435,8 +458,8 @@ export class GameManager {
     this.economy.spend(def.cost);
     this.playerHive.larvae.consumeLarva(this.incubation.larvaCount);
     this.incubation.larvaCount -= 1;
-    const u = this.core.createUnit('gatherer', 'player', def, this.SBW + 2, 0);
-    this.forage.assign(u); // sets its bloom + lane + the move order
+    const u = this.core.createUnit('gatherer', 'player', def, this.SBW + 2);
+    this.forage.assign(u); // sets its bloom + the move order
     this.audio.spawn();
     return { success: true, message: 'Gatherer sent to forage!' };
   }
@@ -446,8 +469,70 @@ export class GameManager {
     this.gatherMode = !this.gatherMode;
     if (this.gatherMode) {
       this.royal.selected = false;
+      this.buildMode = false;
       this.events.emit('logMessage', { message: 'GATHER — click a bloom to prioritize it; empty field = auto.' });
     }
+  }
+
+  /** Enter build-placement mode — the NEXT field click places `variant` at the
+   *  exact pointer x (per-pixel). Mirrors G-mode; mutually exclusive with gather / Royal. */
+  enterBuildMode(variant = 'totem'): void {
+    if (!this.running) return;
+    this.buildMode = true;
+    this.buildVariant = variant;
+    this.gatherMode = false;
+    this.royal.selected = false;
+    const def = getBuildingDef(variant);
+    this.events.emit('logMessage', { message: `BUILD ${def.name} (${def.cost}n) — click the field to place.` });
+  }
+
+  /**
+   * Authoritative placement preview — THE single source of truth for where a
+   * building goes + whether it may be placed. Both the ghost renderer and the
+   * real placeBuilding read this, so the preview can never disagree with the
+   * result. Returns the placement center-x (= pointer x) + validity + a reason.
+   */
+  previewPlacement(worldX: number, variant: string = this.buildVariant): { x: number; valid: boolean; reason: string } {
+    const def = getBuildingDef(variant);
+    const x = worldX; // per-pixel — placed exactly where pointed (no cell snap)
+    // Keep the whole footprint on the playable field. The old segment math
+    // clamped out-of-range x implicitly; per-pixel must guard explicitly.
+    if (x - BUILDING_HALF_W < 0 || x + BUILDING_HALF_W > this.worldW) {
+      return { x, valid: false, reason: 'Out of bounds!' };
+    }
+    // Occupancy is the placement rule — the hives reserve their own footprint
+    // spans (see constructor), so "on a hive / on another structure" both reject.
+    if (this.core.structures.overlaps(x, BUILDING_HALF_W)) return { x, valid: false, reason: 'Occupied!' };
+    if (!this.economy.canAfford(def.cost)) return { x, valid: false, reason: 'Not enough nectar!' };
+    // The builder costs a capacity slot (strategic: buildings compete with army
+    // size) — reject if the hive is full so we never place a building with no
+    // builder to raise it.
+    const used = capUsed(this.core.units, 'player', this.incubation.chambers);
+    if (!canDeploy(UNIT_DEFS['builder'], used, this.maxCapacity)) {
+      return { x, valid: false, reason: 'Hive full!' };
+    }
+    return { x, valid: true, reason: '' };
+  }
+
+  /**
+   * Place a building for the player at world-x: occupy its footprint (rejected
+   * via previewPlacement if illegal), spend nectar, and dispatch a builder worker
+   * from the hive to construct it over its buildTime. The builder is a real,
+   * killable worker — killing it stalls the build (Buildings.tickConstruction).
+   */
+  placeBuilding(variant: string, worldX: number): SpawnResult {
+    if (!this.running) return { success: false, message: '' };
+    const preview = this.previewPlacement(worldX, variant);
+    if (!preview.valid) return { success: false, message: preview.reason };
+    const building = this.buildings.place('player', preview.x, variant);
+    if (!building) return { success: false, message: 'Occupied!' }; // defensive (race)
+    this.economy.spend(getBuildingDef(variant).cost);
+    // Dispatch the builder from the hive doorstep + tie it to this site.
+    const bdef = UNIT_DEFS['builder'];
+    const builder = this.core.createUnit('builder', 'player', bdef, this.SBW + 2);
+    this.buildings.assignBuilder(building, builder.id);
+    this.audio.spawn();
+    return { success: true, message: 'Building placed — builder dispatched.' };
   }
 
   /**
@@ -455,21 +540,29 @@ export class GameManager {
    * (a bloom under the click, or AUTO on empty field); otherwise the click
    * belongs to Royal control.
    */
-  commandFieldClick(worldX: number, lane: number): void {
+  commandFieldClick(worldX: number): void {
     if (!this.running) return;
+    if (this.buildMode) {
+      const result = this.placeBuilding(this.buildVariant, worldX);
+      if (result.message) this.events.emit('logMessage', { message: result.message });
+      // Stay in build mode on a REJECTED click (occupied / broke / hive full) so a
+      // mis-aim doesn't eject the player — the red ghost is exactly for re-aiming.
+      if (result.success) this.buildMode = false;
+      return;
+    }
     if (this.gatherMode && this.forage) {
-      // Nearest forage target under the click — a bloom OR a corpse (same-lane
-      // preferred). Corpse → all gatherers to corpse-duty (with its built-in
-      // fallback chain); bloom → prioritize it; empty field → auto.
+      // Nearest forage target under the click — a bloom OR a corpse. Corpse →
+      // all gatherers to corpse-duty (with its built-in fallback chain); bloom →
+      // prioritize it; empty field → auto.
       let bestBloom: { id: number; rich: boolean } | null = null;
       let bestDist = BLOOM_CLICK_RADIUS;
       let corpse = false;
       for (const b of this.forage.blooms) {
-        const d = Math.abs(b.x - worldX) + (b.lane === lane ? 0 : 30);
+        const d = Math.abs(b.x - worldX);
         if (d <= bestDist) { bestDist = d; bestBloom = { id: b.id, rich: b.rich }; corpse = false; }
       }
       for (const c of this.forage.corpsePickups) {
-        const d = Math.abs(c.x - worldX) + (c.lane === lane ? 0 : 30);
+        const d = Math.abs(c.x - worldX);
         if (d <= bestDist) { bestDist = d; bestBloom = null; corpse = true; }
       }
       if (corpse) {
@@ -486,7 +579,7 @@ export class GameManager {
       this.gatherMode = false;
       return;
     }
-    this.royal.commandClick(worldX, lane);
+    this.royal.commandClick(worldX);
   }
 
   // --- Royal control delegates (RoyalLifecycle owns the behavior) ---
@@ -494,7 +587,7 @@ export class GameManager {
   /** Toggle Royal command mode (R key / profile click). Exits G-mode. */
   toggleRoyalSelect(): void {
     this.royal.toggleSelect();
-    if (this.royal.selected) this.gatherMode = false;
+    if (this.royal.selected) { this.gatherMode = false; this.buildMode = false; }
   }
 
   /** Royal state for the HUD profile panel (registry 'royal.status') —

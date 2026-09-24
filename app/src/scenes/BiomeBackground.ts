@@ -4,10 +4,10 @@
 // every created GameObject so the caller can track/destroy them on a redraw
 // (the sandbox switches biomes live; WorldScene draws once).
 //
-// Geometry is config-fixed (lanes via getGroundY, height via H); only the
+// Geometry is config-fixed (routes via getGroundY, height via H); only the
 // horizontal extent (worldW) varies per battle. Depths: the main bg sits at
-// -100 (behind bases/units), the South-tunnel overlay at 60.5 and the dirt veil
-// at 62 so they bury the tunnel-lane units.
+// -100 (behind bases/units), the dirt veil at 72 (above the unit depth band) so
+// it buries the tunnel-route units.
 
 import Phaser from 'phaser';
 import { getGroundY } from '../config/RouteMatrix';
@@ -27,22 +27,21 @@ export function drawBiomeBackground(
   bg.setDepth(-100);
   objs.push(bg);
 
-  const lS = getGroundY('land', 1);
-  const tN = getGroundY('tunnel', 0), tS = getGroundY('tunnel', 1);
-  const grassTop = Math.round(getGroundY('land', 0)); // grass tip = North land's feet
-  const dirtTop = Math.round(lS + 8);                  // underground begins just below the surface
+  const t = getGroundY('tunnel');                  // the single tunnel gallery line
+  const grassTop = Math.round(getGroundY('land'));  // grass tip = land surface
+  const dirtTop = grassTop + 20;                     // underground begins just below the surface
 
   if (biomeKey === 'fetidPool') {
     // β's biome paints its own world end-to-end (incl. the flooded warrens).
     drawFetidSurface(bg, ww, grassTop, dirtTop);
-    objs.push(...drawFetidUnderground(scene, bg, ww, dirtTop, tN, tS));
+    objs.push(...drawFetidUnderground(scene, bg, ww, dirtTop, t));
     return objs;
   }
 
   if (biomeKey === 'sunCarapace') drawCarapaceSurface(bg, ww, grassTop, dirtTop);
   else drawWildSurface(bg, ww, grassTop, dirtTop);
 
-  objs.push(...drawUnderground(scene, bg, biomeKey, ww, dirtTop, tN, tS));
+  objs.push(...drawUnderground(scene, bg, biomeKey, ww, dirtTop, t));
   return objs;
 }
 
@@ -195,16 +194,14 @@ function drawFetidSurface(bg: Phaser.GameObjects.Graphics, ww: number, grassTop:
 
 // ---- FETID POOL underground — waterlogged peat warrens: a saturated black
 // soil column with a glistening water table, root tendrils reaching down,
-// buried bones, and FLOODED tunnel galleries (each holds standing water).
-// Keeps the functional overlays (S-gallery @60.5, veil @62) that bury the
-// tunnel-lane units. ----
+// buried bones, and a FLOODED tunnel gallery (it holds standing water). Keeps
+// the functional veil overlay (@72) that buries the tunnel-route units. ----
 function drawFetidUnderground(
   scene: Phaser.Scene,
   bg: Phaser.GameObjects.Graphics,
   ww: number,
   dirtTop: number,
-  tN: number,
-  tS: number,
+  t: number,
 ): Phaser.GameObjects.GameObject[] {
   const dirtH = H - dirtTop, ds = Math.max(1, Math.ceil(dirtH / 4));
   // Peat column — wet black-green, not brown.
@@ -238,30 +235,23 @@ function drawFetidUnderground(
     bg.strokePath();
   }
 
-  // FLOODED galleries — each warren holds standing water (dark gloss bottom,
-  // a pale waterline). North gallery solid behind its unit; South overlays.
+  // FLOODED gallery — the warren holds standing water (dark gloss bottom, a pale
+  // waterline), solid behind its unit.
   const galleryH = 38;
-  const galTop = (y: number): number => Math.round(y - 12 - galleryH / 2);
-  const flooded = (g: Phaser.GameObjects.Graphics, y: number, alpha: number): void => {
-    const top = galTop(y);
-    g.fillStyle(0x1a2410, alpha);                          // air pocket
-    g.fillRect(0, top, ww, galleryH * 0.55);
-    g.fillStyle(0x141e0c, alpha);                          // standing water
-    g.fillRect(0, top + galleryH * 0.55, ww, galleryH * 0.45);
-    g.lineStyle(1, 0x6c8040, alpha * 0.7);                 // the waterline
-    g.lineBetween(0, top + galleryH * 0.55, ww, top + galleryH * 0.55);
-  };
-  flooded(bg, tN, 1);
-  const sGal = scene.add.graphics();                       // South gallery — over the North unit
-  sGal.setDepth(60.5);
-  flooded(sGal, tS, 0.55);
-  const tVeil = scene.add.graphics();                      // peat veil over both tunnel units
-  tVeil.setDepth(62);
+  const galTop = Math.round(t - 12 - galleryH / 2);
+  bg.fillStyle(0x1a2410, 1);                               // air pocket
+  bg.fillRect(0, galTop, ww, galleryH * 0.55);
+  bg.fillStyle(0x141e0c, 1);                               // standing water
+  bg.fillRect(0, galTop + galleryH * 0.55, ww, galleryH * 0.45);
+  bg.lineStyle(1, 0x6c8040, 0.7);                          // the waterline
+  bg.lineBetween(0, galTop + galleryH * 0.55, ww, galTop + galleryH * 0.55);
+  const tVeil = scene.add.graphics();                      // peat veil over the tunnel units
+  tVeil.setDepth(72);                                       // above the unit depth band (60..70)
   tVeil.fillStyle(0x1c2410, 0.5);
   tVeil.fillRect(0, dirtTop, ww, H - dirtTop);
   tVeil.fillStyle(0x0e1408, 0.35);
   for (let i = 0; i < 180; i++) tVeil.fillRect((i * 83) % ww, dirtTop + 2 + (i * 59) % Math.max(1, H - dirtTop - 6), 3, 2);
-  return [sGal, tVeil];
+  return [tVeil];
 }
 
 // ---- WILD biome (Normal / neutral) — untamed woodland: misty forest sky,
@@ -332,17 +322,16 @@ function drawCarapaceSurface(bg: Phaser.GameObjects.Graphics, ww: number, grassT
   }
 }
 
-// ---- Underground (shared across biomes) — ant-nest galleries. North unit sits
-// BEHIND the South tunnel's opacity (sGal@60.5); both buried by tVeil@62. Soil
-// is warmed slightly for Sun Carapace. Returns the extra overlay graphics. ----
+// ---- Underground (shared across biomes) — the ant-nest tunnel gallery, buried
+// by tVeil@72. Soil is warmed slightly for Sun Carapace. Returns the extra
+// overlay graphics. ----
 function drawUnderground(
   scene: Phaser.Scene,
   bg: Phaser.GameObjects.Graphics,
   biomeKey: BiomeKey,
   ww: number,
   dirtTop: number,
-  tN: number,
-  tS: number,
+  t: number,
 ): Phaser.GameObjects.GameObject[] {
   const dirtH = H - dirtTop, ds = Math.max(1, Math.ceil(dirtH / 4));
   // Per-biome underground palette. Wild = dark, loamy forest soil (fades to
@@ -350,8 +339,8 @@ function drawUnderground(
   // subsoil — stays warm rather than going black).
   const sand = biomeKey === 'sunCarapace';
   const pal = sand
-    ? { top: 0xba9c5c, bot: 0x46331a, speck: 0x3a2812, crack: 0x4a3620, tunN: 0x5e4626, tunS: 0x301f0e, veil: 0x3a2812, veilSpeck: 0x241808 }
-    : { top: 0x7a5029, bot: 0x1a1107, speck: 0x2c1c0e, crack: 0x201305, tunN: 0x4a3620, tunS: 0x1c1308, veil: 0x281a0c, veilSpeck: 0x140d06 };
+    ? { top: 0xba9c5c, bot: 0x46331a, speck: 0x3a2812, crack: 0x4a3620, tun: 0x5e4626, veil: 0x3a2812, veilSpeck: 0x241808 }
+    : { top: 0x7a5029, bot: 0x1a1107, speck: 0x2c1c0e, crack: 0x201305, tun: 0x4a3620, veil: 0x281a0c, veilSpeck: 0x140d06 };
 
   for (let i = 0; i < ds; i++) {                        // soil body → deep earth
     bg.fillStyle(lerpColor(pal.top, pal.bot, Math.min(1, (i / Math.max(1, ds - 1)) * 1.3)));
@@ -372,18 +361,14 @@ function drawUnderground(
     bg.strokePath();
   }
   const galleryH = 38;
-  const galTop = (y: number): number => Math.round(y - 12 - galleryH / 2);
-  bg.fillStyle(pal.tunN, 1);                            // North tunnel — solid, behind the North unit
-  bg.fillRect(0, galTop(tN), ww, galleryH);
-  const sGal = scene.add.graphics();                    // South tunnel — over the North unit (60.5)
-  sGal.setDepth(60.5);
-  sGal.fillStyle(pal.tunS, 0.55);
-  sGal.fillRect(0, galTop(tS), ww, galleryH);
-  const tVeil = scene.add.graphics();                   // dirt veil over both tunnel units (62)
-  tVeil.setDepth(62);
+  const galTop = Math.round(t - 12 - galleryH / 2);
+  bg.fillStyle(pal.tun, 1);                             // tunnel gallery — solid, behind the tunnel unit
+  bg.fillRect(0, galTop, ww, galleryH);
+  const tVeil = scene.add.graphics();                   // dirt veil over the tunnel units
+  tVeil.setDepth(72);                                    // above the unit depth band (60..70)
   tVeil.fillStyle(pal.veil, 0.5);
   tVeil.fillRect(0, dirtTop, ww, H - dirtTop);
   tVeil.fillStyle(pal.veilSpeck, 0.35);
   for (let i = 0; i < 180; i++) tVeil.fillRect((i * 83) % ww, dirtTop + 2 + (i * 59) % Math.max(1, H - dirtTop - 6), 3, 2);
-  return [sGal, tVeil];
+  return [tVeil];
 }

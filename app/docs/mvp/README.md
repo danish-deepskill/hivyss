@@ -9,6 +9,7 @@
 4. **`ALPHA.md`** — α Primal in depth (identity · roster ecosystem · build path). The Phase-0 showcase geneline.
 5. **`MECHANICS_INVENTORY.md`** — built-vs-lore **status audit** (what's *coded* vs *designed*). The "where are we" reference — not design.
 6. **`PHASE0_BUILD.md`** — Phase-0 build notes.
+7. **`MARKET_RESEARCH.md`** — **commercial/market reference** (not design): Steam viability, the direct competitor **Hive Blight**, comparable sales, pricing, the realistic outcome distribution, and the pros/cons/improvements self-assessment. Read when thinking about *scope, differentiation, or go-to-market* — it sharpens "why ship this, and how."
 
 ## Authority & the one rule
 - **`VISION.md` is the newest top-level design** and **supersedes** earlier scope decisions where they conflict — notably it *expands* the MVP to make the **hive-build loop + a thin controllable Royal core** (older `REQUIREMENTS.md` had deferred them; it now defers to VISION).

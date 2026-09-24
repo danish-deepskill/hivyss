@@ -1,5 +1,5 @@
 import type { Route, AttackRange } from '../types';
-import { LANE, LANE_VERTICAL_SPAN, LANE_DEPTH } from './Layout';
+import { LANE, LANE_BAND_SPAN, BAND_FAR_SCALE, BAND_FAR_ALPHA } from './Layout';
 
 export const ROUTE_MATRIX: Record<Route, Record<Route, 'always' | 'ranged' | 'never'>> = {
   air:    { air: 'always', land: 'always', tunnel: 'never' },
@@ -14,44 +14,25 @@ export function canAttack(attackerRoute: Route, attackRange: AttackRange, target
   return false;
 }
 
-/**
- * Ground Y for a unit on `route` in battle `lane` (0 = upper, 1 = lower).
- * Lane 0 sits half a span above the route's base ground, lane 1 the same
- * below, so the two bilateral lanes straddle the single-lane center.
- * `lane = 0` is the default and reproduces the upper-lane position;
- * callers that don't track a lane (background art, debug) pass 0.
- */
-export function getGroundY(route: Route, lane = 0): number {
-  return LANE[route].groundY + (lane - 0.5) * LANE_VERTICAL_SPAN;
+/** Ground Y for a unit on `route` — the single ground line for that stratum
+ *  (air canopy / land surface / tunnel gallery). */
+export function getGroundY(route: Route): number {
+  return LANE[route].groundY;
 }
 
 /**
- * Inverse of getGroundY for the land route — which battle lane a world-Y
- * falls in (0 = upper, 1 = lower). Used to map a click to a lane (Royal
- * control, sandbox placement). Picks the nearer lane ground line.
+ * Continuous depth-band placement for a unit at band position `t` (0 = back,
+ * 1 = front). The "done-right" continuous replacement for the old discrete
+ * lane-depth: the spread is DOWNWARD-ONLY into the grass band — back rows sit ON
+ * the ground line (smaller + dimmer), front rows DOWN into the grass (full size)
+ * — so the herd reads as a soft band with depth and nobody floats above the
+ * surface. PRESENTATION ONLY — combat never reads it (it's pure 1-D x). `t` is clamped.
  */
-export function laneFromY(y: number): number {
-  return Math.abs(y - getGroundY('land', 1)) < Math.abs(y - getGroundY('land', 0)) ? 1 : 0;
-}
-
-/**
- * Presentational depth cue for a battle `lane` — `{ scale, alpha }` to
- * draw the far (North/lane 0) row smaller + dimmer than the near
- * (South/lane 1) row, selling the stacking as depth rather than height.
- * Combat never reads this. Unknown lanes fall back to the far row.
- */
-export function laneDepth(lane = 0): { scale: number; alpha: number } {
-  return LANE_DEPTH[lane] ?? LANE_DEPTH[0];
-}
-
-/**
- * Depth cue for a FRACTIONAL lane (0..1) — interpolates scale + alpha between the
- * two rows. Drives a unit mid lane-switch as it slides across the depth stack
- * (grows/brightens toward the near row, shrinks/dims toward the far one). At an
- * integer lane it returns that row's exact values, so settled units are unchanged.
- */
-export function laneDepthLerp(lane: number): { scale: number; alpha: number } {
-  const t = lane < 0 ? 0 : lane > 1 ? 1 : lane;
-  const a = LANE_DEPTH[0], b = LANE_DEPTH[1];
-  return { scale: a.scale + (b.scale - a.scale) * t, alpha: a.alpha + (b.alpha - a.alpha) * t };
+export function bandDepth(t: number): { dy: number; scale: number; alpha: number } {
+  const c = t < 0 ? 0 : t > 1 ? 1 : t;
+  return {
+    dy: LANE_BAND_SPAN * c, // back (c=0) = on the line; front (c=1) = +SPAN, down into the grass
+    scale: BAND_FAR_SCALE + (1 - BAND_FAR_SCALE) * c,
+    alpha: BAND_FAR_ALPHA + (1 - BAND_FAR_ALPHA) * c,
+  };
 }
